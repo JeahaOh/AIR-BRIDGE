@@ -1,0 +1,71 @@
+plugins {
+    id 'application'
+    id 'java'
+    id 'com.gradleup.shadow' version '9.0.0-beta13'
+}
+
+group = 'com.airbridge'
+version = '0.5.0'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation 'info.picocli:picocli:4.7.6'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.6'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.2'
+}
+
+application {
+    mainClass = 'com.airbridge.Main'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.named('jar') {
+    enabled = false
+}
+
+tasks.named('shadowJar') {
+    archiveClassifier.set('')
+    manifest {
+        attributes('Main-Class': application.mainClass.get())
+    }
+}
+
+tasks.named('startScripts') {
+    enabled = false
+}
+
+tasks.named('distTar') {
+    enabled = false
+}
+
+tasks.named('distZip') {
+    enabled = false
+}
+
+tasks.named('build') {
+    dependsOn tasks.named('shadowJar')
+}
+
+tasks.named('startShadowScripts') {
+    enabled = false
+}
+
+tasks.named('shadowDistTar') {
+    enabled = false
+}
+
+tasks.named('shadowDistZip') {
+    enabled = false
+}

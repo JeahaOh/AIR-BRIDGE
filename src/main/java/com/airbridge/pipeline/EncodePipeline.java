@@ -26,6 +26,8 @@ import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 
 public final class EncodePipeline {
+    private static final int MANIFEST_HOLD_SECONDS = 5;
+    private static final int END_SCREEN_SECONDS = 5;
     private final Path input;
     private final Path output;
     private final Path work;
@@ -83,9 +85,11 @@ public final class EncodePipeline {
         }
         List<byte[]> manifestShards = split(manifestBytes, metaPayloadLimit);
 
-        long totalFrames = manifestShards.size() + manifest.totalChunks;
+        long manifestHoldFrames = Math.max(manifestShards.size(), (long) params.fps() * MANIFEST_HOLD_SECONDS);
+        long endScreenFrames = (long) params.fps() * END_SCREEN_SECONDS;
+        long totalFrames = manifestHoldFrames + manifest.totalChunks + endScreenFrames;
         FfmpegRunner ffmpeg = FfmpegRunner.create();
-        printEncodeEstimate(manifest, manifestBytes.length, manifestShards.size(), totalFrames);
+        printEncodeEstimate(manifest, manifestBytes.length, manifestHoldFrames, endScreenFrames, totalFrames);
         estimateEncodeOutput(ffmpeg, codec, manifest, manifestShards, scannedFiles, absWork, totalFrames, warnings)
                 .ifPresent(this::printSampledEncodeEstimate);
 
@@ -94,7 +98,8 @@ public final class EncodePipeline {
         int frameNumber = 1;
         long generatedFrames = 0;
 
-        for (int shardIndex = 0; shardIndex < manifestShards.size(); shardIndex++) {
+        for (int i = 0; i < manifestHoldFrames; i++) {
+            int shardIndex = (int) (i % manifestShards.size());
             FramePacket packet = FramePacket.meta(
                     manifest.sessionId,
                     frameNumber,
@@ -152,6 +157,14 @@ public final class EncodePipeline {
             }
         }
 
+        for (int i = 0; i < endScreenFrames; i++) {
+            writeEndFrame(params, framesDir.resolve(frameName(frameNumber)),
+                    "TRANSFER COMPLETE", "You can stop recording now.");
+            frameNumber++;
+            generatedFrames++;
+            frameProgress.update(generatedFrames, totalFrames);
+        }
+
         ProgressPrinter muxProgress = new ProgressPrinter("encode:mux");
         muxProgress.update(0, 1);
         ffmpeg.encodePngSequence(framesDir.resolve("frame_%06d.png"), params.fps(), absOutput);
@@ -170,8 +183,9 @@ public final class EncodePipeline {
         report.totalFiles = manifest.totalFiles;
         report.totalBytes = manifest.totalBytes;
         report.totalChunks = manifest.totalChunks;
-        report.metaFrames = manifestShards.size();
+        report.metaFrames = manifestHoldFrames;
         report.dataFrames = manifest.totalChunks;
+        report.endFrames = endScreenFrames;
         report.totalFrames = totalFrames;
         report.frameWidth = params.width();
         report.frameHeight = params.height();
@@ -273,19 +287,57 @@ public final class EncodePipeline {
         ImageIO.write(image, "png", path.toFile());
     }
 
+    private static void writeEndFrame(Params params, Path path, String title, String subtitle) throws IOException {
+        BufferedImage image = new BufferedImage(params.width(), params.height(), BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = image.createGraphics();
+        try {
+            g.setColor(java.awt.Color.BLACK);
+            g.fillRect(0, 0, params.width(), params.height());
+
+            g.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING,
+                    java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setColor(java.awt.Color.WHITE);
+            g.setFont(new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.BOLD, 48));
+            drawCenteredText(g, title, params.width(), params.height() / 2 - 20);
+            g.setFont(new java.awt.Font(java.awt.Font.SANS_SERIF, java.awt.Font.PLAIN, 28));
+            drawCenteredText(g, subtitle, params.width(), params.height() / 2 + 30);
+        } finally {
+            g.dispose();
+        }
+
+        Files.createDirectories(path.getParent());
+        ImageIO.write(image, "png", path.toFile());
+    }
+
+    private static void drawCenteredText(java.awt.Graphics2D g, String text, int width, int y) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        java.awt.FontMetrics metrics = g.getFontMetrics();
+        int x = (width - metrics.stringWidth(text)) / 2;
+        g.drawString(text, Math.max(0, x), y);
+    }
+
     private static String frameName(int frameNumber) {
         return String.format("frame_%06d.png", frameNumber);
     }
 
-    private void printEncodeEstimate(Manifest manifest, int manifestBytes, long metaFrames, long totalFrames) {
+    private void printEncodeEstimate(
+            Manifest manifest,
+            int manifestBytes,
+            long metaFrames,
+            long endFrames,
+            long totalFrames
+    ) {
         double transferSeconds = totalFrames / (double) params.fps();
-        System.out.printf("[encode:estimate] files=%d, input=%s, chunks=%d, frames=%d (meta=%d, data=%d)%n",
+        System.out.printf("[encode:estimate] files=%d, input=%s, chunks=%d, frames=%d (meta=%d, data=%d, end=%d)%n",
                 manifest.totalFiles,
                 humanBytes(manifest.totalBytes),
                 manifest.totalChunks,
                 totalFrames,
                 metaFrames,
-                manifest.totalChunks);
+                manifest.totalChunks,
+                endFrames);
         System.out.printf("[encode:estimate] playback=%s @ %dfps, manifest=%s%n",
                 humanDurationSeconds(transferSeconds),
                 params.fps(),
@@ -605,6 +657,7 @@ public final class EncodePipeline {
         public long totalChunks;
         public long metaFrames;
         public long dataFrames;
+        public long endFrames;
         public long totalFrames;
         public int frameWidth;
         public int frameHeight;

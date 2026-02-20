@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.airbridge'
-version = '0.5.0'
+version = '0.6.0'
 
 repositories {
     mavenCentral()
@@ -45,8 +45,14 @@ tasks.named('shadowJar') {
 
 tasks.register('shadowJarMac', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     archiveClassifier.set('mac')
+    from(sourceSets.main.output)
+    configurations = [project.configurations.runtimeClasspath]
     manifest {
-        attributes('Main-Class': application.mainClass.get())
+        attributes(
+                'Main-Class': application.mainClass.get(),
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version
+        )
     }
     from('src/main/resources/ffmpeg/mac-arm64') {
         include('**/*')
@@ -57,8 +63,14 @@ tasks.register('shadowJarMac', com.github.jengelman.gradle.plugins.shadow.tasks.
 
 tasks.register('shadowJarWin', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
     archiveClassifier.set('win')
+    from(sourceSets.main.output)
+    configurations = [project.configurations.runtimeClasspath]
     manifest {
-        attributes('Main-Class': application.mainClass.get())
+        attributes(
+                'Main-Class': application.mainClass.get(),
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version
+        )
     }
     from('src/main/resources/ffmpeg/win-x64') {
         include('**/*')

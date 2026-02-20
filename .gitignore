@@ -59,3 +59,8 @@ work/
 /transfer.mp4
 /decoded-output/
 /decoded-output_work/
+
+/test
+/w-64
+**/ffmpeg/mac-arm64/*
+**/ffmpeg/win-x64/*

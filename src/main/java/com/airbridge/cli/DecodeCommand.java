@@ -1,6 +1,7 @@
 package com.airbridge.cli;
 
 import com.airbridge.pipeline.DecodePipeline;
+import com.airbridge.util.LogRedirector;
 import java.nio.file.Path;
 import picocli.CommandLine;
 
@@ -27,10 +28,16 @@ public final class DecodeCommand implements Runnable {
 
     @Override
     public void run() {
+        LogRedirector redirector = null;
         try {
+            redirector = LogRedirector.start("decode");
             new DecodePipeline(input, output, work, report, autoAlign, fpsFix).run();
         } catch (Exception e) {
             throw new CommandLine.ExecutionException(new CommandLine(this), "Decode failed", e);
+        } finally {
+            if (redirector != null) {
+                redirector.close();
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.airbridge.cli;
 
 import com.airbridge.core.Params;
 import com.airbridge.pipeline.EncodePipeline;
+import com.airbridge.util.LogRedirector;
 import java.nio.file.Path;
 import java.util.Locale;
 import picocli.CommandLine;
@@ -30,10 +31,16 @@ public final class EncodeCommand implements Runnable {
 
     @Override
     public void run() {
+        LogRedirector redirector = null;
         try {
+            redirector = LogRedirector.start("encode");
             new EncodePipeline(input, output, work, buildParams()).run();
         } catch (Exception e) {
             throw new CommandLine.ExecutionException(new CommandLine(this), "Encode failed", e);
+        } finally {
+            if (redirector != null) {
+                redirector.close();
+            }
         }
     }
 

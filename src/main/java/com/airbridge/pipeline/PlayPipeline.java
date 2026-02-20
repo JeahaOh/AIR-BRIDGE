@@ -2,6 +2,7 @@ package com.airbridge.pipeline;
 
 import com.airbridge.core.Params;
 import com.airbridge.ffmpeg.FfmpegRunner;
+import com.airbridge.ffmpeg.FfplayRunner;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -44,14 +45,24 @@ public final class PlayPipeline {
 
     private final Path input;
     private final Integer fpsOverride;
+    private final boolean useFfplay;
 
-    public PlayPipeline(Path input, Integer fpsOverride) {
+    public PlayPipeline(Path input, Integer fpsOverride, boolean useFfplay) {
         this.input = input;
         this.fpsOverride = fpsOverride;
+        this.useFfplay = useFfplay;
     }
 
     public void run() throws Exception {
         Path absInput = input.toAbsolutePath().normalize();
+
+        if (useFfplay) {
+            if (tryFfplay(absInput)) {
+                return;
+            }
+            System.out.println("WARN ffplay not available; falling back to internal player");
+        }
+
         Path tempFrames = Files.createTempDirectory("airbridge-play-");
 
         try {
@@ -70,6 +81,23 @@ public final class PlayPipeline {
             playFrames(frames, fps);
         } finally {
             deleteRecursively(tempFrames);
+        }
+    }
+
+    private boolean tryFfplay(Path input) {
+        var runner = FfplayRunner.createOptional();
+        if (runner.isEmpty()) {
+            return false;
+        }
+
+        try {
+            runner.get().play(input, fpsOverride);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } catch (IOException e) {
+            return false;
         }
     }
 

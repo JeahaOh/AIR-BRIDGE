@@ -31,15 +31,40 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.named('processResources') {
+    exclude('ffmpeg/**')
+}
+
 tasks.named('jar') {
     enabled = false
 }
 
 tasks.named('shadowJar') {
-    archiveClassifier.set('')
+    enabled = false
+}
+
+tasks.register('shadowJarMac', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier.set('mac')
     manifest {
         attributes('Main-Class': application.mainClass.get())
     }
+    from('src/main/resources/ffmpeg/mac-arm64') {
+        include('**/*')
+        into('ffmpeg/mac-arm64')
+    }
+    exclude('ffmpeg/win-x64/**')
+}
+
+tasks.register('shadowJarWin', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveClassifier.set('win')
+    manifest {
+        attributes('Main-Class': application.mainClass.get())
+    }
+    from('src/main/resources/ffmpeg/win-x64') {
+        include('**/*')
+        into('ffmpeg/win-x64')
+    }
+    exclude('ffmpeg/mac-arm64/**')
 }
 
 tasks.named('startScripts') {
@@ -55,7 +80,7 @@ tasks.named('distZip') {
 }
 
 tasks.named('build') {
-    dependsOn tasks.named('shadowJar')
+    dependsOn tasks.named('shadowJarMac'), tasks.named('shadowJarWin')
 }
 
 tasks.named('startShadowScripts') {

@@ -12,7 +12,19 @@ public final class FfmpegLocator {
     private FfmpegLocator() {
     }
 
-    public static Optional<Path> extractBundledBinary() {
+    public static Optional<Path> extractBundledFfmpeg() {
+        return extractBundled("ffmpeg");
+    }
+
+    public static Optional<Path> extractBundledFfprobe() {
+        return extractBundled("ffprobe");
+    }
+
+    public static Optional<Path> extractBundledFfplay() {
+        return extractBundled("ffplay");
+    }
+
+    private static Optional<Path> extractBundled(String toolName) {
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
 
@@ -20,11 +32,11 @@ public final class FfmpegLocator {
         String outputName;
 
         if (os.contains("win")) {
-            resource = "/ffmpeg/win-x64/ffmpeg.exe";
-            outputName = "ffmpeg.exe";
+            resource = "/ffmpeg/win-x64/bin/" + toolName + ".exe";
+            outputName = toolName + ".exe";
         } else if (os.contains("mac") && (arch.contains("arm") || arch.contains("aarch64"))) {
-            resource = "/ffmpeg/mac-arm64/ffmpeg";
-            outputName = "ffmpeg";
+            resource = "/ffmpeg/mac-arm64/" + toolName;
+            outputName = toolName;
         } else {
             return Optional.empty();
         }

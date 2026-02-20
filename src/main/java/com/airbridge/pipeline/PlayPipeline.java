@@ -85,10 +85,42 @@ public final class PlayPipeline {
             if (fps <= 0) {
                 throw new IllegalArgumentException("--fps must be > 0");
             }
+            logPlaybackInfo(frames.size(), fps);
             playFrames(frames, fps);
         } finally {
             deleteRecursively(tempFrames);
         }
+    }
+
+    private static void logPlaybackInfo(int totalFrames, int fps) {
+        double durationSeconds = fps > 0 ? (double) totalFrames / (double) fps : 0.0;
+        System.out.printf("[play] total frames=%d, frames per second=%d, duration=%s%n",
+                totalFrames,
+                fps,
+                humanDurationSeconds(durationSeconds));
+        System.out.println("[play] keys: Space=pause/resume, S=start/resume, P=pause, R=restart, "
+                + "Left/Right=seek 5s, Shift+Left/Right=step frame, +/-=zoom, 0=fit, 1=original size, "
+                + "F=toggle fit, Alt+Enter=fullscreen, ESC=exit fullscreen, Q=quit");
+    }
+
+    private static String humanDurationSeconds(double seconds) {
+        if (seconds <= 0) {
+            return "0s";
+        }
+        if (seconds < 60.0) {
+            return String.format("%.1fs", seconds);
+        }
+        long total = Math.round(seconds);
+        long hours = total / 3600L;
+        long minutes = (total % 3600L) / 60L;
+        long secs = total % 60L;
+        if (hours > 0) {
+            return String.format("%dh %02dm %02ds", hours, minutes, secs);
+        }
+        if (minutes > 0) {
+            return String.format("%dm %02ds", minutes, secs);
+        }
+        return String.format("%ds", secs);
     }
 
     private boolean tryFfplay(Path input) {

@@ -585,7 +585,7 @@ public final class DecodePipeline {
             return;
         }
         try (Stream<Path> walk = Files.walk(root)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+            walk.sorted((a, b) -> b.compareTo(a)).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException e) {

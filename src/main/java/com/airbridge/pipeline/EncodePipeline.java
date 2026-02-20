@@ -629,7 +629,7 @@ public final class EncodePipeline {
         for (Path candidate : candidates) {
             try {
                 if (Files.exists(candidate)) {
-                    deleteRecursively(candidate);
+                    deleteRecursivelyStrict(candidate);
                 }
                 Files.createDirectories(candidate);
                 if (!candidate.equals(requested)) {
@@ -652,12 +652,12 @@ public final class EncodePipeline {
         throw result;
     }
 
-    private static void deleteRecursively(Path root) throws IOException {
+    private static void deleteRecursivelyStrict(Path root) throws IOException {
         if (root == null || !Files.exists(root)) {
             return;
         }
         try (Stream<Path> walk = Files.walk(root)) {
-            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+            walk.sorted((a, b) -> b.compareTo(a)).forEach(path -> {
                 try {
                     Files.deleteIfExists(path);
                 } catch (IOException e) {

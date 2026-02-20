@@ -65,6 +65,10 @@ public final class FrameCodec {
     }
 
     public Optional<byte[]> decode(BufferedImage image) {
+        return decodeWithOffset(image, 0, 0);
+    }
+
+    public Optional<byte[]> decodeWithOffset(BufferedImage image, int offsetX, int offsetY) {
         if (image.getWidth() != params.width() || image.getHeight() != params.height()) {
             return Optional.empty();
         }
@@ -75,8 +79,11 @@ public final class FrameCodec {
         int index = 0;
         for (int row = 0; row < rows; row++) {
             for (int col = 0; col < cols; col++) {
-                int x = col * params.cellSize() + (params.cellSize() / 2);
-                int y = params.overlayHeight() + row * params.cellSize() + (params.cellSize() / 2);
+                int x = col * params.cellSize() + (params.cellSize() / 2) + offsetX;
+                int y = params.overlayHeight() + row * params.cellSize() + (params.cellSize() / 2) + offsetY;
+                if (x < 0 || y < 0 || x >= image.getWidth() || y >= image.getHeight()) {
+                    return Optional.empty();
+                }
                 int rgb = image.getRGB(x, y);
 
                 nibbles[index++] = quantizeNibble((rgb >>> 16) & 0xFF);

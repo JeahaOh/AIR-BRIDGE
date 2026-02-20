@@ -19,10 +19,16 @@ public final class DecodeCommand implements Runnable {
     @CommandLine.Option(names = "--report", description = "decode_report.json path")
     Path report;
 
+    @CommandLine.Option(names = "--auto-align", description = "Attempt small alignment fixes when decoding frames")
+    boolean autoAlign;
+
+    @CommandLine.Option(names = "--fps-fix", description = "Skip duplicate frame numbers during decode")
+    boolean fpsFix;
+
     @Override
     public void run() {
         try {
-            new DecodePipeline(input, output, work, report).run();
+            new DecodePipeline(input, output, work, report, autoAlign, fpsFix).run();
         } catch (Exception e) {
             throw new CommandLine.ExecutionException(new CommandLine(this), "Decode failed", e);
         }

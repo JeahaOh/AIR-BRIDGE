@@ -27,16 +27,22 @@ import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 
 public final class DecodePipeline {
+    private static final int ALIGN_MARGIN_PX = 8;
+    private static final int ALIGN_STEP_PX = 4;
     private final Path input;
     private final Path output;
     private final Path work;
     private final Path report;
+    private final boolean autoAlign;
+    private final boolean fpsFix;
 
-    public DecodePipeline(Path input, Path output, Path work, Path report) {
+    public DecodePipeline(Path input, Path output, Path work, Path report, boolean autoAlign, boolean fpsFix) {
         this.input = input;
         this.output = output;
         this.work = work;
         this.report = report;
+        this.autoAlign = autoAlign;
+        this.fpsFix = fpsFix;
     }
 
     public void run() throws Exception {
@@ -96,8 +102,7 @@ public final class DecodePipeline {
             throw new IOException("Unable to read first extracted frame: " + frames.get(0));
         }
 
-        Params params = paramsForFrame(firstFrame);
-        FrameCodec codec = new FrameCodec(params);
+        List<DecodeCandidate> candidates = candidatesForFrame(firstFrame, autoAlign);
 
         Map<String, SessionCollector> sessions = new HashMap<>();
         ProgressPrinter parseProgress = new ProgressPrinter("decode:parse");
@@ -114,14 +119,7 @@ public final class DecodePipeline {
                 continue;
             }
 
-            var decodedPacketBytes = codec.decode(image);
-            if (decodedPacketBytes.isEmpty()) {
-                invalidFrames++;
-                parseProgress.update(i + 1L, frames.size());
-                continue;
-            }
-
-            var parsedPacket = FramePacket.fromBytes(decodedPacketBytes.get());
+            var parsedPacket = decodePacket(image, candidates, autoAlign);
             if (parsedPacket.isEmpty()) {
                 invalidFrames++;
                 parseProgress.update(i + 1L, frames.size());
@@ -130,7 +128,7 @@ public final class DecodePipeline {
 
             FramePacket packet = parsedPacket.get();
             SessionCollector collector = sessions.computeIfAbsent(packet.sessionId(), key -> new SessionCollector());
-            collector.accept(packet);
+            collector.accept(packet, fpsFix);
             validFrames++;
             parseProgress.update(i + 1L, frames.size());
         }
@@ -357,6 +355,94 @@ public final class DecodePipeline {
         return new Params(frame.getWidth(), frame.getHeight(), overlayHeight, 8, 24, Params.DEFAULT_CHUNK_SIZE);
     }
 
+    private static Params paramsForSize(int width, int height) {
+        int overlayHeight = height >= 2000 ? 144 : 96;
+        return new Params(width, height, overlayHeight, 8, 24, Params.DEFAULT_CHUNK_SIZE);
+    }
+
+    private static List<DecodeCandidate> candidatesForFrame(BufferedImage frame, boolean autoAlign) {
+        List<DecodeCandidate> candidates = new ArrayList<>();
+        addCandidate(candidates, paramsForFrame(frame));
+        if (!autoAlign) {
+            return candidates;
+        }
+        addCandidate(candidates, paramsForSize(1920, 1080));
+        addCandidate(candidates, paramsForSize(3840, 2160));
+        return candidates;
+    }
+
+    private static void addCandidate(List<DecodeCandidate> candidates, Params params) {
+        for (DecodeCandidate candidate : candidates) {
+            if (candidate.params.width() == params.width() && candidate.params.height() == params.height()) {
+                return;
+            }
+        }
+        candidates.add(new DecodeCandidate(params, new FrameCodec(params)));
+    }
+
+    private static java.util.Optional<FramePacket> decodePacket(
+            BufferedImage image,
+            List<DecodeCandidate> candidates,
+            boolean autoAlign
+    ) {
+        for (DecodeCandidate candidate : candidates) {
+            BufferedImage working = image;
+            if (image.getWidth() != candidate.params.width() || image.getHeight() != candidate.params.height()) {
+                if (!autoAlign) {
+                    continue;
+                }
+                working = scaleNearest(image, candidate.params.width(), candidate.params.height());
+            }
+
+            var packet = decodeWithOffsets(candidate.codec, working, autoAlign);
+            if (packet.isPresent()) {
+                return packet;
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static java.util.Optional<FramePacket> decodeWithOffsets(FrameCodec codec, BufferedImage image, boolean autoAlign) {
+        var packet = decodeAtOffset(codec, image, 0, 0);
+        if (packet.isPresent() || !autoAlign) {
+            return packet;
+        }
+
+        for (int dy = -ALIGN_MARGIN_PX; dy <= ALIGN_MARGIN_PX; dy += ALIGN_STEP_PX) {
+            for (int dx = -ALIGN_MARGIN_PX; dx <= ALIGN_MARGIN_PX; dx += ALIGN_STEP_PX) {
+                if (dx == 0 && dy == 0) {
+                    continue;
+                }
+                packet = decodeAtOffset(codec, image, dx, dy);
+                if (packet.isPresent()) {
+                    return packet;
+                }
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static java.util.Optional<FramePacket> decodeAtOffset(FrameCodec codec, BufferedImage image, int dx, int dy) {
+        var decodedPacketBytes = codec.decodeWithOffset(image, dx, dy);
+        if (decodedPacketBytes.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        return FramePacket.fromBytes(decodedPacketBytes.get());
+    }
+
+    private static BufferedImage scaleNearest(BufferedImage input, int targetWidth, int targetHeight) {
+        BufferedImage scaled = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = scaled.createGraphics();
+        try {
+            g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION,
+                    java.awt.RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(input, 0, 0, targetWidth, targetHeight, null);
+        } finally {
+            g.dispose();
+        }
+        return scaled;
+    }
+
     private static void printDecodeInitialEstimate(DecodeReport report) {
         System.out.printf("[decode:estimate] input video=%s%n", humanBytes(report.inputVideoBytes));
         if (report.estimatedVideoDurationSeconds != null) {
@@ -495,9 +581,13 @@ public final class DecodePipeline {
     private static final class SessionCollector {
         private final Map<Integer, byte[]> metaShards = new HashMap<>();
         private final List<FramePacket> dataPackets = new ArrayList<>();
+        private final java.util.Set<Integer> seenFrameNumbers = new java.util.HashSet<>();
         private int metaShardCount = 0;
 
-        private void accept(FramePacket packet) {
+        private void accept(FramePacket packet, boolean fpsFix) {
+            if (fpsFix && !seenFrameNumbers.add(packet.frameNumber())) {
+                return;
+            }
             if (packet.type() == FramePacket.Type.META) {
                 if (packet.metaShardIndex() >= 0) {
                     metaShards.putIfAbsent(packet.metaShardIndex(), packet.payload());
@@ -524,6 +614,9 @@ public final class DecodePipeline {
             this.sessionId = sessionId;
             this.collector = collector;
         }
+    }
+
+    private record DecodeCandidate(Params params, FrameCodec codec) {
     }
 
     private static final class RecoveredFile {

@@ -6,7 +6,7 @@ import picocli.CommandLine;
         name = "airbridge",
         mixinStandardHelpOptions = true,
         versionProvider = Root.VersionProvider.class,
-        subcommands = {EncodeCommand.class, DecodeCommand.class, PlayCommand.class, FltnCommand.class, UfltnCommand.class, HelpCommand.class, SearchCommand.class}
+        subcommands = {EncodeCommand.class, DecodeCommand.class, PlayCommand.class, FltnCommand.class, UfltnCommand.class, HelpCommand.class, InitCommand.class, SearchCommand.class}
 )
 public final class Root implements Runnable {
     static final class VersionProvider implements CommandLine.IVersionProvider {

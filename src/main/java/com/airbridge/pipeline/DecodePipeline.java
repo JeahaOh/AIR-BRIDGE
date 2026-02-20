@@ -55,6 +55,12 @@ public final class DecodePipeline {
         Path absWork = prepareWorkDir(absOutput, warnings);
         Path absReport = resolveReportPath(absWork);
 
+        if (Files.exists(absOutput)) {
+            if (!Files.isDirectory(absOutput)) {
+                throw new IOException("Output path is not a directory: " + absOutput);
+            }
+            deleteRecursively(absOutput);
+        }
         Files.createDirectories(absOutput);
 
         DecodeReport decodeReport = new DecodeReport();
@@ -550,6 +556,9 @@ public final class DecodePipeline {
 
         for (Path candidate : candidates) {
             try {
+                if (Files.exists(candidate)) {
+                    deleteRecursively(candidate);
+                }
                 Files.createDirectories(candidate);
                 if (!candidate.equals(requested)) {
                     String warning = "WARN unable to create requested --work directory: " + requested
@@ -569,6 +578,26 @@ public final class DecodePipeline {
             result.addSuppressed(lastError);
         }
         throw result;
+    }
+
+    private static void deleteRecursively(Path root) throws IOException {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException io) {
+                throw io;
+            }
+            throw e;
+        }
     }
 
     private Path resolveReportPath(Path absWork) {

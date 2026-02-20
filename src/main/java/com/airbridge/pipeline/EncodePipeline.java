@@ -54,6 +54,13 @@ public final class EncodePipeline {
         Path absOutput = prepareOutputPath(absRequestedOutput, warnings);
         Path absWork = prepareWorkDir(absOutput, warnings);
 
+        if (Files.exists(absOutput)) {
+            if (Files.isDirectory(absOutput)) {
+                throw new IOException("Output path is a directory: " + absOutput);
+            }
+            Files.delete(absOutput);
+        }
+
         Path framesDir = absWork.resolve("frames");
         Path manifestPath = absWork.resolve("manifest.json");
         Path reportPath = absWork.resolve("encode_report.json");
@@ -621,6 +628,9 @@ public final class EncodePipeline {
 
         for (Path candidate : candidates) {
             try {
+                if (Files.exists(candidate)) {
+                    deleteRecursively(candidate);
+                }
                 Files.createDirectories(candidate);
                 if (!candidate.equals(requested)) {
                     String warning = "WARN unable to create requested --work directory: " + requested
@@ -640,6 +650,26 @@ public final class EncodePipeline {
             result.addSuppressed(lastError);
         }
         throw result;
+    }
+
+    private static void deleteRecursively(Path root) throws IOException {
+        if (root == null || !Files.exists(root)) {
+            return;
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            walk.sorted(Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof IOException io) {
+                throw io;
+            }
+            throw e;
+        }
     }
 
     public static final class EncodeReport {

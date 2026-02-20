@@ -29,6 +29,19 @@ public final class ArchiveRewriter {
         Files.move(temp, abs, StandardCopyOption.REPLACE_EXISTING);
     }
 
+    public static Path rewriteToZip(Path archivePath, Set<String> targetExts) throws IOException {
+        Path abs = archivePath.toAbsolutePath().normalize();
+        String baseName = stripExtension(abs.getFileName().toString());
+        Path output = abs.resolveSibling(baseName + ".zip");
+        Path temp = Files.createTempFile(abs.getParent(), "airbridge-fltn-", ".zip");
+        try (InputStream in = Files.newInputStream(abs);
+             OutputStream out = Files.newOutputStream(temp)) {
+            rewriteStream(in, out, targetExts, RewriteMode.FLATTEN);
+        }
+        Files.move(temp, output, StandardCopyOption.REPLACE_EXISTING);
+        return output;
+    }
+
     public static void rewriteInPlaceUnflatten(Path archivePath, Set<String> targetExts) throws IOException {
         Path abs = archivePath.toAbsolutePath().normalize();
         Path temp = Files.createTempFile(abs.getParent(), "airbridge-ufltn-", ".zip");
@@ -151,6 +164,14 @@ public final class ArchiveRewriter {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         input.transferTo(out);
         return out.toByteArray();
+    }
+
+    private static String stripExtension(String name) {
+        int dot = name.lastIndexOf('.');
+        if (dot <= 0) {
+            return name;
+        }
+        return name.substring(0, dot);
     }
 
     private enum RewriteMode {

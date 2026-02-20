@@ -30,11 +30,13 @@ public final class FltnCommand implements Runnable {
             Set<String> targetExts = readTargetExts(targetExtPath);
 
             List<String> flattened = ArchiveInspector.collectFlattenedNames(input, targetExts);
-            ArchiveRewriter.rewriteInPlace(input, targetExts);
+            Path zipOutput = ArchiveRewriter.rewriteToZip(input, targetExts);
             Path targetPath = baseDir.resolve("target.txt");
             Files.write(targetPath, flattened, StandardCharsets.UTF_8);
 
             System.out.printf("Wrote %d entries to %s%n", flattened.size(), targetPath.toAbsolutePath());
+            System.out.printf("Saved flattened archive to %s%n", zipOutput.toAbsolutePath());
+            System.out.println("Next: jar cfm airbridge-*.jar META-INF/MANIFEST.MF -C . .");
         } catch (Exception e) {
             throw new CommandLine.ExecutionException(new CommandLine(this), "fltn failed", e);
         }

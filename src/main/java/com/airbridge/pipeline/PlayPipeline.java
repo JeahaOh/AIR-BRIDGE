@@ -10,6 +10,10 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.MouseInfo;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.Robot;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -21,6 +25,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -117,6 +124,7 @@ public final class PlayPipeline {
         JFrame window = new JFrame("AirBridge Player");
         window.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         window.setBackground(Color.BLACK);
+        window.setUndecorated(true);
 
         JPanel panel = new JPanel() {
             @Override
@@ -164,6 +172,7 @@ public final class PlayPipeline {
             panel.repaint();
         });
 
+        ScheduledExecutorService jiggleExecutor = startMouseJiggle(running);
         long frameDelayNanos = Math.max(1L, 1_000_000_000L / Math.max(1, fps));
         try {
             while (running.get()) {
@@ -193,6 +202,9 @@ public final class PlayPipeline {
                 }
             }
         } finally {
+            if (jiggleExecutor != null) {
+                jiggleExecutor.shutdownNow();
+            }
             SwingUtilities.invokeAndWait(() -> {
                 if (device.isFullScreenSupported() && device.getFullScreenWindow() == window) {
                     device.setFullScreenWindow(null);
@@ -492,8 +504,6 @@ public final class PlayPipeline {
             int y = (panel.getHeight() - drawHeight) / 2;
             g.drawImage(image, x, y, drawWidth, drawHeight, null);
         }
-
-        drawHud(g, frameIndex, totalFrames, paused, scaleMode, customScale);
     }
 
     private static double currentScale(JPanel panel, BufferedImage image, ScaleMode mode, double customScale) {
@@ -552,6 +562,45 @@ public final class PlayPipeline {
         g.setColor(Color.WHITE);
         g.drawString(line1, x, y);
         g.drawString(line2, x, y + lineHeight);
+    }
+
+    private static ScheduledExecutorService startMouseJiggle(AtomicBoolean running) {
+        try {
+            Robot robot = new Robot();
+            GraphicsDevice device = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+            Rectangle bounds = device.getDefaultConfiguration().getBounds();
+            ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "airbridge-mouse-jiggle");
+                thread.setDaemon(true);
+                return thread;
+            });
+
+            AtomicInteger direction = new AtomicInteger(1);
+            executor.scheduleAtFixedRate(() -> {
+                if (!running.get()) {
+                    return;
+                }
+                Point location = MouseInfo.getPointerInfo().getLocation();
+                int delta = direction.getAndSet(direction.get() * -1);
+                int nextX = clampInt(location.x + delta, bounds.x, bounds.x + bounds.width - 1);
+                int nextY = clampInt(location.y, bounds.y, bounds.y + bounds.height - 1);
+                robot.mouseMove(nextX, nextY);
+            }, 10, 10, TimeUnit.SECONDS);
+            return executor;
+        } catch (Exception e) {
+            System.out.println("WARN mouse jiggle disabled: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static int clampInt(int value, int min, int max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 
     private static double clamp(double value, double min, double max) {

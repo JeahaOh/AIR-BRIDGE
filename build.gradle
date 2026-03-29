@@ -4,6 +4,15 @@ import java.time.format.DateTimeFormatter
 
 apply plugin: 'base'
 
+ext {
+    picocliVersion = '4.7.6'
+    zxingVersion = '3.5.2'
+    junitJupiterVersion = '5.10.2'
+    junitPlatformLauncherVersion = '1.10.2'
+    javacvVersion = '1.5.10'
+    opencvPlatformVersion = '4.9.0-1.5.10'
+}
+
 def buildVersion = "0.9.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"
 version = buildVersion
 
@@ -46,22 +55,31 @@ subprojects {
     group = 'airbridge'
     version = rootProject.version
 
-    apply plugin: 'java'
-
-    java {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-        toolchain {
-            languageVersion = JavaLanguageVersion.of(21)
-        }
-    }
-
     repositories {
         mavenCentral()
     }
 
-    tasks.withType(JavaCompile).configureEach {
-        options.encoding = 'UTF-8'
+    pluginManager.withPlugin('java') {
+        java {
+            sourceCompatibility = JavaVersion.VERSION_21
+            targetCompatibility = JavaVersion.VERSION_21
+            toolchain {
+                languageVersion = JavaLanguageVersion.of(21)
+            }
+        }
+
+        dependencies {
+            testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
+            testRuntimeOnly "org.junit.platform:junit-platform-launcher:${junitPlatformLauncherVersion}"
+        }
+
+        tasks.withType(JavaCompile).configureEach {
+            options.encoding = 'UTF-8'
+        }
+
+        tasks.named('test') {
+            useJUnitPlatform()
+        }
     }
 
     plugins.withId('application') {
@@ -69,6 +87,7 @@ subprojects {
             dependsOn configurations.runtimeClasspath
             outputs.upToDateWhen { false }
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            archiveFileName = "${project.name}-${project.version}.jar"
             manifest {
                 attributes(
                         'Manifest-Version': '1.0',

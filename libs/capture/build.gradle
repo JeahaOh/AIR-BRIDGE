@@ -1,14 +1,8 @@
 apply plugin: 'java-library'
 
 dependencies {
-    api 'com.google.zxing:core:3.5.2'
-    api 'com.google.zxing:javase:3.5.2'
-    api 'org.bytedeco:javacv:1.5.10'
-    runtimeOnly 'org.bytedeco:opencv-platform:4.9.0-1.5.10'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
+    implementation "com.google.zxing:core:${zxingVersion}"
+    implementation "com.google.zxing:javase:${zxingVersion}"
+    implementation "org.bytedeco:javacv:${javacvVersion}"
+    runtimeOnly "org.bytedeco:opencv-platform:${opencvPlatformVersion}"
 }

@@ -1,27 +1,14 @@
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+apply plugin: 'application'
 
 dependencies {
     implementation project(':common')
     implementation project(':packager')
     implementation project(':slide')
-    implementation 'info.picocli:picocli:4.7.6'
-    implementation 'com.google.zxing:core:3.5.2'
-    implementation 'com.google.zxing:javase:3.5.2'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+    implementation "info.picocli:picocli:${picocliVersion}"
+    implementation "com.google.zxing:core:${zxingVersion}"
+    implementation "com.google.zxing:javase:${zxingVersion}"
 }
-
-apply plugin: 'application'
 
 application {
     mainClass = 'airbridge.sender.Sender'
-}
-
-tasks.named('jar') {
-    archiveFileName = "sender-${project.version}.jar"
-}
-
-tasks.named('test') {
-    useJUnitPlatform()
 }

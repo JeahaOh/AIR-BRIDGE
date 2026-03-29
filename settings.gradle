@@ -1,0 +1,9 @@
+rootProject.name = 'air-bridge'
+include 'common', 'capture', 'packager', 'slide', 'sender', 'receiver'
+
+project(':common').projectDir = file('libs/common')
+project(':capture').projectDir = file('libs/capture')
+project(':packager').projectDir = file('libs/packager')
+project(':slide').projectDir = file('libs/slide')
+project(':sender').projectDir = file('apps/sender')
+project(':receiver').projectDir = file('apps/receiver')

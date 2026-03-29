@@ -1,0 +1,95 @@
+import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+apply plugin: 'base'
+
+def buildVersion = "0.9.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"
+version = buildVersion
+
+tasks.register('syncRootLibs', Sync) {
+    into layout.buildDirectory.dir('libs')
+}
+
+tasks.register('printRootLibs') {
+    dependsOn tasks.named('syncRootLibs')
+    doLast {
+        def libsDir = layout.buildDirectory.dir('libs').get().asFile
+        println ''
+        println 'Artifacts in build/libs:'
+        if (!libsDir.exists()) {
+            println '  (none)'
+            return
+        }
+
+        def jarFiles = libsDir.listFiles()
+                ?.findAll { it.isFile() }
+                ?.sort { a, b -> a.name <=> b.name } ?: []
+
+        if (jarFiles.isEmpty()) {
+            println '  (none)'
+            return
+        }
+
+        jarFiles.each { file ->
+            def sizeMb = file.length() / (1024d * 1024d)
+            println String.format(Locale.ROOT, '  %s (%.1f MB)', file.name, sizeMb)
+        }
+    }
+}
+
+tasks.named('build') {
+    finalizedBy tasks.named('printRootLibs')
+}
+
+subprojects {
+    group = 'airbridge'
+    version = rootProject.version
+
+    apply plugin: 'java'
+
+    java {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21)
+        }
+    }
+
+    repositories {
+        mavenCentral()
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        options.encoding = 'UTF-8'
+    }
+
+    plugins.withId('application') {
+        tasks.named('jar') {
+            dependsOn configurations.runtimeClasspath
+            outputs.upToDateWhen { false }
+            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+            manifest {
+                attributes(
+                        'Manifest-Version': '1.0',
+                        'Main-Class': application.mainClass.get(),
+                        'Implementation-Title': project.name,
+                        'Implementation-Version': project.version
+                )
+            }
+            from {
+                configurations.runtimeClasspath.collect {
+                    it.isDirectory() ? it : zipTree(it)
+                }
+            } {
+                exclude 'META-INF/MANIFEST.MF'
+                exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+            }
+        }
+
+        rootProject.tasks.named('syncRootLibs', Sync) {
+            dependsOn tasks.named('jar')
+            from(tasks.named('jar'))
+        }
+    }
+}

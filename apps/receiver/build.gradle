@@ -1,0 +1,39 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+dependencies {
+    implementation project(':common')
+    implementation project(':capture')
+    implementation project(':packager')
+    implementation 'info.picocli:picocli:4.7.6'
+    implementation 'com.google.zxing:core:3.5.2'
+    implementation 'com.google.zxing:javase:3.5.2'
+    implementation 'org.bytedeco:javacv:1.5.10'
+    runtimeOnly 'org.bytedeco:opencv-platform:4.9.0-1.5.10'
+    testImplementation project(':sender')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.10.2'
+}
+
+apply plugin: 'application'
+
+application {
+    mainClass = 'airbridge.receiver.Receiver'
+    applicationDefaultJvmArgs = [
+            '-Xms1g',
+            '-Xmx4g',
+            '-XX:+UseG1GC',
+            '-XX:MaxGCPauseMillis=200',
+            '-XX:+ParallelRefProcEnabled',
+            '-XX:+UseStringDeduplication',
+            '-XX:InitiatingHeapOccupancyPercent=30'
+    ]
+}
+
+tasks.named('jar') {
+    archiveFileName = "receiver-${project.version}.jar"
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

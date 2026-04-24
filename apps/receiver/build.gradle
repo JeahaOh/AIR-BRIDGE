@@ -12,13 +12,4 @@ dependencies {
 
 application {
     mainClass = 'airbridge.receiver.Receiver'
-    applicationDefaultJvmArgs = [
-            '-Xms1g',
-            '-Xmx4g',
-            '-XX:+UseG1GC',
-            '-XX:MaxGCPauseMillis=200',
-            '-XX:+ParallelRefProcEnabled',
-            '-XX:+UseStringDeduplication',
-            '-XX:InitiatingHeapOccupancyPercent=30'
-    ]
 }

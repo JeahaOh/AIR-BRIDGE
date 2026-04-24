@@ -85,7 +85,6 @@ subprojects {
     plugins.withId('application') {
         tasks.named('jar') {
             dependsOn configurations.runtimeClasspath
-            outputs.upToDateWhen { false }
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
             archiveFileName = "${project.name}-${project.version}.jar"
             manifest {

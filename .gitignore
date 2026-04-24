@@ -64,3 +64,4 @@ work/
 **/ffmpeg/win-x64/*
 
 fixtures/
+.gradle-home

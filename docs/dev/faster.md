@@ -1,6 +1,6 @@
 # Faster Tuning Notes
 
-이 문서는 `slide` 와 `capture` 속도 개선 항목을 현재 코드 상태 기준으로 정리한 체크리스트다.
+이 문서는 `slide` 와 `capture` 속도 개선 항목을 현재 코드 상태 기준으로 정리한 체크리스트입니다.
 
 상태 표기:
 - `반영됨`: 코드에 이미 반영됨
@@ -8,17 +8,17 @@
 - `미반영`: 아직 안 한 항목
 
 기준 소스:
-- [`SlideApp.java`](../libs/slide/src/main/java/airbridge/slide/SlideApp.java)
-- [`Receiver.java`](../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
-- [`CaptureService.java`](../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java)
+- [`SlideApp.java`](../../libs/slide/src/main/java/airbridge/slide/SlideApp.java)
+- [`Receiver.java`](../../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
+- [`CaptureService.java`](../../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java)
 
 주의:
-- `capture` 성능 상태는 현재 [`CaptureService.java`](../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java) 기준으로 읽는 것이 맞다.
-- 이 문서의 `capture` 체크 상태는 `receiver` 엔트리포인트가 아니라 `capture` 모듈 기준으로 읽는 것이 맞다.
+- `capture` 성능 상태는 현재 [`CaptureService.java`](../../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java) 기준으로 읽는 것이 맞습니다.
+- 이 문서의 `capture` 체크 상태는 `receiver` 엔트리포인트가 아니라 `capture` 모듈 기준으로 읽는 것이 맞습니다.
 
 ## 결론
 
-속도를 올리는 방향은 여전히 아래 순서가 맞다.
+속도를 올리는 방향은 여전히 아래 순서가 맞습니다.
 
 1. `slide`: 이미지 로딩을 UI 스레드 밖으로 분리
 2. `capture`: decode 처리량과 큐 용량 조정
@@ -40,7 +40,7 @@
 - `PREFETCH_COUNT = 20`
 
 위치:
-- [`SlideApp.java`](../libs/slide/src/main/java/airbridge/slide/SlideApp.java)
+- [`SlideApp.java`](../../libs/slide/src/main/java/airbridge/slide/SlideApp.java)
 
 ### 항목별 상태
 
@@ -110,7 +110,7 @@
 - `MAX_PENDING_DECODE = 32`
 
 위치:
-- [`CaptureService.java`](../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java)
+- [`CaptureService.java`](../../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java)
 
 기본값:
 - CLI `fps = 15`
@@ -118,8 +118,8 @@
 - CLI `statusIntervalMs = 10000`
 
 위치:
-- [`Receiver.java`](../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
-- [`Receiver.java`](../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
+- [`Receiver.java`](../../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
+- [`Receiver.java`](../../apps/receiver/src/main/java/airbridge/receiver/Receiver.java)
 
 ### 항목별 상태
 
@@ -162,9 +162,9 @@
 - 저장 경로 자체 최적화
   - `반영됨`
   - 중복 판정 뒤 실제 PNG 쓰기는 별도 save worker 로 분산
-  - 저장 worker 적체도 세마포어로 제한한다
-  - PNG 저장은 더 빠른 writer 경로를 사용한다
-  - 포맷은 여전히 PNG 이다
+  - 저장 worker 적체도 세마포어로 제한합니다.
+  - PNG 저장은 더 빠른 writer 경로를 사용합니다.
+  - 포맷은 여전히 PNG 입니다.
 
 - 실행 계측 추가
   - `반영됨`

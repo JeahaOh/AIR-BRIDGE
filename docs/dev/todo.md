@@ -11,14 +11,14 @@
   - `receiver`: `decode`, `capture`, `identify`, `pack`
 - `printer`는 별도 명령이 아니라 `--help`, `--version`에서 쓰는 공통 배너 출력으로 본다.
 - 공통 배너와 버전 출력 유틸은 `common`에 둔다.
-- 자동 테스트는 이미 들어가 있으며 현재 `./gradlew test` 기준으로 통과한다.
+- 자동 테스트는 이미 들어가 있으며 현재 `./gradlew test` 기준으로 통과합니다.
 - 앱 버전 표기는 `{major}.{minor}.{yymmdd}.{hh24mi}` 형식으로 관리한다.
 
 ## 남은 작업
 
 ### 1. 문서 정리
 
-README.ko.md, deploy-\*.md 등 문서 정리
+README.ko.md, deploy-\*.md 등 문서를 정리합니다.
 
 ### 2. 구조 리팩터링
 

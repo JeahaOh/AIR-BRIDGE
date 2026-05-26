@@ -5,6 +5,7 @@ import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
 import airbridge.packager.IdentifyCommand;
 import airbridge.packager.PackCommand;
+import airbridge.receiver.gui.ReceiverGui;
 import airbridge.receiver.capture.CaptureDefaults;
 import airbridge.receiver.capture.CaptureDeviceInfo;
 import airbridge.receiver.capture.CaptureListener;
@@ -15,12 +16,19 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
+import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
+import java.awt.GraphicsEnvironment;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 
 @Command(
         name = "receiver",
@@ -29,6 +37,7 @@ import java.util.concurrent.Callable;
         subcommands = {
                 Receiver.DecodeCommand.class,
                 Receiver.CaptureCommand.class,
+                Receiver.GuiCommand.class,
                 IdentifyCommand.class,
                 PackCommand.class
         }
@@ -44,8 +53,41 @@ public class Receiver implements Runnable {
 
     public static void main(String[] args) {
         CliSupport.setLocaleFromArgs(args);
+        if (shouldLaunchGuiByDefault(args)) {
+            args = appendGuiCommand(args);
+        }
         int exitCode = newCommandLine().execute(args);
         System.exit(exitCode);
+    }
+
+    static boolean shouldLaunchGuiByDefault(String[] args) {
+        if (args == null || args.length == 0) {
+            return true;
+        }
+
+        int index = 0;
+        while (index < args.length) {
+            String arg = args[index];
+            if ("--lang".equals(arg)) {
+                if (index + 1 >= args.length) {
+                    return false;
+                }
+                index += 2;
+                continue;
+            }
+            if (arg.startsWith("--lang=")) {
+                index++;
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static String[] appendGuiCommand(String[] args) {
+        String[] effectiveArgs = Arrays.copyOf(args == null ? new String[0] : args, args == null ? 1 : args.length + 1);
+        effectiveArgs[effectiveArgs.length - 1] = "gui";
+        return effectiveArgs;
     }
 
     static CommandLine newCommandLine() {
@@ -59,6 +101,32 @@ public class Receiver implements Runnable {
     @Override
     public void run() {
         CommandLine.usage(this, System.out);
+    }
+
+    @Command(name = "gui", mixinStandardHelpOptions = true, resourceBundle = "Messages",
+            description = "Open the receiver GUI.")
+    static final class GuiCommand implements Callable<Integer> {
+        @Override
+        public Integer call() throws Exception {
+            if (GraphicsEnvironment.isHeadless()) {
+                System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
+                return 2;
+            }
+
+            CountDownLatch closed = new CountDownLatch(1);
+            SwingUtilities.invokeAndWait(() -> {
+                JFrame frame = ReceiverGui.createFrame();
+                frame.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosed(WindowEvent event) {
+                        closed.countDown();
+                    }
+                });
+                frame.setVisible(true);
+            });
+            closed.await();
+            return 0;
+        }
     }
 
     @Command(name = "decode", mixinStandardHelpOptions = true, resourceBundle = "Messages",

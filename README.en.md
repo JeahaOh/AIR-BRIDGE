@@ -52,11 +52,13 @@ build/libs/receiver-<version>.jar
 The version format is `{major}.{minor}.{yymmdd}.{hh24mi}`.
 
 The default runtime entrypoint for both `sender` and `receiver` is the fat jar.
+Running the jar without a command opens the GUI. Supplying a command or CLI
+option such as `encode`, `decode`, or `--help` keeps the existing CLI behavior.
 
 ## Public Commands
 
-- `sender`: `encode`, `slide`, `unpack`
-- `receiver`: `decode`, `capture`, `identify`, `pack`
+- `sender`: `encode`, `gui`, `slide`, `unpack`
+- `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 ## Quick Start
 

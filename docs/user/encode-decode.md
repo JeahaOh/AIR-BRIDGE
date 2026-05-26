@@ -30,6 +30,30 @@ java -jar build/libs/sender-<version>.jar encode \
   --project-name PROJECT
 ```
 
+GUI로 인코딩할 수도 있습니다.
+
+```bash
+java -jar build/libs/sender-<version>.jar gui
+```
+
+`Encode` 탭에서 입력 디렉터리와 출력 디렉터리를 선택한 뒤 `Encode`를
+누릅니다. 같은 GUI의 `Slide` 탭에서 슬라이드 입력 디렉터리를 고를 수 있고,
+`Encode` 탭의 `Slide` 버튼은 출력 디렉터리가 입력돼 있으면 그 디렉터리를
+바로 슬라이드 입력으로 엽니다.
+
+encode 실행 중에는 결과가 중간에 다른 설정과 섞이지 않도록 Encode 탭의
+입력값이 잠깁니다. 잠기는 대상은 입력/출력/encode root, 프로젝트/오류 보정,
+chunk size, QR size, label height, files per folder, targets, skip dirs,
+exclude, 변환 옵션, folder structure, print HTML입니다. 실행 중단이 필요하면
+`Stop`을 누릅니다. Stop으로 중단되면 이번 encode 실행에서 생성한 QR PNG,
+manifest, print HTML 파일은 정리하고, 기존에 있던 파일이나 비어 있지 않은
+디렉터리는 유지합니다.
+
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
+native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
+내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
+유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+
 주요 입력:
 
 - `--in`: 인코딩할 파일이 있는 디렉터리
@@ -90,6 +114,20 @@ java -jar build/libs/receiver-<version>.jar decode \
   --in /path/qr-images \
   --out /path/restore
 ```
+
+GUI로 복원할 수도 있습니다.
+
+```bash
+java -jar build/libs/receiver-<version>.jar gui
+```
+
+`Decode` 탭에서 QR PNG 입력 디렉터리와 복원 출력 디렉터리를 선택한 뒤
+`Decode`를 누릅니다. CLI `decode`와 같은 복원 로직을 사용합니다.
+복원이 실행되는 동안에는 Decode 탭의 입력값을 바꿀 수 없습니다.
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
+native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
+내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
+유효하지 않으면 앱을 시작한 위치에서 시작합니다.
 
 주요 입력:
 

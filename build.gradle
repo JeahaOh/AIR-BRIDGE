@@ -20,6 +20,11 @@ tasks.register('syncRootLibs', Sync) {
     into layout.buildDirectory.dir('libs')
 }
 
+tasks.register('syncGuiUserManual', Sync) {
+    from layout.projectDirectory.dir('docs/gui-user-manual')
+    into layout.buildDirectory.dir('gui-user-manual')
+}
+
 tasks.register('printRootLibs') {
     dependsOn tasks.named('syncRootLibs')
     doLast {
@@ -48,6 +53,7 @@ tasks.register('printRootLibs') {
 }
 
 tasks.named('build') {
+    dependsOn tasks.named('syncGuiUserManual')
     finalizedBy tasks.named('printRootLibs')
 }
 

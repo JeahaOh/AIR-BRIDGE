@@ -4,6 +4,7 @@
 
 - `encode-decode.md`
 - `faster.md`
+- `gui-cli-plan.md`
 - `packager.md`
 - `slide-capture.md`
 - `codex/README.md`

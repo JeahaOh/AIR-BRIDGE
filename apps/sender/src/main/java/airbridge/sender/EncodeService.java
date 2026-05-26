@@ -11,11 +11,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 
 final class EncodeService {
     private final QrImageWriter qrImageWriter;
@@ -54,13 +57,25 @@ final class EncodeService {
                             List<String> excludePaths,
                             boolean printHtml,
                             EncodeListener listener) throws Exception {
+        return encode(srcPath, outPath, rootPath, projectName, targetExtensions, skipDirs, excludePaths, printHtml, listener, () -> false);
+    }
+
+    EncodeSummary encode(Path srcPath,
+                            Path outPath,
+                            Path rootPath,
+                            String projectName,
+                            List<String> targetExtensions,
+                            List<String> skipDirs,
+                            List<String> excludePaths,
+                            boolean printHtml,
+                            EncodeListener listener,
+                            BooleanSupplier cancelled) throws Exception {
         EncodeListener effectiveListener = listener != null ? listener : line -> { };
+        BooleanSupplier effectiveCancelled = cancelled != null ? cancelled : () -> false;
         List<Path> sourceFiles = SourceCollector.collectSourceFiles(srcPath, targetExtensions, skipDirs, excludePaths);
         if (sourceFiles.isEmpty()) {
             return new EncodeSummary(0, 0, 0, null);
         }
-
-        Files.createDirectories(outPath);
 
         int totalQrCount = 0;
         int totalFileCount = 0;
@@ -73,97 +88,112 @@ final class EncodeService {
         manifest.append(ConsoleSupport.line('=', 60)).append("\n\n");
 
         List<Path> allQrPaths = new ArrayList<>();
+        List<Path> createdFiles = new ArrayList<>();
+        List<Path> createdDirs = new ArrayList<>();
 
-        for (int fi = 0; fi < sourceFiles.size(); fi++) {
-            Path file = sourceFiles.get(fi);
-            String sourceRelPath = rootPath.relativize(file).toString().replace('\\', '/');
+        try {
+            createDirectory(outPath, createdDirs);
 
-            String origName = file.getFileName().toString();
-            String origExtLower = detectExtension(origName);
-            if (".xls".equals(origExtLower)) {
-                effectiveListener.onLog("");
-                effectiveListener.onLog("  [WARN] .xls(구형 바이너리 포맷)는 자동 CSV 변환 미지원. 원본 그대로 인코딩합니다.");
-            }
+            for (int fi = 0; fi < sourceFiles.size(); fi++) {
+                throwIfCancelled(effectiveCancelled);
+                Path file = sourceFiles.get(fi);
+                String sourceRelPath = rootPath.relativize(file).toString().replace('\\', '/');
 
-            FileEncodingPlan plan = FileEncodingPlan.fromSourceFile(
-                    file,
-                    sourceRelPath,
-                    convertXlsxToCsv,
-                    convertOfficeToText,
-                    chunkDataSize
-            );
-            totalOrigBytes += plan.fileSize();
-
-            effectiveListener.onLog("");
-            if (plan.convertedType() != null) {
-                effectiveListener.onLog(String.format("[FILE %d/%d] %s (%s 변환)",
-                        fi + 1, sourceFiles.size(), plan.relPath(), plan.convertedType()));
-                effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
-                        plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
-            } else {
-                effectiveListener.onLog(String.format("[FILE %d/%d] %s", fi + 1, sourceFiles.size(), plan.relPath()));
-                effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
-                        plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
-            }
-
-            Path fileOutDir = null;
-            if (folderStructure) {
-                Path relDir = srcPath.relativize(file).getParent();
-                fileOutDir = (relDir != null) ? outPath.resolve(relDir) : outPath;
-                Files.createDirectories(fileOutDir);
-            }
-
-            manifest.append(String.format("[%s] %,d bytes -> QR %d장 (hash: %s)\n",
-                    plan.relPath(), plan.fileSize(), plan.totalChunks(), plan.fileHash().substring(0, 16)));
-
-            for (int i = 0; i < plan.totalChunks(); i++) {
-                int start = i * chunkDataSize;
-                int end = Math.min((i + 1) * chunkDataSize, plan.encodedSize());
-                String chunkData = plan.encoded().substring(start, end);
-
-                String payload = QrPayloadSupport.buildPayload(
-                        projectName,
-                        plan.relPath(),
-                        i + 1,
-                        plan.totalChunks(),
-                        plan.fileHash(),
-                        chunkData
-                );
-
-                String line1 = buildQrLabel(plan.fileName(), i + 1, plan.totalChunks());
-                String line2 = plan.relPath();
-                BufferedImage qrImage = qrImageWriter.generateQrImage(payload, line1, line2);
-
-                if (!folderStructure) {
-                    String folderName = String.format("%07d", (pngCounter / filesPerFolder) * filesPerFolder);
-                    fileOutDir = outPath.resolve(folderName);
-                    Files.createDirectories(fileOutDir);
+                String origName = file.getFileName().toString();
+                String origExtLower = detectExtension(origName);
+                if (".xls".equals(origExtLower)) {
+                    effectiveListener.onLog("");
+                    effectiveListener.onLog("  [WARN] .xls(구형 바이너리 포맷)는 자동 CSV 변환 미지원. 원본 그대로 인코딩합니다.");
                 }
 
-                String qrFileName = buildQrFileName(plan.safePrefix(), i + 1, plan.totalChunks());
-                Path qrFilePath = fileOutDir.resolve(qrFileName);
-                ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
-                allQrPaths.add(qrFilePath);
+                FileEncodingPlan plan = FileEncodingPlan.fromSourceFile(
+                        file,
+                        sourceRelPath,
+                        convertXlsxToCsv,
+                        convertOfficeToText,
+                        chunkDataSize
+                );
+                totalOrigBytes += plan.fileSize();
 
-                totalQrCount++;
-                pngCounter++;
+                effectiveListener.onLog("");
+                if (plan.convertedType() != null) {
+                    effectiveListener.onLog(String.format("[FILE %d/%d] %s (%s 변환)",
+                            fi + 1, sourceFiles.size(), plan.relPath(), plan.convertedType()));
+                    effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
+                            plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
+                } else {
+                    effectiveListener.onLog(String.format("[FILE %d/%d] %s", fi + 1, sourceFiles.size(), plan.relPath()));
+                    effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
+                            plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
+                }
+
+                Path fileOutDir = null;
+                if (folderStructure) {
+                    Path relDir = srcPath.relativize(file).getParent();
+                    fileOutDir = (relDir != null) ? outPath.resolve(relDir) : outPath;
+                    createDirectory(fileOutDir, createdDirs);
+                }
+
+                manifest.append(String.format("[%s] %,d bytes -> QR %d장 (hash: %s)\n",
+                        plan.relPath(), plan.fileSize(), plan.totalChunks(), plan.fileHash().substring(0, 16)));
+
+                for (int i = 0; i < plan.totalChunks(); i++) {
+                    throwIfCancelled(effectiveCancelled);
+                    int start = i * chunkDataSize;
+                    int end = Math.min((i + 1) * chunkDataSize, plan.encodedSize());
+                    String chunkData = plan.encoded().substring(start, end);
+
+                    String payload = QrPayloadSupport.buildPayload(
+                            projectName,
+                            plan.relPath(),
+                            i + 1,
+                            plan.totalChunks(),
+                            plan.fileHash(),
+                            chunkData
+                    );
+
+                    String line1 = buildQrLabel(plan.fileName(), i + 1, plan.totalChunks());
+                    String line2 = plan.relPath();
+                    BufferedImage qrImage = qrImageWriter.generateQrImage(payload, line1, line2);
+
+                    if (!folderStructure) {
+                        String folderName = String.format("%07d", (pngCounter / filesPerFolder) * filesPerFolder);
+                        fileOutDir = outPath.resolve(folderName);
+                        createDirectory(fileOutDir, createdDirs);
+                    }
+
+                    String qrFileName = buildQrFileName(plan.safePrefix(), i + 1, plan.totalChunks());
+                    Path qrFilePath = fileOutDir.resolve(qrFileName);
+                    ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
+                    allQrPaths.add(qrFilePath);
+                    createdFiles.add(qrFilePath);
+
+                    totalQrCount++;
+                    pngCounter++;
+                }
+
+                totalFileCount++;
             }
 
-            totalFileCount++;
+            manifest.append("\n").append(ConsoleSupport.line('=', 60)).append("\n");
+            manifest.append(String.format("총 파일: %d개 / 총 QR: %d장 / 총 원본: %,d bytes\n",
+                    totalFileCount, totalQrCount, totalOrigBytes));
+
+            Path manifestPath = outPath.resolve("_manifest.txt");
+            Files.write(manifestPath, manifest.toString().getBytes(StandardCharsets.UTF_8));
+            createdFiles.add(manifestPath);
+
+            if (printHtml) {
+                throwIfCancelled(effectiveCancelled);
+                Path printHtmlPath = generatePrintHtml(allQrPaths, outPath, effectiveListener, effectiveCancelled);
+                createdFiles.add(printHtmlPath);
+            }
+
+            return new EncodeSummary(totalQrCount, totalFileCount, totalOrigBytes, manifestPath);
+        } catch (CancellationException e) {
+            cleanupCancelledOutput(createdFiles, createdDirs, effectiveListener);
+            throw e;
         }
-
-        manifest.append("\n").append(ConsoleSupport.line('=', 60)).append("\n");
-        manifest.append(String.format("총 파일: %d개 / 총 QR: %d장 / 총 원본: %,d bytes\n",
-                totalFileCount, totalQrCount, totalOrigBytes));
-
-        Path manifestPath = outPath.resolve("_manifest.txt");
-        Files.write(manifestPath, manifest.toString().getBytes(StandardCharsets.UTF_8));
-
-        if (printHtml) {
-            generatePrintHtml(allQrPaths, outPath, effectiveListener);
-        }
-
-        return new EncodeSummary(totalQrCount, totalFileCount, totalOrigBytes, manifestPath);
     }
 
     ReencodeSummary reencode(Path srcPath,
@@ -299,7 +329,40 @@ final class EncodeService {
         return fileName.substring(dotIdx).toLowerCase(Locale.ROOT);
     }
 
-    private static void generatePrintHtml(List<Path> qrPaths, Path outPath, EncodeListener listener) throws IOException {
+    private static void throwIfCancelled(BooleanSupplier cancelled) {
+        if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) {
+            throw new CancellationException("encode cancelled");
+        }
+    }
+
+    private static void createDirectory(Path dir, List<Path> createdDirs) throws IOException {
+        if (Files.notExists(dir)) {
+            Files.createDirectories(dir);
+            createdDirs.add(dir);
+        }
+    }
+
+    private static void cleanupCancelledOutput(List<Path> createdFiles, List<Path> createdDirs, EncodeListener listener) {
+        for (int i = createdFiles.size() - 1; i >= 0; i--) {
+            try {
+                Files.deleteIfExists(createdFiles.get(i));
+            } catch (IOException e) {
+                listener.onLog("[CANCELLED][WARN] 생성 파일 삭제 실패: " + createdFiles.get(i) + " (" + e.getMessage() + ")");
+            }
+        }
+        createdDirs.stream()
+                .sorted(Comparator.reverseOrder())
+                .forEach(dir -> {
+                    try {
+                        Files.deleteIfExists(dir);
+                    } catch (IOException ignored) {
+                        // Keep non-empty directories because they may contain pre-existing user files.
+                    }
+                });
+        listener.onLog("[CANCELLED] 생성된 encode 파일을 정리했습니다.");
+    }
+
+    private static Path generatePrintHtml(List<Path> qrPaths, Path outPath, EncodeListener listener, BooleanSupplier cancelled) throws IOException {
         listener.onLog("");
         listener.onLog("[HTML] 인쇄용 HTML 생성 중...");
 
@@ -315,6 +378,7 @@ final class EncodeService {
         html.append("</style>\n</head><body>\n");
 
         for (Path qrFile : qrPaths) {
+            throwIfCancelled(cancelled);
             byte[] imgBytes = Files.readAllBytes(qrFile);
             String imgBase64 = Base64.getEncoder().encodeToString(imgBytes);
 
@@ -330,5 +394,6 @@ final class EncodeService {
         Files.write(htmlPath, html.toString().getBytes(StandardCharsets.UTF_8));
         listener.onLog("[HTML] 생성 완료: " + htmlPath);
         listener.onLog(String.format("[HTML] QR %d장 포함", qrPaths.size()));
+        return htmlPath;
     }
 }

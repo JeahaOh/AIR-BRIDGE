@@ -33,20 +33,21 @@
 ### 현재 값
 
 현재 코드 기준:
-- `DEFAULT_PAGE_DISPLAY_MS = 400`
-- `DEFAULT_BLACK_FRAME_MS = 100`
+- `DEFAULT_PAGE_DISPLAY_MS = 100`
+- `DEFAULT_BLACK_FRAME_MS = 50`
 - `MAX_CACHE_SIZE = 200`
 - `PRELOAD_COUNT = 30`
 - `PREFETCH_COUNT = 20`
 
 위치:
+- [`SlideDefaults.java`](../../libs/slide/src/main/java/airbridge/slide/SlideDefaults.java)
 - [`SlideApp.java`](../../libs/slide/src/main/java/airbridge/slide/SlideApp.java)
 
 ### 항목별 상태
 
 - `blackFrameMs` 줄이기 또는 `0` 사용
   - `반영됨`
-  - 코드 변경이 아니라 운영 설정으로 바로 적용 가능
+  - 기본값은 `50ms`로 낮췄고, 운영 설정으로 `0`까지 조정 가능
 
 - `MAX_CACHE_SIZE` 확대
   - `반영됨`
@@ -86,6 +87,10 @@
 - 현재 프레임 miss 도 UI 블로킹 없이 넘길 수 있는 상태
 
 ### 현재 권장 운영값
+
+기본값:
+- `page=100ms`
+- `black=50ms`
 
 안정형:
 - `page=250ms`

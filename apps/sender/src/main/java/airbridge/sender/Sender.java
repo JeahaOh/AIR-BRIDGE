@@ -4,6 +4,7 @@ import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
 import airbridge.packager.UnpackCommand;
+import airbridge.sender.gui.SenderGui;
 import airbridge.slide.SlideApp;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import picocli.CommandLine;
@@ -13,6 +14,11 @@ import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Model.CommandSpec;
 
+import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
+import java.awt.GraphicsEnvironment;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -22,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 
 @Command(
         name = "sender",
@@ -29,6 +36,7 @@ import java.util.concurrent.Callable;
         resourceBundle = "Messages",
         subcommands = {
                 Sender.EncodeCommand.class,
+                Sender.GuiCommand.class,
                 Sender.SlideCommand.class,
                 UnpackCommand.class,
                 Sender.ReencodeCommand.class
@@ -45,6 +53,9 @@ public class Sender implements Runnable {
 
     public static void main(String[] args) {
         CliSupport.setLocaleFromArgs(args);
+        if (shouldLaunchGuiByDefault(args)) {
+            args = appendGuiCommand(args);
+        }
         String[] slideArgs = extractDirectSlideArgs(args);
         if (slideArgs != null) {
             SlideApp.launch(slideArgs);
@@ -52,6 +63,36 @@ public class Sender implements Runnable {
         }
         int exitCode = newCommandLine().execute(args);
         System.exit(exitCode);
+    }
+
+    static boolean shouldLaunchGuiByDefault(String[] args) {
+        if (args == null || args.length == 0) {
+            return true;
+        }
+
+        int index = 0;
+        while (index < args.length) {
+            String arg = args[index];
+            if ("--lang".equals(arg)) {
+                if (index + 1 >= args.length) {
+                    return false;
+                }
+                index += 2;
+                continue;
+            }
+            if (arg.startsWith("--lang=")) {
+                index++;
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static String[] appendGuiCommand(String[] args) {
+        String[] effectiveArgs = Arrays.copyOf(args == null ? new String[0] : args, args == null ? 1 : args.length + 1);
+        effectiveArgs[effectiveArgs.length - 1] = "gui";
+        return effectiveArgs;
     }
 
     private static String[] extractDirectSlideArgs(String[] args) {
@@ -91,6 +132,32 @@ public class Sender implements Runnable {
     @Override
     public void run() {
         CommandLine.usage(this, System.out);
+    }
+
+    @Command(name = "gui", mixinStandardHelpOptions = true, resourceBundle = "Messages",
+            description = "Open the sender GUI.")
+    static final class GuiCommand implements Callable<Integer> {
+        @Override
+        public Integer call() throws Exception {
+            if (GraphicsEnvironment.isHeadless()) {
+                System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
+                return 2;
+            }
+
+            CountDownLatch closed = new CountDownLatch(1);
+            SwingUtilities.invokeAndWait(() -> {
+                JFrame frame = SenderGui.createFrame();
+                frame.addWindowListener(new WindowAdapter() {
+                    @Override
+                    public void windowClosed(WindowEvent event) {
+                        closed.countDown();
+                    }
+                });
+                frame.setVisible(true);
+            });
+            closed.await();
+            return 0;
+        }
     }
 
     static final class EncodeSharedOptions {

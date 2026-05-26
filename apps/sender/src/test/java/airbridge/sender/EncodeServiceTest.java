@@ -23,10 +23,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EncodeServiceTest {
@@ -175,6 +177,42 @@ class EncodeServiceTest {
         assertEquals(1, summary.errorCount());
         assertEquals(insidePlan.totalChunks(), summary.totalQrCount());
         assertFalse(Files.exists(outDir.resolve("escape.txt")));
+    }
+
+    @Test
+    void cancelledEncodeRemovesFilesCreatedByCurrentRun() throws Exception {
+        Path srcDir = tempDir.resolve("src");
+        Files.createDirectories(srcDir);
+        Files.write(srcDir.resolve("sample.txt"), randomBytes(2048, 41L));
+
+        Path outDir = tempDir.resolve("encoded");
+        AtomicInteger cancellationChecks = new AtomicInteger();
+
+        assertThrows(java.util.concurrent.CancellationException.class, () -> new EncodeService(
+                new QrImageWriter(450, 70, ErrorCorrectionLevel.M),
+                30,
+                false,
+                false,
+                false,
+                500
+        ).encode(
+                srcDir,
+                outDir,
+                srcDir,
+                "TESTPROJ",
+                List.of("txt"),
+                List.of(),
+                List.of(),
+                true,
+                null,
+                () -> cancellationChecks.getAndIncrement() >= 2
+        ));
+
+        if (Files.exists(outDir)) {
+            try (Stream<Path> stream = Files.walk(outDir)) {
+                assertEquals(List.of(outDir), stream.sorted().toList());
+            }
+        }
     }
 
     private static byte[] randomBytes(int size, long seed) {

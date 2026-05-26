@@ -15,6 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SlideSpinnerBehaviorTest {
     @Test
+    void defaultsUseFastPlaybackTiming() {
+        assertEquals(100, SlideDefaults.DEFAULT_PAGE_DISPLAY_MS);
+        assertEquals(50, SlideDefaults.DEFAULT_BLACK_FRAME_MS);
+    }
+
+    @Test
     void configureNumericSpinnerEditorRestrictsInvalidInput() throws Exception {
         AtomicReference<AssertionError> failure = new AtomicReference<>();
 

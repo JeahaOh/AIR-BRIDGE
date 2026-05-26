@@ -33,6 +33,12 @@
 java -jar build/libs/sender-<version>.jar slide
 ```
 
+초기 입력 디렉터리를 지정해 열기:
+
+```bash
+java -jar build/libs/sender-<version>.jar slide --in /path/qr
+```
+
 도움말:
 
 ```bash
@@ -51,6 +57,11 @@ java -jar build/libs/sender-<version>.jar slide --help
 2. 필요하면 `Page(ms)`, `Black(ms)`, `Loop`를 조정한다.
 3. `Play`로 재생을 시작한다.
 
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
+native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
+내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
+유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+
 주요 UI:
 
 - `Browse`: 입력 디렉터리 선택
@@ -64,8 +75,8 @@ java -jar build/libs/sender-<version>.jar slide --help
 
 기본값:
 
-- `Page(ms)`: `400`
-- `Black(ms)`: `100`
+- `Page(ms)`: `100`
+- `Black(ms)`: `50`
 - `Loop`: `1`
 - `Full Screen`: 기본 켜짐
 - `Always On Top`: 기본 켜짐
@@ -87,6 +98,25 @@ java -jar build/libs/sender-<version>.jar slide --help
 java -jar build/libs/receiver-<version>.jar capture \
   --out /path/capture-out
 ```
+
+GUI 실행:
+
+```bash
+java -jar build/libs/receiver-<version>.jar gui
+```
+
+GUI의 `Capture` 탭은 CLI `capture`와 같은 `CaptureService`를 사용합니다.
+출력 디렉터리와 장치 설정을 입력한 뒤 `Start`로 캡처를 시작하고,
+필요하면 `Stop`으로 종료합니다.
+GUI에서는 `duration`, `max payloads`, `same signal` 값을 직접 입력하지 않고
+내부 기본값을 사용합니다. 캡처가 실행되는 동안에는 Capture 탭의 입력값이
+잠기고 `Decode` 버튼도 비활성화됩니다. `Preview`와 `Preview FPS`는 캡처
+실행 중에도 바꿀 수 있으며, GUI 미리보기 갱신 빈도에만 영향을 줍니다.
+캡처가 끝난 뒤 같은 GUI의 `Decode` 탭에서 `captured-images` 디렉터리를
+입력으로 선택해 복원할 수 있습니다.
+
+Decode 탭에서 복원을 실행하는 동안에는 QR PNG 입력 디렉터리, 복원 출력
+디렉터리, Browse 버튼, Decode 버튼이 잠깁니다.
 
 장치 목록 확인:
 
@@ -133,8 +163,8 @@ java -jar build/libs/receiver-<version>.jar decode \
 
 `slide` 기본 권장:
 
-- `Page(ms)`: `200`
-- `Black(ms)`: `0`
+- `Page(ms)`: `100`
+- `Black(ms)`: `50`
 
 보수적 설정:
 

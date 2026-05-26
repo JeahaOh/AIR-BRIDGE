@@ -13,6 +13,7 @@
 - `libs/slide/src/main/java/airbridge/slide/SlideImageCatalog.java`
 - `libs/slide/src/main/java/airbridge/slide/SlideDirectoryChooser.java`
 - `libs/slide/src/main/java/airbridge/slide/SlideDefaults.java`
+- `libs/common/src/main/java/airbridge/common/gui/DirectoryChooser.java`
 - `libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java`
 - `libs/capture/src/main/java/airbridge/receiver/capture/CaptureOptions.java`
 - `libs/capture/src/main/java/airbridge/receiver/capture/CaptureSupport.java`
@@ -32,10 +33,15 @@
 
 ## slide 입력 수집
 
-입력 디렉터리 선택은 `SlideDirectoryChooser`가 담당합니다.
+입력 디렉터리 선택은 `SlideDirectoryChooser`가 담당합니다. 실제 선택창
+구현은 `airbridge.common.gui.DirectoryChooser`를 사용하므로 sender/receiver
+GUI의 Browse 버튼과 같은 정책을 공유합니다.
 
 - macOS: `FileDialog` 디렉터리 선택
+- Windows: native `FileDialog`를 우선 시도하고, 디렉터리 선택으로 확정되지 않으면 `JFileChooser(DIRECTORIES_ONLY)`로 fallback
 - 그 외: `JFileChooser(DIRECTORIES_ONLY)`
+- 입력칸 경로가 유효하면 그 위치에서 시작
+- 입력칸이 비어 있거나 유효하지 않으면 앱 실행 위치(`user.dir`)에서 시작
 
 이미지 목록은 `SlideImageCatalog.load(...)`가 만듭니다.
 
@@ -67,6 +73,8 @@
 
 캐시 관련 기본값:
 
+- page display ms: `100`
+- black frame ms: `50`
 - max cache: `200`
 - initial preload: `30`
 - prefetch ahead: `20`
@@ -174,6 +182,14 @@ GUI 재생 전체는 통합 테스트보다 구현 검토와 수동 확인 비�
 - `fps >= 0.1`
 - `decodeWorkers >= 1`
 - `sameSignalSeconds >= 1`
+
+`receiver gui`의 Capture 탭도 같은 `CaptureService`를 호출합니다. GUI에서는
+`durationSeconds`, `maxPayloads`, `sameSignalSeconds` 입력을 노출하지 않고
+`CaptureDefaults` 값을 그대로 사용합니다. Capture 실행 중에는 Capture 입력
+컴포넌트를 잠그고 Decode 시작 버튼을 비활성화해 실행 중 설정 변경과 동시
+decode 시작을 막습니다. 단, `Preview` 토글과 `Preview FPS`는 실행 중에도
+수정 가능하며 `CaptureService`가 emit한 preview frame을 GUI listener 쪽에서
+추가로 drop/coalesce하는 데만 사용합니다.
 
 ## capture 장치 탐색
 

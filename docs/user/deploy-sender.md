@@ -7,6 +7,7 @@
 `sender`는 아래 작업을 담당한다.
 
 - `encode`: 입력 파일을 QR 이미지 세트로 변환
+- `gui`: sender GUI 실행. 현재는 encode와 slide 화면을 제공
 - `slide`: QR 이미지 또는 일반 이미지 세트를 화면에 재생
 - `unpack`: 패킹된 jar/zip의 `.txt` suffix를 제거
 
@@ -25,6 +26,10 @@ build/libs/sender-<version>.jar
 ```bash
 java -jar build/libs/sender-<version>.jar
 ```
+
+명령 없이 실행하면 sender GUI가 열립니다. jar를 더블 클릭해 실행하는 경우도
+같은 동작을 목표로 합니다. `encode`, `slide`, `unpack`, `--help`처럼 명령이나
+CLI 옵션을 지정하면 CLI로 동작합니다.
 
 도움말:
 
@@ -49,10 +54,32 @@ java -jar build/libs/sender-<version>.jar encode \
   --project-name PROJECT
 ```
 
+GUI에서 파일을 QR 이미지로 만들기:
+
+```bash
+java -jar build/libs/sender-<version>.jar gui
+```
+
+`gui` 명령을 명시해도 되고, 명령 없이 jar만 실행해도 같은 GUI가 열립니다.
+
+GUI의 `Slide` 탭에서 슬라이드 입력 디렉터리를 고를 수 있습니다. `Encode`
+탭의 `Slide` 버튼은 출력 디렉터리가 입력돼 있으면 그 디렉터리를 슬라이드
+입력으로 열어 줍니다.
+
+encode 실행 중에는 Encode 탭의 입력값과 Browse 버튼이 잠기며, 중단은
+`Stop`으로 요청합니다. 중단된 encode는 이번 실행에서 만든 QR PNG, manifest,
+print HTML 파일을 정리합니다.
+
 QR 이미지를 화면에 재생하기:
 
 ```bash
 java -jar build/libs/sender-<version>.jar slide
+```
+
+초기 입력 디렉터리를 지정해 열 수도 있습니다.
+
+```bash
+java -jar build/libs/sender-<version>.jar slide --in /path/qr
 ```
 
 패킹된 zip을 다시 복원하기:
@@ -70,6 +97,8 @@ java -jar build/libs/sender-<version>.jar unpack --in /path/to/sender.zip
 ## 간단 확인
 
 - `java -jar build/libs/sender-<version>.jar --help`
+- `java -jar build/libs/sender-<version>.jar`
+- `java -jar build/libs/sender-<version>.jar gui`
 - `java -jar build/libs/sender-<version>.jar encode --help`
 - `java -jar build/libs/sender-<version>.jar slide --help`
 - `java -jar build/libs/sender-<version>.jar unpack --help`

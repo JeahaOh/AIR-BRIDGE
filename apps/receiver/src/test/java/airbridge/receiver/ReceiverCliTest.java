@@ -7,6 +7,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReceiverCliTest {
@@ -17,6 +18,7 @@ class ReceiverCliTest {
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().contains("air-bridge receiver - "));
         assertTrue(result.stdout().contains("Usage: receiver"));
+        assertTrue(result.stdout().contains("gui"));
         assertTrue(result.stdout().contains("identify"));
     }
 
@@ -27,6 +29,21 @@ class ReceiverCliTest {
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().contains("air-bridge receiver - "));
         assertTrue(result.stdout().contains("____"));
+    }
+
+    @Test
+    void noArgsLaunchesGuiByDefault() {
+        assertTrue(Receiver.shouldLaunchGuiByDefault(new String[0]));
+        assertTrue(Receiver.shouldLaunchGuiByDefault(new String[]{"--lang", "ko"}));
+        assertTrue(Receiver.shouldLaunchGuiByDefault(new String[]{"--lang=en"}));
+    }
+
+    @Test
+    void commandArgsStayCli() {
+        assertFalse(Receiver.shouldLaunchGuiByDefault(new String[]{"--help"}));
+        assertFalse(Receiver.shouldLaunchGuiByDefault(new String[]{"decode", "--help"}));
+        assertFalse(Receiver.shouldLaunchGuiByDefault(new String[]{"capture"}));
+        assertFalse(Receiver.shouldLaunchGuiByDefault(new String[]{"--lang"}));
     }
 
     private static Result execute(String... args) {

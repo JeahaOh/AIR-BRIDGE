@@ -53,10 +53,13 @@ build/libs/receiver-<version>.jar
 
 실행 기준은 `sender` 와 `receiver` 모두 jar 입니다.
 
+`java -jar ...`처럼 명령 없이 실행하면 GUI가 열립니다. `encode`, `decode`,
+`--help`처럼 명령이나 CLI 옵션을 지정하면 기존 CLI로 동작합니다.
+
 ## 기본 명령
 
-- `sender`: `encode`, `slide`, `unpack`
-- `receiver`: `decode`, `capture`, `identify`, `pack`
+- `sender`: `encode`, `gui`, `slide`, `unpack`
+- `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 ## Quick Start
 

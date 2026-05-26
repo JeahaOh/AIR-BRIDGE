@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,6 +25,7 @@ class SenderCliTest {
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().contains("air-bridge sender - "));
         assertTrue(result.stdout().contains("Usage: sender"));
+        assertTrue(result.stdout().contains("gui"));
     }
 
     @Test
@@ -33,6 +35,21 @@ class SenderCliTest {
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().contains("air-bridge sender - "));
         assertTrue(result.stdout().contains("____"));
+    }
+
+    @Test
+    void noArgsLaunchesGuiByDefault() {
+        assertTrue(Sender.shouldLaunchGuiByDefault(new String[0]));
+        assertTrue(Sender.shouldLaunchGuiByDefault(new String[]{"--lang", "ko"}));
+        assertTrue(Sender.shouldLaunchGuiByDefault(new String[]{"--lang=en"}));
+    }
+
+    @Test
+    void commandArgsStayCli() {
+        assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"--help"}));
+        assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"encode", "--help"}));
+        assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"slide"}));
+        assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"--lang"}));
     }
 
     @Test

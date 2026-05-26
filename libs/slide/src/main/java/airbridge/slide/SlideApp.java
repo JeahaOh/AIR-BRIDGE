@@ -68,11 +68,22 @@ import airbridge.common.VersionSupport;
 public class SlideApp {
     public static void launch(String[] args) {
         if (args != null && Arrays.stream(args).anyMatch(arg -> "--help".equals(arg) || "-h".equals(arg))) {
-            System.out.println("Usage: sender slide");
+            System.out.println("Usage: sender slide [--in DIR|DIR]");
             System.out.println("Launch the Swing slide player bundled inside the sender app.");
             return;
         }
-        main(args);
+        launch(initialInputDirFromArgs(args));
+    }
+
+    public static void launch(Path inputDir) {
+        SwingUtilities.invokeLater(() -> {
+            try {
+                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+            } catch (Exception ignored) {
+                // fall back to default look and feel
+            }
+            new SlideApp(inputDir).start();
+        });
     }
 
     private static final Color COLOR_BG = Color.BLACK;
@@ -128,24 +139,50 @@ public class SlideApp {
     private Rectangle windowedBounds;
     private boolean fullScreenActive;
     private boolean playing;
-    private boolean showingBlackFrame;
     private boolean selectionSyncing;
-    private boolean postFinishBlackout;
     private boolean controlsVisible = true;
-    private int currentIndex;
-    private int completedLoops;
-    private int lastNonBlackIndex = -1;
     private int savedDividerLocation = 1080;
+    private final Path initialInputDir;
+    private final SlidePlaybackController playback = new SlidePlaybackController();
+
+    public SlideApp() {
+        this(null);
+    }
+
+    private SlideApp(Path initialInputDir) {
+        this.initialInputDir = initialInputDir != null ? initialInputDir.toAbsolutePath().normalize() : null;
+    }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception ignored) {
-                // fall back to default look and feel
+        launch(initialInputDirFromArgs(args));
+    }
+
+    static Path initialInputDirFromArgs(String[] args) {
+        if (args == null || args.length == 0) {
+            return null;
+        }
+        for (int index = 0; index < args.length; index++) {
+            String arg = args[index];
+            if (arg == null || arg.isBlank()) {
+                continue;
             }
-            new SlideApp().start();
-        });
+            if ("--in".equals(arg) || "--input".equals(arg)) {
+                if (index + 1 >= args.length) {
+                    return null;
+                }
+                return Path.of(args[index + 1]);
+            }
+            if (arg.startsWith("--in=")) {
+                return Path.of(arg.substring("--in=".length()));
+            }
+            if (arg.startsWith("--input=")) {
+                return Path.of(arg.substring("--input=".length()));
+            }
+            if (!arg.startsWith("-")) {
+                return Path.of(arg);
+            }
+        }
+        return null;
     }
 
     private void start() {
@@ -196,6 +233,10 @@ public class SlideApp {
         frame.setAlwaysOnTop(true);
         alwaysOnTopCheckBox.setSelected(true);
         frame.setVisible(true);
+        if (initialInputDir != null) {
+            inputDirField.setText(initialInputDir.toString());
+            loadImagesFromInput();
+        }
         printShortcutHelp(System.out);
         SwingUtilities.invokeLater(() -> {
             setFullScreen(true);
@@ -377,11 +418,7 @@ public class SlideApp {
         loadingImages.clear();
         treeNodeIndex.clear();
         slideCanvas.setImage(null);
-        showingBlackFrame = false;
-        postFinishBlackout = false;
-        currentIndex = 0;
-        completedLoops = 0;
-        lastNonBlackIndex = -1;
+        playback.reset(0);
 
         Path inputDir = SlideDirectoryChooser.parsePath(inputDirField.getText());
         if (inputDir == null || !Files.isDirectory(inputDir)) {
@@ -396,6 +433,7 @@ public class SlideApp {
             imageFiles.addAll(catalog.imageFiles());
             treeNodeIndex.putAll(catalog.treeNodeIndex());
             imageTree.setModel(new DefaultTreeModel(catalog.treeRoot()));
+            playback.reset(imageFiles.size());
         } catch (Exception e) {
             imageTree.setModel(new DefaultTreeModel(new DefaultMutableTreeNode("Pages")));
             updateImageCountLabel();
@@ -433,7 +471,7 @@ public class SlideApp {
     }
 
     private void startPlayback() {
-        postFinishBlackout = false;
+        playback.startPlayback();
         cancelCloseTimer();
         playing = true;
         startMouseJiggle();
@@ -449,9 +487,7 @@ public class SlideApp {
         cancelTimers();
         cancelCloseTimer();
         playPauseButton.setText("Play");
-        if (!postFinishBlackout) {
-            showingBlackFrame = false;
-        }
+        playback.pausePlayback();
         if (keepImage && !imageFiles.isEmpty()) {
             showCurrentImage();
         }
@@ -487,17 +523,9 @@ public class SlideApp {
     }
 
     private void advanceToNext() {
-        showingBlackFrame = false;
-        currentIndex++;
-        if (currentIndex >= imageFiles.size()) {
-            completedLoops++;
-            int loopLimit = getSpinnerValue(loopCountSpinner);
-            if (loopLimit > 0 && completedLoops >= loopLimit) {
-                currentIndex = Math.max(0, imageFiles.size() - 1);
-                enterPostFinishBlackout();
-                return;
-            }
-            currentIndex = 0;
+        if (playback.advanceToNext(getSpinnerValue(loopCountSpinner)) == SlidePlaybackController.AdvanceResult.POST_FINISH) {
+            enterPostFinishBlackout();
+            return;
         }
         showCurrentImage();
         scheduleDisplayPhase();
@@ -507,15 +535,10 @@ public class SlideApp {
         if (imageFiles.isEmpty()) {
             return;
         }
-        boolean wasShowingBlackFrame = showingBlackFrame;
-        postFinishBlackout = false;
-        int targetIndex = Math.max(0, Math.min(imageFiles.size() - 1, currentIndex + delta));
-        if (targetIndex == currentIndex && !wasShowingBlackFrame) {
+        if (!playback.navigateRelative(delta)) {
             focusMainWindow();
             return;
         }
-        showingBlackFrame = false;
-        currentIndex = targetIndex;
         showCurrentImage();
         if (playing) {
             scheduleDisplayPhase();
@@ -528,7 +551,8 @@ public class SlideApp {
             return;
         }
         int generation = imageLoadGeneration.get();
-        Path current = imageFiles.get(currentIndex);
+        int index = playback.currentIndex();
+        Path current = imageFiles.get(index);
         BufferedImage currentImage = getCachedImage(current);
         if (currentImage != null || isImageCached(current)) {
             slideCanvas.setImage(currentImage);
@@ -538,16 +562,15 @@ public class SlideApp {
                 slideCanvas.setImage(null);
             }
         }
-        showingBlackFrame = false;
-        lastNonBlackIndex = currentIndex;
-        syncSelection(currentIndex);
-        prefetchAround(currentIndex);
+        playback.markCurrentImageShown();
+        syncSelection(index);
+        prefetchAround(index);
         setStatusText(buildStatusPrefix(playing ? "PLAY" : "PAUSE") + currentRelativePath());
     }
 
     private void showBlackFrame() {
         slideCanvas.setImage(null);
-        showingBlackFrame = true;
+        playback.showBlackFrame();
         setStatusText(buildStatusPrefix(playing ? "PLAY" : "PAUSE") + currentRelativePath());
     }
 
@@ -573,7 +596,9 @@ public class SlideApp {
             return;
         }
 
-        currentIndex = selectedIndex;
+        if (!playback.selectIndex(selectedIndex)) {
+            return;
+        }
         showCurrentImage();
         if (playing) {
             scheduleDisplayPhase();
@@ -657,10 +682,10 @@ public class SlideApp {
                     imageCache.put(path, image);
                 }
                 shouldRefreshCurrent = repaintIfCurrent
-                        && !showingBlackFrame
-                        && currentIndex >= 0
-                        && currentIndex < imageFiles.size()
-                        && path.equals(imageFiles.get(currentIndex));
+                        && !playback.showingBlackFrame()
+                        && playback.currentIndex() >= 0
+                        && playback.currentIndex() < imageFiles.size()
+                        && path.equals(imageFiles.get(playback.currentIndex()));
             }
 
             SwingUtilities.invokeLater(() -> {
@@ -686,7 +711,7 @@ public class SlideApp {
         topBar.setVisible(controlsVisible);
         rebuildCenterLayout();
         if (controlsVisible) {
-            syncSelection(currentIndex);
+            syncSelection(playback.currentIndex());
         }
         focusMainWindow();
     }
@@ -695,7 +720,7 @@ public class SlideApp {
         playing = false;
         stopMouseJiggle();
         cancelTimers();
-        postFinishBlackout = true;
+        playback.enterPostFinishBlackout();
         playPauseButton.setText("Play");
         showBlackFrame();
         controlsVisible = false;
@@ -714,17 +739,19 @@ public class SlideApp {
         if (imageFiles.isEmpty()) {
             return "no file";
         }
-        int index = lastNonBlackIndex >= 0 ? lastNonBlackIndex : Math.max(0, Math.min(currentIndex, imageFiles.size() - 1));
+        int index = playback.lastNonBlackIndex() >= 0
+                ? playback.lastNonBlackIndex()
+                : Math.max(0, Math.min(playback.currentIndex(), imageFiles.size() - 1));
         return imageFiles.get(index).getFileName().toString();
     }
 
     private String buildStatusPrefix(String state) {
         int loopValue = getSpinnerValue(loopCountSpinner);
         String loopText = loopValue <= 0 ? "inf" : String.valueOf(loopValue);
-        int currentLoop = imageFiles.isEmpty() ? 0 : completedLoops + 1;
+        int currentLoop = imageFiles.isEmpty() ? 0 : playback.completedLoops() + 1;
         return String.format("[%s] %d/%d page=%dms black=%dms loop=%d/%s cache=%d | ",
                 state,
-                imageFiles.isEmpty() ? 0 : currentIndex + 1,
+                imageFiles.isEmpty() ? 0 : playback.currentIndex() + 1,
                 imageFiles.size(),
                 getSpinnerValue(pageDisplaySpinner),
                 getSpinnerValue(blackFrameSpinner),
@@ -801,7 +828,7 @@ public class SlideApp {
     private boolean shouldRecoverForeground() {
         return frame != null
                 && frame.isDisplayable()
-                && (playing || postFinishBlackout);
+                && (playing || playback.postFinishBlackout());
     }
 
     private void recoverForeground() {
@@ -814,7 +841,7 @@ public class SlideApp {
             frame.setAlwaysOnTop(false);
             frame.setAlwaysOnTop(true);
         }
-        if ((playing || postFinishBlackout) && !frame.isVisible()) {
+        if ((playing || playback.postFinishBlackout()) && !frame.isVisible()) {
             frame.setVisible(true);
         }
         frame.toFront();
@@ -937,11 +964,11 @@ public class SlideApp {
     }
 
     private void onTimingSettingChanged() {
-        if (!playing || postFinishBlackout) {
+        if (!playing || playback.postFinishBlackout()) {
             setStatusText(buildStatusPrefix("PAUSE") + currentRelativePath());
             return;
         }
-        if (showingBlackFrame) {
+        if (playback.showingBlackFrame()) {
             scheduleBlackPhase();
         } else {
             scheduleDisplayPhase();
@@ -951,7 +978,7 @@ public class SlideApp {
 
     private void rebuildCenterLayout() {
         centerHost.removeAll();
-        if (controlsVisible && !postFinishBlackout) {
+        if (controlsVisible && !playback.postFinishBlackout()) {
             if (splitPane.getWidth() > 0) {
                 savedDividerLocation = splitPane.getDividerLocation();
             }

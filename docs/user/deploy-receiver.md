@@ -8,6 +8,7 @@
 
 - `decode`: QR 이미지 세트를 읽어 원본 파일 복원
 - `capture`: UVC 카메라 입력에서 QR 프레임 수집
+- `gui`: receiver GUI 실행. 현재는 capture와 decode 화면을 제공
 - `identify`: jar/zip 내부 확장자 목록 추출
 - `pack`: jar/zip 대상 엔트리에 `.txt` suffix 추가
 
@@ -26,6 +27,10 @@ build/libs/receiver-<version>.jar
 ```bash
 java -jar build/libs/receiver-<version>.jar
 ```
+
+명령 없이 실행하면 receiver GUI가 열립니다. jar를 더블 클릭해 실행하는 경우도
+같은 동작을 목표로 합니다. `decode`, `capture`, `identify`, `pack`, `--help`처럼
+명령이나 CLI 옵션을 지정하면 CLI로 동작합니다.
 
 도움말:
 
@@ -70,6 +75,14 @@ java -jar build/libs/receiver-<version>.jar capture \
   --out /path/capture-out
 ```
 
+GUI에서 카메라 캡처 또는 QR PNG 복원하기:
+
+```bash
+java -jar build/libs/receiver-<version>.jar gui
+```
+
+`gui` 명령을 명시해도 되고, 명령 없이 jar만 실행해도 같은 GUI가 열립니다.
+
 장치 목록 보기:
 
 ```bash
@@ -98,6 +111,8 @@ java -jar build/libs/receiver-<version>.jar pack --in /path/to/sender.jar
 ## 간단 확인
 
 - `java -jar build/libs/receiver-<version>.jar --version`
+- `java -jar build/libs/receiver-<version>.jar`
+- `java -jar build/libs/receiver-<version>.jar gui`
 - `java -jar build/libs/receiver-<version>.jar decode --help`
 - `java -jar build/libs/receiver-<version>.jar capture --help`
 - `java -jar build/libs/receiver-<version>.jar identify --help`

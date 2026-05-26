@@ -11,8 +11,12 @@
 ## 관련 구현
 
 - `apps/sender/src/main/java/airbridge/sender/EncodeService.java`
+- `apps/sender/src/main/java/airbridge/sender/EncodeWorkflow.java`
+- `apps/sender/src/main/java/airbridge/sender/gui/SenderGui.java`
 - `apps/sender/src/main/java/airbridge/sender/FileEncodingPlan.java`
 - `apps/receiver/src/main/java/airbridge/receiver/DecodeService.java`
+- `apps/receiver/src/main/java/airbridge/receiver/DecodeWorkflow.java`
+- `apps/receiver/src/main/java/airbridge/receiver/gui/ReceiverGui.java`
 - `apps/receiver/src/main/java/airbridge/receiver/FileChunks.java`
 - `apps/receiver/src/main/java/airbridge/receiver/QrDecodeSupport.java`
 - `libs/common/src/main/java/airbridge/common/QrPayloadSupport.java`
@@ -106,6 +110,28 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
 - 전체 파일 수 / QR 수 / 총 원본 바이트
 
 `_print.html`은 각 PNG를 base64 data URI로 인라인한 단순 인쇄용 HTML이다.
+
+## encode GUI 실행 상태
+
+`sender gui`의 Encode 탭은 `EncodeWorkflow`를 통해 CLI와 같은
+`EncodeService`를 호출한다. Swing EDT를 막지 않도록 실제 encode는
+`SwingWorker`에서 실행한다.
+
+실행 중에는 아래 입력을 비활성화한다.
+
+- input, output, encode root
+- project, error correction level
+- chunk size, QR size, label height, files per folder
+- targets, skip dirs, exclude
+- XLSX/Office 변환 옵션
+- folder structure, print HTML
+- 각 Browse 버튼과 Encode 버튼
+
+`Stop` 버튼은 `AtomicBoolean` cancellation supplier와 `SwingWorker.cancel(true)`를
+함께 사용한다. `EncodeService`는 파일별 처리와 청크 생성 사이에서 cancellation을
+확인하고, 취소되면 이번 실행에서 만든 파일을 삭제한다. 삭제 대상은 생성된 QR PNG,
+`_manifest.txt`, `_print.html`이며, 비어 있는 생성 디렉터리만 제거한다. 비어 있지
+않은 디렉터리는 기존 사용자 파일 보호를 위해 유지한다.
 
 ## decode 입력 수집
 
@@ -212,3 +238,4 @@ encode와 decode 모두 상대경로 안전성은 `RelativePathSupport`에 의�
 - chunking 기준은 바이트가 아니라 Base64 문자열 길이다.
 - QR 파일명은 decode의 복원 근거가 아니다. 실제 복원 기준은 payload다.
 - 성공 시 QR 원본 PNG를 `*-success`로 이동하므로, decode 입력 디렉터리를 후처리 파이프라인과 공유할 때 주의가 필요하다.
+- GUI 실행 중 입력 잠금과 취소 동작은 core service가 아니라 GUI adapter와 workflow 계약에서 관리한다.

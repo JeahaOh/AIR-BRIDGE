@@ -71,10 +71,14 @@ The primary artifacts are `build/libs/sender-<version>.jar` and `build/libs/rece
 
 The default runtime entrypoint for both `sender` and `receiver` is the fat jar.
 
+명령 없이 `java -jar ...`로 실행하면 GUI가 열리고, 명령이나 CLI 옵션을 지정하면 CLI로 동작합니다.
+
+Running the jar without a command opens the GUI. Supplying a command or CLI option keeps CLI behavior.
+
 ## 기본 명령 / Commands
 
-- `sender`: `encode`, `slide`, `unpack`
-- `receiver`: `decode`, `capture`, `identify`, `pack`
+- `sender`: `encode`, `gui`, `slide`, `unpack`
+- `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 ## 빠른 시작 / Quick Start
 

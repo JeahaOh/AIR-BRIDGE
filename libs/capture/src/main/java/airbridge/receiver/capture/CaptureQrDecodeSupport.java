@@ -97,7 +97,10 @@ final class CaptureQrDecodeSupport {
 
     private static List<Map<DecodeHintType, ?>> buildDecodeHintsList() {
         Map<DecodeHintType, Object> normalHints = new EnumMap<>(DecodeHintType.class);
-        normalHints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
+        // Match the QR payload format (8-bit byte mode, ISO-8859-1): decoding the binary payload
+        // as ISO-8859-1 recovers bytes 1:1, so frame dedup keys on the true payload identity
+        // (UTF-8 would fold distinct byte runs into U+FFFD and could collide distinct frames).
+        normalHints.put(DecodeHintType.CHARACTER_SET, "ISO-8859-1");
         normalHints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
 
         Map<DecodeHintType, Object> tryHarderHints = new EnumMap<>(normalHints);

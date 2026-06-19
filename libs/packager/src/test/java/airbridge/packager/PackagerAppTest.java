@@ -218,6 +218,140 @@ class PackagerAppTest {
         assertFalse(unpackedNestedNames.contains("target-ext.txt"));
     }
 
+    @Test
+    void packRewritesJarInJarInJarRecursively() throws Exception {
+        // level 3 (innermost)
+        Path innerJar = tempDir.resolve("inner.jar");
+        createZip(innerJar, Map.of(
+                "deep/blob.dat", text("inner-dat"),
+                "deep/run", text("inner-run"),
+                "deep/keep.xml", text("inner-xml")
+        ));
+        // level 2
+        Path midJar = tempDir.resolve("mid.jar");
+        createZip(midJar, Map.of(
+                "lib/inner.jar", Files.readAllBytes(innerJar),
+                "mid/blob.dat", text("mid-dat")
+        ));
+        // level 1 (outer)
+        Path outer = tempDir.resolve("outer.jar");
+        createZip(outer, Map.of(
+                "lib/mid.jar", Files.readAllBytes(midJar),
+                "assets/root.dat", text("root-dat")
+        ));
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", outer.toString()));
+
+        Path packed = tempDir.resolve("outer.zip");
+        byte[] midBytes = readZipEntryBytes(packed, "lib/mid.jar");
+        byte[] innerBytes = readNestedEntryBytes(midBytes, "lib/inner.jar");
+        List<String> innerNames = listZipEntries(new ByteArrayInputStream(innerBytes));
+
+        // The innermost (level-3) entries must be packed too.
+        assertTrue(innerNames.contains("deep/blob.dat.txt"), "innermost .dat not packed: " + innerNames);
+        assertTrue(innerNames.contains("deep/run.txt"), "innermost extensionless not packed: " + innerNames);
+        assertFalse(innerNames.contains("deep/keep.xml.txt"), "xml should be excluded: " + innerNames);
+    }
+
+    @Test
+    void packRewritesStoredNestedJarsRecursively() throws Exception {
+        // Fat-jar style: nested jars stored uncompressed (STORED), like Spring Boot.
+        Path innerJar = tempDir.resolve("inner.jar");
+        createJar(innerJar, Map.of(
+                "deep/blob.dat", text("inner-dat"),
+                "deep/run", text("inner-run")
+        ));
+        Path midJar = tempDir.resolve("mid.jar");
+        createStoredJar(midJar, Map.of("lib/inner.jar", Files.readAllBytes(innerJar)));
+        Path outer = tempDir.resolve("outer.jar");
+        createStoredJar(outer, Map.of("lib/mid.jar", Files.readAllBytes(midJar)));
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", outer.toString()));
+
+        Path packed = tempDir.resolve("outer.zip");
+        byte[] midBytes = readNestedEntryBytes(readZipEntryBytes(packed, "lib/mid.jar"), "lib/inner.jar");
+        List<String> innerNames = listZipEntries(new ByteArrayInputStream(midBytes));
+        assertTrue(innerNames.contains("deep/blob.dat.txt"), "innermost STORED .dat not packed: " + innerNames);
+        assertTrue(innerNames.contains("deep/run.txt"), "innermost STORED extensionless not packed: " + innerNames);
+    }
+
+    @Test
+    void packThenUnpackRestoresJarInJarInJar() throws Exception {
+        Path innerJar = tempDir.resolve("inner.jar");
+        createZip(innerJar, Map.of("deep/blob.dat", text("inner-dat"), "deep/run", text("inner-run")));
+        Path midJar = tempDir.resolve("mid.jar");
+        createZip(midJar, Map.of("lib/inner.jar", Files.readAllBytes(innerJar)));
+        Path outer = tempDir.resolve("outer.jar");
+        createZip(outer, Map.of("lib/mid.jar", Files.readAllBytes(midJar)));
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", outer.toString()));
+        Path packed = tempDir.resolve("outer.zip");
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
+
+        // After unpack, the innermost entries must be restored to their original names/content.
+        byte[] midBytes = readNestedEntryBytes(readZipEntryBytes(packed, "lib/mid.jar"), "lib/inner.jar");
+        List<String> innerNames = listZipEntries(new ByteArrayInputStream(midBytes));
+        assertTrue(innerNames.contains("deep/blob.dat"), "innermost .dat not restored: " + innerNames);
+        assertTrue(innerNames.contains("deep/run"), "innermost extensionless not restored: " + innerNames);
+        assertFalse(innerNames.contains("deep/blob.dat.txt"), "still packed after unpack: " + innerNames);
+    }
+
+    @Test
+    void unpackRecursesIntoRenamedNestedArchives() throws Exception {
+        // When target-ext.txt lists "jar", pack renames nested archives to .jar.txt AND packs
+        // their contents. Unpack must reverse BOTH: un-rename the archive and recurse to restore
+        // its inner entries.
+        Path innerJar = tempDir.resolve("inner.jar");
+        createZip(innerJar, Map.of("deep/blob.dat", text("inner-dat")));
+        Path outer = tempDir.resolve("outer.jar");
+        createZip(outer, Map.of("lib/inner.jar", Files.readAllBytes(innerJar)));
+        Files.write(tempDir.resolve("target-ext.txt"), List.of("jar", "dat"), StandardCharsets.UTF_8);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", outer.toString()));
+        Path packed = tempDir.resolve("outer.zip");
+        // pack renamed the nested archive and packed its contents
+        byte[] packedInner = readZipEntryBytes(packed, "lib/inner.jar.txt");
+        assertTrue(listZipEntries(new ByteArrayInputStream(packedInner)).contains("deep/blob.dat.txt"));
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
+        byte[] restoredInner = readZipEntryBytes(packed, "lib/inner.jar");
+        List<String> innerNames = listZipEntries(new ByteArrayInputStream(restoredInner));
+        assertTrue(innerNames.contains("deep/blob.dat"), "inner entry not restored on unpack: " + innerNames);
+        assertFalse(innerNames.contains("deep/blob.dat.txt"), "inner entry still packed after unpack: " + innerNames);
+    }
+
+    private static void createStoredJar(Path path, Map<String, byte[]> entries) throws IOException {
+        Manifest manifest = new Manifest();
+        manifest.getMainAttributes().put(Attributes.Name.MANIFEST_VERSION, "1.0");
+        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(path), manifest)) {
+            for (Map.Entry<String, byte[]> e : entries.entrySet()) {
+                byte[] data = e.getValue();
+                ZipEntry entry = new ZipEntry(e.getKey());
+                entry.setMethod(ZipEntry.STORED);
+                entry.setSize(data.length);
+                entry.setCompressedSize(data.length);
+                java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+                crc.update(data);
+                entry.setCrc(crc.getValue());
+                jos.putNextEntry(entry);
+                jos.write(data);
+                jos.closeEntry();
+            }
+        }
+    }
+
+    private static byte[] readNestedEntryBytes(byte[] zipBytes, String entryName) throws IOException {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (entryName.equals(entry.getName())) {
+                    return zis.readAllBytes();
+                }
+            }
+        }
+        throw new AssertionError("nested entry not found: " + entryName);
+    }
+
     private static byte[] text(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
     }

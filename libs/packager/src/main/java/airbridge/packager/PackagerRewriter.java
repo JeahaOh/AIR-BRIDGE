@@ -144,7 +144,11 @@ public final class PackagerRewriter {
                 String newName = renameIfMatch(originalName, targetExts, mode);
 
                 byte[] payload = readAllBytes(zis);
-                if (PackagerInspector.isPackageName(originalName)) {
+                // On unpack a nested archive arrives renamed (e.g. inner.jar.txt) when "jar"/"zip"
+                // is a target ext, so its package-ness shows on the un-renamed name. Recurse if
+                // either name is a package so the nested entries are reversed too (symmetric with
+                // pack, which recurses on the original ".jar" name).
+                if (PackagerInspector.isPackageName(originalName) || PackagerInspector.isPackageName(newName)) {
                     payload = rewriteNestedPackage(payload, targetExts, mode, List.of());
                 }
 

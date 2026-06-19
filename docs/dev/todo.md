@@ -32,9 +32,10 @@
   `a/sample.txt`, `b/sample.txt`처럼 같은 이름의 파일이 같은 출력 폴더에서
   덮어써질 수 있다. → 평탄화 출력 시 상대경로 기반 `flatSafePrefix`를 쓰도록 수정.
   `reencode`도 항상 평탄화하므로 동일 적용. (회귀 테스트 추가)
-- `EncodeService`: `--encode-root`가 실제 소스 파일의 상위 경로인지 검증하지
-  않는다. 잘못 지정하면 payload 상대경로에 `../`가 들어가 receiver에서
-  복원 실패할 수 있으므로 encode 시작 전에 검증한다.
+- [완료] `EncodeService`: `--encode-root`가 실제 소스 파일의 상위 경로인지 검증하지
+  않는다. → `EncodeService.isSourceUnderRoot`로 검증. `EncodeService.encode` 시작 시
+  가드(IllegalArgumentException, GUI 포함 모든 호출자 보호), CLI `encode`에는
+  친절한 `[ERROR]` 메시지 추가. (회귀 테스트 추가)
 - [완료] `SlideApp`: `imageCache`와 `loadingImages`가 EDT와 이미지 로더 스레드에서
   동시에 접근된다. → EDT 쪽 `clear()`/`size()`도 `imageCache` 모니터로 보호
   (로더와 동일 락). `cacheSize()` 헬퍼 추가.
@@ -48,9 +49,12 @@
   산출물 성격이다. → `git rm --cached`로 추적 해제.
 - [완료] `.gitignore`에 `**/bin/`을 추가해 IDE/Gradle이 만든 `bin` 출력물이 다시
   들어오지 않게 한다.
-- `command.gui.description` 리소스 키는 현재 `@Command(description = "...")`
-  하드코딩 때문에 실제 help 출력에 쓰이지 않는다. description을 리소스 키 기반으로
-  바꾸거나 미사용 키를 제거한다.
+- [완료] `command.gui.description` 등 `command.<name>.description` 리소스 키는 현재
+  `@Command(description = "...")` 하드코딩 때문에 help 출력에 쓰이지 않았다.
+  `@Command`에는 `descriptionKey` 속성이 없으므로, 루트 설명과 동일하게
+  `newCommandLine()`에서 번들 키를 서브커맨드 spec에 수동 주입하도록 했다
+  (`applySubcommandDescriptions`). 이제 명령 설명도 `--lang`에 따라 현지화된다.
+  (어노테이션 `description=`은 영어 fallback로 남겨둠. 회귀 테스트 추가)
 - `docs/dev/gui-cli-plan.md`는 구현 계획 문서다. 현재 구현 상태와 맞춰 유지할지,
   완료된 계획 기록으로 제거할지 정리한다.
 

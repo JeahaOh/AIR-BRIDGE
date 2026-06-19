@@ -72,6 +72,7 @@ final class EncodeService {
                             BooleanSupplier cancelled) throws Exception {
         EncodeListener effectiveListener = listener != null ? listener : line -> { };
         BooleanSupplier effectiveCancelled = cancelled != null ? cancelled : () -> false;
+        requireSourceUnderRoot(srcPath, rootPath);
         List<Path> sourceFiles = SourceCollector.collectSourceFiles(srcPath, targetExtensions, skipDirs, excludePaths);
         if (sourceFiles.isEmpty()) {
             return new EncodeSummary(0, 0, 0, null);
@@ -310,6 +311,23 @@ final class EncodeService {
         }
 
         return new ReencodeSummary(totalQrCount, fileCount, errorCount);
+    }
+
+    // encode relativizes each source file against rootPath to build the QR payload's
+    // relative path. If rootPath is not an ancestor of srcPath, relativize produces
+    // paths containing "..", which the receiver rejects during restore. Require the
+    // source directory to live under the encode root.
+    static boolean isSourceUnderRoot(Path srcPath, Path rootPath) {
+        return srcPath.toAbsolutePath().normalize().startsWith(rootPath.toAbsolutePath().normalize());
+    }
+
+    private static void requireSourceUnderRoot(Path srcPath, Path rootPath) {
+        if (!isSourceUnderRoot(srcPath, rootPath)) {
+            throw new IllegalArgumentException(
+                    "encode-root must be an ancestor of the source directory: encode-root="
+                            + rootPath.toAbsolutePath().normalize()
+                            + ", source=" + srcPath.toAbsolutePath().normalize());
+        }
     }
 
     private String buildQrFileName(String safePrefix, int chunkIdx, int totalChunks) {

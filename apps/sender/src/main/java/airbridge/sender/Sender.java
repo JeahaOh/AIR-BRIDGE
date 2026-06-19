@@ -126,7 +126,20 @@ public class Sender implements Runnable {
         BannerSupport.apply(commandLine, "air-bridge sender");
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
+        applySubcommandDescriptions(commandLine, bundle);
         return commandLine;
+    }
+
+    // @Command has no descriptionKey attribute, so the command.<name>.description bundle
+    // keys are wired manually (same pattern as the root command.description). This keeps
+    // subcommand descriptions localized to the active --lang.
+    private static void applySubcommandDescriptions(CommandLine commandLine, ResourceBundle bundle) {
+        commandLine.getSubcommands().forEach((name, sub) -> {
+            String key = "command." + name + ".description";
+            if (bundle.containsKey(key)) {
+                sub.getCommandSpec().usageMessage().description(bundle.getString(key));
+            }
+        });
     }
 
     @Override
@@ -281,6 +294,11 @@ public class Sender implements Runnable {
             ConsoleSupport.printLine('=', 60);
 
             Path rootPath = options.encodeRoot != null ? options.encodeRoot.toAbsolutePath() : srcPath;
+            if (!EncodeService.isSourceUnderRoot(srcPath, rootPath)) {
+                System.out.println("[ERROR] --encode-root는 소스 디렉토리의 상위 경로여야 합니다: encode-root="
+                        + rootPath.toAbsolutePath().normalize() + ", 소스=" + srcPath.toAbsolutePath().normalize());
+                return 0;
+            }
             EncodeSummary summary = options.newEncodeService().encode(
                     srcPath,
                     outPath,

@@ -95,7 +95,20 @@ public class Receiver implements Runnable {
         BannerSupport.apply(commandLine, "air-bridge receiver");
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
+        applySubcommandDescriptions(commandLine, bundle);
         return commandLine;
+    }
+
+    // @Command has no descriptionKey attribute, so the command.<name>.description bundle
+    // keys are wired manually (same pattern as the root command.description). This keeps
+    // subcommand descriptions localized to the active --lang.
+    private static void applySubcommandDescriptions(CommandLine commandLine, ResourceBundle bundle) {
+        commandLine.getSubcommands().forEach((name, sub) -> {
+            String key = "command." + name + ".description";
+            if (bundle.containsKey(key)) {
+                sub.getCommandSpec().usageMessage().description(bundle.getString(key));
+            }
+        });
     }
 
     @Override

@@ -129,6 +129,27 @@ class EncodeServiceTest {
     }
 
     @Test
+    void encodeRejectsEncodeRootThatIsNotAncestorOfSource() throws Exception {
+        Path srcDir = tempDir.resolve("src");
+        Files.createDirectories(srcDir);
+        Files.write(srcDir.resolve("sample.txt"), randomBytes(64, 201L));
+
+        // encode-root is a sibling, not an ancestor: relativize would yield "../..".
+        Path badRoot = tempDir.resolve("other/root");
+        Files.createDirectories(badRoot);
+
+        Path outDir = tempDir.resolve("encoded");
+        EncodeService service = new EncodeService(
+                new QrImageWriter(450, 70, ErrorCorrectionLevel.M),
+                40, false, false, false, 500);
+
+        assertThrows(IllegalArgumentException.class, () -> service.encode(
+                srcDir, outDir, badRoot, "TESTPROJ",
+                List.of("txt"), List.of(), List.of(), false, null));
+        assertFalse(Files.exists(outDir));
+    }
+
+    @Test
     void reencodeRegeneratesOnlyRequestedChunksAndCountsMissingSources() throws Exception {
         Path srcDir = tempDir.resolve("src");
         Files.createDirectories(srcDir.resolve("docs"));

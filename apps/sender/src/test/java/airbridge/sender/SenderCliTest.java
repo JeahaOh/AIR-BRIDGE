@@ -29,6 +29,19 @@ class SenderCliTest {
     }
 
     @Test
+    void helpUsesLocalizedSubcommandDescriptionFromBundle() {
+        String expected = java.util.ResourceBundle
+                .getBundle("Messages", java.util.Locale.getDefault())
+                .getString("command.gui.description");
+
+        Result result = execute("--help");
+
+        assertEquals(0, result.exitCode());
+        assertTrue(result.stdout().contains(expected),
+                "help should show the gui description from the resource bundle: " + expected);
+    }
+
+    @Test
     void versionPrintsBanner() {
         Result result = execute("--version");
 

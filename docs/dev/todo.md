@@ -81,9 +81,16 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
   (같은 패스에서 SHA-256 계산), 청크는 임시파일에서 윈도우로 읽는다. `FileEncodingPlan`은
   `AutoCloseable`로 임시파일을 정리. peak heap이 파일 크기와 무관(≈O(buffer))해졌다.
   QR payload는 바이트 동일 → receiver/decode/round-trip 무변경. (대용량 round-trip 수동 검증 완료)
-  남은 것: `decode`도 동일 패턴으로 스트리밍 복원(현재는 모든 청크를 이어붙여 full String→full bytes).
+- [완료] `decode` 파일별 복원도 스트리밍화. `CodecSupport.decodeDecompressToFile` +
+  `FileChunks.orderedEncodedStream`으로 청크를 순서대로 흘려 Base64+GZIP 해제를 임시파일에
+  스트리밍 기록하고(같은 패스에서 SHA-256), 해시 검증 후 최종 경로로 move. 거대 join String과
+  full 복원 바이트(2N) 동시 적재 제거. 잘못된 payload는 임시파일만 남기고 최종 경로엔 안 씀.
+  (대용량 round-trip 수동 검증 완료)
+  남은 것(부분): decode는 여전히 모든 QR을 먼저 모은 뒤 복원하므로 전송 전체의 base64 청크
+  문자열이 메모리에 남는다. 파일 완료 즉시 복원·evict하면 총 메모리도 묶을 수 있으나,
+  중복/지연 청크·success-move·보고 의미에 영향이 있어 별도 과제로 둔다.
 - 큰 파일이나 많은 파일에서 heap 사용량이 급증하지 않도록 스트리밍 또는 단계별 처리 방식을 검토한다.
-  (encode/reencode는 위에서 반영. decode 측은 후속.)
+  (encode/reencode/decode 파일별 복원까지 반영. decode의 "완료 즉시 evict"는 후속.)
 - [완료] `print-html`(모든 PNG를 base64 inline으로 한 파일에 모으던 메모리 폭탄)은
   분할/외부참조 개선 대신 기능 자체를 제거했다. CLI `--print-html` 옵션, GUI 체크박스,
   `EncodeWorkflow.Request.printHtml`, `EncodeService.generatePrintHtml`, 리소스 키,

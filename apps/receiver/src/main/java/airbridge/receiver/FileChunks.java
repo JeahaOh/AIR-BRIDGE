@@ -1,5 +1,7 @@
 package airbridge.receiver;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -48,15 +50,53 @@ final class FileChunks {
         return missing;
     }
 
-    String joinEncodedData() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 1; i <= totalChunks; i++) {
-            String chunk = chunks.get(i);
-            if (chunk == null) {
-                throw new IllegalStateException("누락 청크 존재");
+    /**
+     * Streams the ordered base64 chunks as ASCII bytes without materializing the full
+     * payload string. Holds only one chunk's bytes at a time, so decode memory does not
+     * scale with file size. Requires all chunks to be present (call after completeness check).
+     */
+    InputStream orderedEncodedStream() {
+        return new InputStream() {
+            private int nextChunk = 1;
+            private byte[] current = new byte[0];
+            private int pos = 0;
+
+            @Override
+            public int read() {
+                if (!ensureAvailable()) {
+                    return -1;
+                }
+                return current[pos++] & 0xFF;
             }
-            sb.append(chunk);
-        }
-        return sb.toString();
+
+            @Override
+            public int read(byte[] b, int off, int len) {
+                if (len == 0) {
+                    return 0;
+                }
+                if (!ensureAvailable()) {
+                    return -1;
+                }
+                int n = Math.min(len, current.length - pos);
+                System.arraycopy(current, pos, b, off, n);
+                pos += n;
+                return n;
+            }
+
+            private boolean ensureAvailable() {
+                while (pos >= current.length) {
+                    if (nextChunk > totalChunks) {
+                        return false;
+                    }
+                    String chunk = chunks.get(nextChunk++);
+                    if (chunk == null) {
+                        throw new IllegalStateException("누락 청크 존재");
+                    }
+                    current = chunk.getBytes(StandardCharsets.US_ASCII);
+                    pos = 0;
+                }
+                return true;
+            }
+        };
     }
 }

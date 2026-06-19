@@ -2,6 +2,8 @@ package airbridge.receiver;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -11,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class FileChunksTest {
 
     @Test
-    void addChunkTracksMissingChunksAndJoinsDataInChunkOrder() {
+    void addChunkTracksMissingChunksAndStreamsDataInChunkOrder() throws Exception {
         FileChunks fileChunks = new FileChunks("TESTPROJ", "docs/sample.bin", 3, "hash-1234");
 
         fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 2, 3, "hash-1234", "B"), Path.of("qr-2.png"));
@@ -22,7 +24,9 @@ class FileChunksTest {
         fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 3, 3, "hash-1234", "C"), Path.of("qr-3.png"));
 
         assertEquals(List.of(), fileChunks.findMissingChunks());
-        assertEquals("ABC", fileChunks.joinEncodedData());
+        try (InputStream stream = fileChunks.orderedEncodedStream()) {
+            assertEquals("ABC", new String(stream.readAllBytes(), StandardCharsets.US_ASCII));
+        }
         assertEquals(List.of(Path.of("qr-2.png"), Path.of("qr-1.png"), Path.of("qr-3.png")), fileChunks.qrFiles());
     }
 

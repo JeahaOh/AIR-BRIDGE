@@ -115,25 +115,6 @@ final class DecodeService {
                 continue;
             }
 
-            byte[] restoredData;
-            try {
-                restoredData = CodecSupport.decodeAndDecompress(fileChunks.joinEncodedData());
-            } catch (Exception e) {
-                reportLines.add("X " + fileChunks.relPath + " - DECODE_ERROR");
-                effectiveListener.onLog(String.format("  [DECODE_ERROR] %s - %s", fileChunks.relPath, e.getMessage()));
-                decodeErrorCount++;
-                continue;
-            }
-
-            String actualHash16 = CodecSupport.sha256Hex(restoredData).substring(0, 16);
-            if (!actualHash16.equals(fileChunks.hash16)) {
-                reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
-                effectiveListener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
-                        fileChunks.relPath, fileChunks.hash16, actualHash16));
-                hashMismatchCount++;
-                continue;
-            }
-
             Path restoredFile;
             try {
                 restoredFile = RelativePathSupport.resolveUnderRoot(outPath, fileChunks.relPath);
@@ -147,7 +128,34 @@ final class DecodeService {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.write(restoredFile, restoredData);
+
+            // Stream base64 -> gzip -> a temp file in the destination directory, computing the
+            // hash in the same pass, so memory does not scale with file size. Only move the temp
+            // file into place once the hash matches, so a bad payload never lands at the target.
+            Path stagingDir = (parent != null) ? parent : outPath;
+            Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
+            String actualHash16;
+            try {
+                actualHash16 = CodecSupport.decodeDecompressToFile(fileChunks.orderedEncodedStream(), tempFile)
+                        .substring(0, 16);
+            } catch (Exception e) {
+                Files.deleteIfExists(tempFile);
+                reportLines.add("X " + fileChunks.relPath + " - DECODE_ERROR");
+                effectiveListener.onLog(String.format("  [DECODE_ERROR] %s - %s", fileChunks.relPath, e.getMessage()));
+                decodeErrorCount++;
+                continue;
+            }
+
+            if (!actualHash16.equals(fileChunks.hash16)) {
+                Files.deleteIfExists(tempFile);
+                reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
+                effectiveListener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
+                        fileChunks.relPath, fileChunks.hash16, actualHash16));
+                hashMismatchCount++;
+                continue;
+            }
+
+            Files.move(tempFile, restoredFile, StandardCopyOption.REPLACE_EXISTING);
             List<Path> movedTargets = moveDecodedQrFilesToSuccess(fileChunks.qrFiles());
 
             reportLines.add("O " + fileChunks.relPath + " - OK" + formatMovedTargets(movedTargets));

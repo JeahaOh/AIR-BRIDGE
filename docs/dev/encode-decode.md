@@ -174,12 +174,19 @@ QR 하나를 읽으면 `QrDecodedChunk`가 만들어지고, `relPath` 기준으�
 복원 단계는 파일별로 아래 순서다.
 
 1. 누락 청크 검사
-2. 모든 chunkData 연결
-3. Base64 decode + GZIP 해제
-4. 복원 바이트의 SHA-256 앞 16자리 계산
-5. payload의 `hash16`과 비교
-6. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증 후 파일 저장
-7. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
+2. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
+3. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`) Base64 decode + GZIP 해제한 결과를
+   출력 디렉터리의 임시파일(`.airbridge-restore-*.part`)에 스트리밍 기록
+   (`CodecSupport.decodeDecompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
+   메모리에 통째로 들고 있지 않는다.
+4. 계산된 SHA-256 앞 16자리를 payload의 `hash16`과 비교
+5. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
+   남지 않는다)
+6. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
+
+decode 한 파일의 복원 자체는 메모리 O(buffer)로 끝나지만, 현재 구조는 모든 QR을 먼저 읽어
+`FileChunks`에 청크 문자열을 모아둔 뒤 복원하므로 전송 전체의 base64 청크는 메모리에 남는다.
+파일 완료 즉시 복원·해제하는 추가 개선은 후속 과제다.
 
 예:
 

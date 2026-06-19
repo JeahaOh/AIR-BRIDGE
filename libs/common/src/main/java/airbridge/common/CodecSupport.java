@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.zip.Deflater;
@@ -54,6 +55,23 @@ public final class CodecSupport {
 
     /** Result of {@link #compressAndEncodeToFile(InputStream, Path)}. */
     public record EncodedStreamInfo(String sha256Hex, long rawByteCount, long encodedByteCount) {
+    }
+
+    /**
+     * Streams a base64+gzip {@code source} into {@code target} (the restored file) using
+     * bounded memory, returning the SHA-256 (hex) of the decompressed bytes computed in the
+     * same pass. The inverse of {@link #compressAndEncodeToFile(InputStream, java.nio.file.Path)};
+     * callers verify the returned hash before committing the file.
+     */
+    public static String decodeDecompressToFile(InputStream base64Source, Path target) throws IOException {
+        MessageDigest digest = newSha256();
+        try (InputStream compressed = Base64.getDecoder().wrap(base64Source);
+             GZIPInputStream gzis = new GZIPInputStream(compressed);
+             DigestInputStream digestIn = new DigestInputStream(gzis, digest);
+             OutputStream out = Files.newOutputStream(target)) {
+            digestIn.transferTo(out);
+        }
+        return toHex(digest.digest());
     }
 
     public static byte[] decodeAndDecompress(String encoded) throws IOException {

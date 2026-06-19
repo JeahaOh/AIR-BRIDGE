@@ -59,6 +59,26 @@ class CodecSupportTest {
     }
 
     @Test
+    void streamingEncodeAndDecodeToFileRoundTrip() throws Exception {
+        byte[] source = new byte[20_000];
+        new Random(24680L).nextBytes(source);
+
+        Path encoded = tempDir.resolve("rt.b64");
+        CodecSupport.EncodedStreamInfo info =
+                CodecSupport.compressAndEncodeToFile(new ByteArrayInputStream(source), encoded);
+
+        Path restored = tempDir.resolve("rt.out");
+        String restoredHash;
+        try (var in = Files.newInputStream(encoded)) {
+            restoredHash = CodecSupport.decodeDecompressToFile(in, restored);
+        }
+
+        assertArrayEquals(source, Files.readAllBytes(restored));
+        assertEquals(info.sha256Hex(), restoredHash);
+        assertEquals(CodecSupport.sha256Hex(source), restoredHash);
+    }
+
+    @Test
     void compressAndEncodeToFileHandlesEmptySource() throws Exception {
         Path target = tempDir.resolve("empty.b64");
         CodecSupport.EncodedStreamInfo info =

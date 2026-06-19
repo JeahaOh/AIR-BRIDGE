@@ -39,8 +39,13 @@
 - `fileName`: QR 라벨에 표시할 파일명
 - `convertedType`: 변환 여부 표시용 문자열
 - `fileHash`: 전처리 후 바이트 기준 SHA-256
-- `encoded`: GZIP + Base64 문자열
-- `totalChunks`: `encoded.length / chunkDataSize` 기준 청크 수
+- `encodedSize`: GZIP + Base64 결과의 길이(문자 수)
+- `totalChunks`: `encodedSize / chunkDataSize` 기준 청크 수
+
+GZIP + Base64 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 임시파일에 스트리밍으로
+1회 기록한다. 따라서 큰 파일을 encode해도 heap 사용량이 파일 크기에 비례해 늘지 않는다.
+청크는 이 임시파일에서 윈도우 단위로 읽고, 파일 처리가 끝나면 임시파일을 삭제한다
+(`FileEncodingPlan`은 `AutoCloseable`).
 
 중요한 점은 해시와 decode 대상 경로가 모두 전처리 후 결과 기준이라는 점입니다. 즉 `.xlsx -> .csv` 옵션을 켜면 encode/decode 관점의 원본은 `.csv`입니다.
 
@@ -70,8 +75,9 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
 
 파일 하나당 처리 순서는 아래와 같다.
 
-1. 전처리 후 바이트를 `CodecSupport.compressAndEncode(...)`로 GZIP + Base64 한다.
-2. `chunkDataSize` 단위로 문자열을 자른다.
+1. 전처리 후 바이트를 `CodecSupport.compressAndEncodeToFile(...)`로 GZIP + Base64 해서
+   임시파일에 스트리밍 기록한다(같은 패스에서 SHA-256도 계산). 메모리는 O(buffer)로 제한된다.
+2. 임시파일을 `chunkDataSize` 단위 윈도우로 읽는다(`FileEncodingPlan.readChunk`).
 3. 각 청크마다 payload 문자열을 만든다.
 4. `QrImageWriter.generateQrImage(...)`로 QR PNG를 만든다.
 5. 파일별 진행 로그를 남긴다.

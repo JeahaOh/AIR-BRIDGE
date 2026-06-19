@@ -3,29 +3,43 @@ package airbridge.sender;
 import airbridge.common.CodecSupport;
 import airbridge.common.RelativePathSupport;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.channels.SeekableByteChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-final class FileEncodingPlan {
+/**
+ * Encode plan for a single source file. The compressed+base64 payload is staged to a
+ * temporary file (streamed with bounded memory) rather than held in memory, so encoding
+ * large files no longer scales heap usage with file size. Callers must {@link #close()}
+ * the plan to release the chunk reader and delete the temp file.
+ */
+final class FileEncodingPlan implements AutoCloseable {
     private final String relPath;
     private final String fileName;
     private final String convertedType;
     private final String fileHash;
-    private final String encoded;
+    private final Path encodedTempFile;
     private final int encodedSize;
     private final int totalChunks;
     private final int fileSize;
     private final String safePrefix;
     private final String flatSafePrefix;
+    private SeekableByteChannel chunkChannel;
 
     private FileEncodingPlan(String relPath,
                                 String fileName,
                                 String convertedType,
                                 String fileHash,
-                                String encoded,
+                                Path encodedTempFile,
                                 int encodedSize,
                                 int totalChunks,
                                 int fileSize,
@@ -35,7 +49,7 @@ final class FileEncodingPlan {
         this.fileName = fileName;
         this.convertedType = convertedType;
         this.fileHash = fileHash;
-        this.encoded = encoded;
+        this.encodedTempFile = encodedTempFile;
         this.encodedSize = encodedSize;
         this.totalChunks = totalChunks;
         this.fileSize = fileSize;
@@ -51,50 +65,92 @@ final class FileEncodingPlan {
         String originalName = file.getFileName().toString();
         String originalExt = detectExtension(originalName);
 
-        byte[] rawData;
+        byte[] convertedData = null;
         String convertedType = null;
         String effectiveRelPath = relPath;
         String effectiveFileName = originalName;
 
         if (convertXlsxToCsv && ".xlsx".equals(originalExt)) {
-            rawData = DocumentConverter.convertXlsxToCsv(file);
+            convertedData = DocumentConverter.convertXlsxToCsv(file);
             effectiveRelPath = replaceExtension(relPath, ".xlsx", ".csv");
             effectiveFileName = replaceExtension(originalName, ".xlsx", ".csv");
             convertedType = "XLSX\u2192CSV";
         } else if (convertOfficeToText && ".docx".equals(originalExt)) {
-            rawData = DocumentConverter.convertDocxToText(file);
+            convertedData = DocumentConverter.convertDocxToText(file);
             effectiveRelPath = replaceExtension(relPath, ".docx", ".txt");
             effectiveFileName = replaceExtension(originalName, ".docx", ".txt");
             convertedType = "DOCX\u2192TXT";
         } else if (convertOfficeToText && ".pptx".equals(originalExt)) {
-            rawData = DocumentConverter.convertPptxToText(file);
+            convertedData = DocumentConverter.convertPptxToText(file);
             effectiveRelPath = replaceExtension(relPath, ".pptx", ".txt");
             effectiveFileName = replaceExtension(originalName, ".pptx", ".txt");
             convertedType = "PPTX\u2192TXT";
-        } else {
-            rawData = Files.readAllBytes(file);
         }
 
-        String fileHash = CodecSupport.sha256Hex(rawData);
-        String encoded = CodecSupport.compressAndEncode(rawData);
-        int encodedSize = encoded.length();
-        int totalChunks = (int) Math.ceil((double) encodedSize / chunkDataSize);
-        if (totalChunks == 0) {
-            totalChunks = 1;
-        }
+        Path tempFile = Files.createTempFile("airbridge-encode-", ".b64");
+        tempFile.toFile().deleteOnExit();
+        try {
+            CodecSupport.EncodedStreamInfo info;
+            try (InputStream source = (convertedData != null)
+                    ? new ByteArrayInputStream(convertedData)
+                    : Files.newInputStream(file)) {
+                info = CodecSupport.compressAndEncodeToFile(source, tempFile);
+            }
 
-        return new FileEncodingPlan(
-                effectiveRelPath,
-                effectiveFileName,
-                convertedType,
-                fileHash,
-                encoded,
-                encodedSize,
-                totalChunks,
-                rawData.length,
-                buildSafePrefix(effectiveFileName),
-                buildFlatSafePrefix(effectiveRelPath)
-        );
+            if (info.encodedByteCount() > Integer.MAX_VALUE) {
+                throw new IOException("encoded payload too large to chunk: " + info.encodedByteCount() + " bytes");
+            }
+            int encodedSize = (int) info.encodedByteCount();
+            int totalChunks = (int) Math.ceil((double) encodedSize / chunkDataSize);
+            if (totalChunks == 0) {
+                totalChunks = 1;
+            }
+
+            return new FileEncodingPlan(
+                    effectiveRelPath,
+                    effectiveFileName,
+                    convertedType,
+                    info.sha256Hex(),
+                    tempFile,
+                    encodedSize,
+                    totalChunks,
+                    (int) info.rawByteCount(),
+                    buildSafePrefix(effectiveFileName),
+                    buildFlatSafePrefix(effectiveRelPath)
+            );
+        } catch (Exception e) {
+            Files.deleteIfExists(tempFile);
+            throw e;
+        }
+    }
+
+    /** Reads the base64 payload window {@code [start, end)} from the staged temp file. */
+    String readChunk(int start, int end) throws IOException {
+        int length = end - start;
+        if (chunkChannel == null) {
+            chunkChannel = Files.newByteChannel(encodedTempFile, StandardOpenOption.READ);
+        }
+        chunkChannel.position(start);
+        ByteBuffer buffer = ByteBuffer.allocate(length);
+        while (buffer.hasRemaining()) {
+            if (chunkChannel.read(buffer) < 0) {
+                break;
+            }
+        }
+        // Base64 is ASCII, so one byte maps to one character.
+        return new String(buffer.array(), 0, buffer.position(), StandardCharsets.US_ASCII);
+    }
+
+    @Override
+    public void close() throws IOException {
+        try {
+            if (chunkChannel != null) {
+                chunkChannel.close();
+                chunkChannel = null;
+            }
+        } finally {
+            Files.deleteIfExists(encodedTempFile);
+        }
     }
 
     static Path resolveSourceFile(Path rootPath,
@@ -136,10 +192,6 @@ final class FileEncodingPlan {
 
     String fileHash() {
         return fileHash;
-    }
-
-    String encoded() {
-        return encoded;
     }
 
     int encodedSize() {

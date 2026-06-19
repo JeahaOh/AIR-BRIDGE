@@ -158,10 +158,19 @@ class EncodeServiceTest {
         Files.write(secondFile, randomBytes(640, 13L));
 
         int chunkDataSize = 25;
-        FileEncodingPlan firstPlan = FileEncodingPlan.fromSourceFile(firstFile, "docs/first.txt", false, false, chunkDataSize);
-        FileEncodingPlan secondPlan = FileEncodingPlan.fromSourceFile(secondFile, "docs/second.txt", false, false, chunkDataSize);
-        assertTrue(firstPlan.totalChunks() >= 4);
-        assertTrue(secondPlan.totalChunks() >= 1);
+        int firstTotalChunks;
+        String firstFlatPrefix;
+        int secondTotalChunks;
+        String secondFlatPrefix;
+        try (FileEncodingPlan firstPlan = FileEncodingPlan.fromSourceFile(firstFile, "docs/first.txt", false, false, chunkDataSize);
+             FileEncodingPlan secondPlan = FileEncodingPlan.fromSourceFile(secondFile, "docs/second.txt", false, false, chunkDataSize)) {
+            firstTotalChunks = firstPlan.totalChunks();
+            firstFlatPrefix = firstPlan.flatSafePrefix();
+            secondTotalChunks = secondPlan.totalChunks();
+            secondFlatPrefix = secondPlan.flatSafePrefix();
+        }
+        assertTrue(firstTotalChunks >= 4);
+        assertTrue(secondTotalChunks >= 1);
 
         Path resultPath = tempDir.resolve("restore/_restore_result.txt");
         Files.createDirectories(resultPath.getParent());
@@ -183,7 +192,7 @@ class EncodeServiceTest {
 
         assertEquals(2, summary.fileCount());
         assertEquals(1, summary.errorCount());
-        assertEquals(2 + secondPlan.totalChunks(), summary.totalQrCount());
+        assertEquals(2 + secondTotalChunks, summary.totalQrCount());
 
         List<String> outputNames;
         try (Stream<Path> stream = Files.list(outDir)) {
@@ -195,10 +204,10 @@ class EncodeServiceTest {
         }
 
         assertEquals(summary.totalQrCount(), outputNames.size());
-        assertTrue(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 2, firstPlan.totalChunks())));
-        assertTrue(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 4, firstPlan.totalChunks())));
-        assertTrue(outputNames.contains(qrFileName(secondPlan.flatSafePrefix(), 1, secondPlan.totalChunks())));
-        assertFalse(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 1, firstPlan.totalChunks())));
+        assertTrue(outputNames.contains(qrFileName(firstFlatPrefix, 2, firstTotalChunks)));
+        assertTrue(outputNames.contains(qrFileName(firstFlatPrefix, 4, firstTotalChunks)));
+        assertTrue(outputNames.contains(qrFileName(secondFlatPrefix, 1, secondTotalChunks)));
+        assertFalse(outputNames.contains(qrFileName(firstFlatPrefix, 1, firstTotalChunks)));
     }
 
     @Test
@@ -207,7 +216,10 @@ class EncodeServiceTest {
         Files.createDirectories(srcDir.resolve("docs"));
         Path insideFile = srcDir.resolve("docs/inside.txt");
         Files.write(insideFile, randomBytes(320, 31L));
-        FileEncodingPlan insidePlan = FileEncodingPlan.fromSourceFile(insideFile, "docs/inside.txt", false, false, 40);
+        int insideTotalChunks;
+        try (FileEncodingPlan insidePlan = FileEncodingPlan.fromSourceFile(insideFile, "docs/inside.txt", false, false, 40)) {
+            insideTotalChunks = insidePlan.totalChunks();
+        }
 
         Path escapedFile = tempDir.resolve("escape.txt");
         Files.write(escapedFile, randomBytes(512, 37L));
@@ -231,7 +243,7 @@ class EncodeServiceTest {
 
         assertEquals(1, summary.fileCount());
         assertEquals(1, summary.errorCount());
-        assertEquals(insidePlan.totalChunks(), summary.totalQrCount());
+        assertEquals(insideTotalChunks, summary.totalQrCount());
         assertFalse(Files.exists(outDir.resolve("escape.txt")));
     }
 

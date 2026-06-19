@@ -76,8 +76,14 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 
 ### 4. 메모리 및 성능
 
-- `encode`/`reencode`가 파일 전체를 `byte[]`와 Base64 문자열로 한 번에 올리는 구조를 줄인다.
+- [완료] `encode`/`reencode`가 파일 전체를 `byte[]`와 Base64 문자열로 한 번에 올리던 구조 제거.
+  `CodecSupport.compressAndEncodeToFile`로 소스를 GZIP+Base64 스트리밍해 임시파일에 1회 기록하고
+  (같은 패스에서 SHA-256 계산), 청크는 임시파일에서 윈도우로 읽는다. `FileEncodingPlan`은
+  `AutoCloseable`로 임시파일을 정리. peak heap이 파일 크기와 무관(≈O(buffer))해졌다.
+  QR payload는 바이트 동일 → receiver/decode/round-trip 무변경. (대용량 round-trip 수동 검증 완료)
+  남은 것: `decode`도 동일 패턴으로 스트리밍 복원(현재는 모든 청크를 이어붙여 full String→full bytes).
 - 큰 파일이나 많은 파일에서 heap 사용량이 급증하지 않도록 스트리밍 또는 단계별 처리 방식을 검토한다.
+  (encode/reencode는 위에서 반영. decode 측은 후속.)
 - [완료] `print-html`(모든 PNG를 base64 inline으로 한 파일에 모으던 메모리 폭탄)은
   분할/외부참조 개선 대신 기능 자체를 제거했다. CLI `--print-html` 옵션, GUI 체크박스,
   `EncodeWorkflow.Request.printHtml`, `EncodeService.generatePrintHtml`, 리소스 키,

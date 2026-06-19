@@ -34,7 +34,6 @@ Current responsibilities:
 - compress and Base64-encode file content
 - split encoded data into QR payload chunks
 - render QR PNG files plus `_manifest.txt`
-- optionally generate `_print.html`
 - launch the Swing slideshow app for playback
 - unpack a previously packed `zip` back into its original archive shape
 - regenerate failed QR chunks with hidden `reencode`
@@ -60,7 +59,6 @@ Takes a source directory and produces:
 
 - QR PNG files
 - `_manifest.txt`
-- optional `_print.html`
 
 Important implementation fact:
 

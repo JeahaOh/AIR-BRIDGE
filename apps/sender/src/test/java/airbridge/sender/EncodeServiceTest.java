@@ -37,7 +37,7 @@ class EncodeServiceTest {
     Path tempDir;
 
     @Test
-    void encodeCreatesManifestPrintHtmlAndDecodableQrFiles() throws Exception {
+    void encodeCreatesManifestAndDecodableQrFiles() throws Exception {
         Path srcDir = tempDir.resolve("src");
         Path sourceFile = srcDir.resolve("docs/sample.txt");
         Files.createDirectories(sourceFile.getParent());
@@ -62,7 +62,6 @@ class EncodeServiceTest {
                 List.of("txt"),
                 List.of("build"),
                 List.of(),
-                true,
                 null
         );
 
@@ -71,7 +70,6 @@ class EncodeServiceTest {
         assertTrue(summary.totalQrCount() > 1);
         assertEquals(outDir.resolve("_manifest.txt"), summary.manifestPath());
         assertTrue(Files.exists(summary.manifestPath()));
-        assertTrue(Files.exists(outDir.resolve("_print.html")));
 
         String manifest = Files.readString(summary.manifestPath(), StandardCharsets.UTF_8);
         assertTrue(manifest.contains("PROJECT: TESTPROJ"));
@@ -109,7 +107,7 @@ class EncodeServiceTest {
                 false,
                 false,
                 500
-        ).encode(srcDir, outDir, srcDir, "TESTPROJ", List.of("txt"), List.of(), List.of(), false, null);
+        ).encode(srcDir, outDir, srcDir, "TESTPROJ", List.of("txt"), List.of(), List.of(), null);
 
         assertEquals(2, summary.totalFileCount());
 
@@ -145,7 +143,7 @@ class EncodeServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> service.encode(
                 srcDir, outDir, badRoot, "TESTPROJ",
-                List.of("txt"), List.of(), List.of(), false, null));
+                List.of("txt"), List.of(), List.of(), null));
         assertFalse(Files.exists(outDir));
     }
 
@@ -261,7 +259,6 @@ class EncodeServiceTest {
                 List.of("txt"),
                 List.of(),
                 List.of(),
-                true,
                 null,
                 () -> cancellationChecks.getAndIncrement() >= 2
         ));

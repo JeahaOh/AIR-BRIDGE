@@ -36,7 +36,6 @@ source file
 Additional encode outputs:
 
 - `_manifest.txt`
-- `_print.html` when `--print-html` is enabled
 
 Important current rule:
 

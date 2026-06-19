@@ -67,7 +67,6 @@ public final class EncodeWorkflow {
                     normalized.targetExtensions(),
                     normalized.skipDirs(),
                     normalized.excludePaths(),
-                    normalized.printHtml(),
                     effectiveListener::accept,
                     effectiveCancelled
             );
@@ -101,8 +100,7 @@ public final class EncodeWorkflow {
             int filesPerFolder,
             List<String> targetExtensions,
             List<String> skipDirs,
-            List<String> excludePaths,
-            boolean printHtml
+            List<String> excludePaths
     ) {
         public static Request defaults(Path sourceDir, Path outputDir) {
             return new Request(
@@ -120,8 +118,7 @@ public final class EncodeWorkflow {
                     DEFAULT_FILES_PER_FOLDER,
                     DEFAULT_TARGET_EXTENSIONS,
                     DEFAULT_SKIP_DIRS,
-                    List.of(),
-                    false
+                    List.of()
             );
         }
 
@@ -151,8 +148,7 @@ public final class EncodeWorkflow {
                     filesPerFolder,
                     copyList(targetExtensions),
                     copyList(skipDirs),
-                    copyList(excludePaths),
-                    printHtml
+                    copyList(excludePaths)
             );
         }
 

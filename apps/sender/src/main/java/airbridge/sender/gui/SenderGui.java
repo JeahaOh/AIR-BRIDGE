@@ -72,7 +72,6 @@ public final class SenderGui {
         private final JCheckBox convertXlsxToCsvCheck = new JCheckBox("XLSX to CSV");
         private final JCheckBox convertOfficeToTextCheck = new JCheckBox("Office to text");
         private final JCheckBox folderStructureCheck = new JCheckBox("Folder structure", EncodeWorkflow.DEFAULT_FOLDER_STRUCTURE);
-        private final JCheckBox printHtmlCheck = new JCheckBox("Print HTML");
         private final JButton encodeButton = new JButton("Encode");
         private final JButton stopEncodeButton = new JButton("Stop");
         private final JButton slideButton = new JButton("Slide");
@@ -138,7 +137,6 @@ public final class SenderGui {
 
             JPanel toggles = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
             toggles.add(folderStructureCheck);
-            toggles.add(printHtmlCheck);
 
             JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
             encodeButton.addActionListener(event -> startEncode());
@@ -297,7 +295,6 @@ public final class SenderGui {
             convertXlsxToCsvCheck.setEnabled(!running);
             convertOfficeToTextCheck.setEnabled(!running);
             folderStructureCheck.setEnabled(!running);
-            printHtmlCheck.setEnabled(!running);
             sourceBrowseButton.setEnabled(!running);
             outputBrowseButton.setEnabled(!running);
             rootBrowseButton.setEnabled(!running);
@@ -328,8 +325,7 @@ public final class SenderGui {
                     intValue(filesPerFolderSpinner),
                     parseCsv(targetExtensionsField.getText(), true),
                     parseCsv(skipDirsField.getText(), true),
-                    parseCsv(excludePathsField.getText(), false),
-                    printHtmlCheck.isSelected()
+                    parseCsv(excludePathsField.getText(), false)
             );
         }
 

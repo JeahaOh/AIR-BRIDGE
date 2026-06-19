@@ -260,9 +260,6 @@ public class Sender implements Runnable {
         @Spec
         private CommandSpec spec;
 
-        @Option(names = "--print-html", descriptionKey = "option.print-html")
-        private boolean printHtml;
-
         @Override
         public Integer call() throws Exception {
             options.validate(spec.commandLine());
@@ -307,7 +304,6 @@ public class Sender implements Runnable {
                     options.targetExtensions,
                     options.skipDirs,
                     options.excludePaths,
-                    printHtml,
                     System.out::println
             );
 

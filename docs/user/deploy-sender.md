@@ -67,8 +67,8 @@ GUI의 `Slide` 탭에서 슬라이드 입력 디렉터리를 고를 수 있습�
 입력으로 열어 줍니다.
 
 encode 실행 중에는 Encode 탭의 입력값과 Browse 버튼이 잠기며, 중단은
-`Stop`으로 요청합니다. 중단된 encode는 이번 실행에서 만든 QR PNG, manifest,
-print HTML 파일을 정리합니다.
+`Stop`으로 요청합니다. 중단된 encode는 이번 실행에서 만든 QR PNG와 manifest
+파일을 정리합니다.
 
 QR 이미지를 화면에 재생하기:
 

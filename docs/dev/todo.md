@@ -78,7 +78,10 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 
 - `encode`/`reencode`가 파일 전체를 `byte[]`와 Base64 문자열로 한 번에 올리는 구조를 줄인다.
 - 큰 파일이나 많은 파일에서 heap 사용량이 급증하지 않도록 스트리밍 또는 단계별 처리 방식을 검토한다.
-- `print-html`은 모든 PNG를 base64 inline으로 한 파일에 모으지 말고 분할 출력 또는 외부 파일 참조 방식도 지원한다.
+- [완료] `print-html`(모든 PNG를 base64 inline으로 한 파일에 모으던 메모리 폭탄)은
+  분할/외부참조 개선 대신 기능 자체를 제거했다. CLI `--print-html` 옵션, GUI 체크박스,
+  `EncodeWorkflow.Request.printHtml`, `EncodeService.generatePrintHtml`, 리소스 키,
+  관련 문서를 모두 삭제. 인쇄가 필요하면 개별 QR PNG를 직접 인쇄한다.
 - 대량 QR 세트에서 처리 시간과 메모리 사용량을 측정하는 벤치마크를 추가한다.
 
 ### 5. 구조 리팩터링 후속 검토

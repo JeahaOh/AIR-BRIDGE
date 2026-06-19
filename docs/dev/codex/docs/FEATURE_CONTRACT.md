@@ -16,7 +16,6 @@
 
 - QR PNG files
 - `_manifest.txt`
-- optional `_print.html`
 - console summary
 
 ### Must Validate

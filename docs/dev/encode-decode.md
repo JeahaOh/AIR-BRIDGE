@@ -94,7 +94,6 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
 
 - QR PNG 파일들
 - `_manifest.txt`
-- 옵션 사용 시 `_print.html`
 
 폴더 배치 규칙:
 
@@ -109,8 +108,6 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
 - 파일별 상대경로, 원본 바이트 크기, QR 장수, 해시 앞 16자리
 - 전체 파일 수 / QR 수 / 총 원본 바이트
 
-`_print.html`은 각 PNG를 base64 data URI로 인라인한 단순 인쇄용 HTML이다.
-
 ## encode GUI 실행 상태
 
 `sender gui`의 Encode 탭은 `EncodeWorkflow`를 통해 CLI와 같은
@@ -124,13 +121,13 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
 - chunk size, QR size, label height, files per folder
 - targets, skip dirs, exclude
 - XLSX/Office 변환 옵션
-- folder structure, print HTML
+- folder structure
 - 각 Browse 버튼과 Encode 버튼
 
 `Stop` 버튼은 `AtomicBoolean` cancellation supplier와 `SwingWorker.cancel(true)`를
 함께 사용한다. `EncodeService`는 파일별 처리와 청크 생성 사이에서 cancellation을
-확인하고, 취소되면 이번 실행에서 만든 파일을 삭제한다. 삭제 대상은 생성된 QR PNG,
-`_manifest.txt`, `_print.html`이며, 비어 있는 생성 디렉터리만 제거한다. 비어 있지
+확인하고, 취소되면 이번 실행에서 만든 파일을 삭제한다. 삭제 대상은 생성된 QR PNG와
+`_manifest.txt`이며, 비어 있는 생성 디렉터리만 제거한다. 비어 있지
 않은 디렉터리는 기존 사용자 파일 보호를 위해 유지한다.
 
 ## decode 입력 수집

@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -55,9 +54,8 @@ final class EncodeService {
                             List<String> targetExtensions,
                             List<String> skipDirs,
                             List<String> excludePaths,
-                            boolean printHtml,
                             EncodeListener listener) throws Exception {
-        return encode(srcPath, outPath, rootPath, projectName, targetExtensions, skipDirs, excludePaths, printHtml, listener, () -> false);
+        return encode(srcPath, outPath, rootPath, projectName, targetExtensions, skipDirs, excludePaths, listener, () -> false);
     }
 
     EncodeSummary encode(Path srcPath,
@@ -67,7 +65,6 @@ final class EncodeService {
                             List<String> targetExtensions,
                             List<String> skipDirs,
                             List<String> excludePaths,
-                            boolean printHtml,
                             EncodeListener listener,
                             BooleanSupplier cancelled) throws Exception {
         EncodeListener effectiveListener = listener != null ? listener : line -> { };
@@ -88,7 +85,6 @@ final class EncodeService {
         manifest.append("DATE   : ").append(new Date()).append("\n");
         manifest.append(ConsoleSupport.line('=', 60)).append("\n\n");
 
-        List<Path> allQrPaths = new ArrayList<>();
         List<Path> createdFiles = new ArrayList<>();
         List<Path> createdDirs = new ArrayList<>();
 
@@ -167,7 +163,6 @@ final class EncodeService {
                     String qrFileName = buildQrFileName(prefix, i + 1, plan.totalChunks());
                     Path qrFilePath = fileOutDir.resolve(qrFileName);
                     ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
-                    allQrPaths.add(qrFilePath);
                     createdFiles.add(qrFilePath);
 
                     totalQrCount++;
@@ -184,12 +179,6 @@ final class EncodeService {
             Path manifestPath = outPath.resolve("_manifest.txt");
             Files.write(manifestPath, manifest.toString().getBytes(StandardCharsets.UTF_8));
             createdFiles.add(manifestPath);
-
-            if (printHtml) {
-                throwIfCancelled(effectiveCancelled);
-                Path printHtmlPath = generatePrintHtml(allQrPaths, outPath, effectiveListener, effectiveCancelled);
-                createdFiles.add(printHtmlPath);
-            }
 
             return new EncodeSummary(totalQrCount, totalFileCount, totalOrigBytes, manifestPath);
         } catch (CancellationException e) {
@@ -381,40 +370,5 @@ final class EncodeService {
                     }
                 });
         listener.onLog("[CANCELLED] 생성된 encode 파일을 정리했습니다.");
-    }
-
-    private static Path generatePrintHtml(List<Path> qrPaths, Path outPath, EncodeListener listener, BooleanSupplier cancelled) throws IOException {
-        listener.onLog("");
-        listener.onLog("[HTML] 인쇄용 HTML 생성 중...");
-
-        StringBuilder html = new StringBuilder();
-        html.append("<!DOCTYPE html>\n<html><head><meta charset=\"UTF-8\">\n");
-        html.append("<title>QR Source Backup - Print</title>\n");
-        html.append("<style>\n");
-        html.append("  @media print { .page { page-break-after: always; } .page:last-child { page-break-after: avoid; } }\n");
-        html.append("  body { margin: 0; padding: 0; }\n");
-        html.append("  .page { text-align: center; padding: 20px; }\n");
-        html.append("  .page img { max-width: 90%; max-height: 80vh; }\n");
-        html.append("  .label { font-family: monospace; font-size: 12px; margin-top: 8px; color: #555; }\n");
-        html.append("</style>\n</head><body>\n");
-
-        for (Path qrFile : qrPaths) {
-            throwIfCancelled(cancelled);
-            byte[] imgBytes = Files.readAllBytes(qrFile);
-            String imgBase64 = Base64.getEncoder().encodeToString(imgBytes);
-
-            html.append("<div class=\"page\">\n");
-            html.append("  <img src=\"data:image/png;base64,").append(imgBase64).append("\">\n");
-            html.append("  <div class=\"label\">").append(qrFile.getFileName()).append("</div>\n");
-            html.append("</div>\n");
-        }
-
-        html.append("</body></html>\n");
-
-        Path htmlPath = outPath.resolve("_print.html");
-        Files.write(htmlPath, html.toString().getBytes(StandardCharsets.UTF_8));
-        listener.onLog("[HTML] 생성 완료: " + htmlPath);
-        listener.onLog(String.format("[HTML] QR %d장 포함", qrPaths.size()));
-        return htmlPath;
     }
 }

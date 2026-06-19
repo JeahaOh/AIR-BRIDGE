@@ -55,11 +55,13 @@ Key classes:
 - shared CLI/banner/version helpers
 - relative path safety helpers
 - QR payload helpers (binary framing)
+- shared QR image decode machine (used by receiver and capture)
 - GZIP compression helpers
 
 Key classes:
 
 - `airbridge.common.QrPayloadSupport`
+- `airbridge.common.qr.QrImageDecoder`
 - `airbridge.common.CodecSupport`
 - `airbridge.common.RelativePathSupport`
 - `airbridge.common.CliSupport`
@@ -110,9 +112,9 @@ Current build-level dependencies:
 sender   -> common, packager, slide
 receiver -> common, capture, packager
 slide    -> common
-capture  -> zxing, javacv/opencv
+capture  -> common, zxing, javacv/opencv
 packager -> picocli
-common   -> picocli
+common   -> picocli, zxing
 ```
 
 Test-only dependency:

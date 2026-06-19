@@ -97,7 +97,7 @@ Current responsibilities:
 ## Architecture Rules
 
 - Keep command orchestration close to the owning app module.
-- Keep QR payload, path, and codec helpers in `libs/common`.
+- Keep QR payload, path, codec, and the shared QR image decoder in `libs/common`.
 - Keep archive rewrite logic in `libs/packager`.
 - Keep slideshow UI behavior in `libs/slide`.
 - Keep live capture logic in `libs/capture`.
@@ -110,10 +110,15 @@ Preferred dependency direction:
 sender   -> common, packager, slide
 receiver -> common, capture, packager
 slide    -> common
-capture  -> zxing, javacv/opencv
+capture  -> common, zxing, javacv/opencv
 packager -> picocli, zip utilities
-common   -> shared helpers only
+common   -> shared helpers + zxing (QR decode/payload)
 ```
+
+The QR image decode machine (rotations/binarizers/scales/crops) lives in
+`airbridge.common.qr.QrImageDecoder`; both `apps/receiver` (clean PNG re-read)
+and `libs/capture` (noisy camera frames) call it with their own tuning
+`Strategy`, so there is one decode implementation and one charset (ISO-8859-1).
 
 Test-only exception:
 

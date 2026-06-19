@@ -6,6 +6,9 @@ def resolvedVersion = version.toString()
 
 dependencies {
     api "info.picocli:picocli:${picocliVersion}"
+    // Shared QR image decoder (QrImageDecoder) used by both receiver and capture.
+    implementation "com.google.zxing:core:${zxingVersion}"
+    implementation "com.google.zxing:javase:${zxingVersion}"
 }
 
 tasks.named('processResources') {

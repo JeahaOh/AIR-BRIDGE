@@ -58,6 +58,18 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 - QR payload 형식 변경은 sender, receiver, tests, docs를 함께 갱신한다.
 - `capture`는 카메라/프레임 수집 책임을 중심으로 유지한다.
 
+#### 검토 결과 (2026-06-20)
+
+- 의존성 방향 기준 3/4 충족: sender는 capture 미의존, receiver 메인은 sender/slide 미의존
+  (sender는 test 전용), payload 변경 동시 갱신은 §6.1에서 실증.
+- capture 책임 경계만 부분 충족이었음 — `apps/receiver/QrDecodeSupport`와
+  `libs/capture/CaptureQrDecodeSupport`가 같은 QR 디코드 머신을 각자 구현(드리프트).
+- **중간 조치 완료**: 디코드 머신을 `airbridge.common.qr.QrImageDecoder`로 통합하고
+  양측이 `Strategy`로 호출하도록 변경(동작 보존, charset 단일화). 의존성에 `capture -> common`,
+  `common -> zxing` 추가.
+- **`transfer-core`/`carrier-qr` 정식 모듈 분리는 계속 보류**: payload 계약이 아직 유동적
+  (§6.1로 변경됨, §6.2 보류). todo의 "계약 안정화 후" 게이트 미충족. §6.2 방향 확정 후 재검토.
+
 ### 6. 전송 포맷 · 처리율(throughput) 개선
 
 QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델"이 병목이라는

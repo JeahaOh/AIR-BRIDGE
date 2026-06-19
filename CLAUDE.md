@@ -70,9 +70,9 @@ file next to the jar. The GUI fills the same defaults.
 ```
 apps/sender    -> common, packager, slide   (Picocli; encode/slide/unpack/hidden reencode)
 apps/receiver  -> common, capture, packager  (Picocli; decode/capture/identify/pack)
-libs/common    -> shared QR payload, path-safety, codec, CLI, banner, version helpers
+libs/common    -> shared QR payload + QR image decoder, path-safety, codec, CLI, banner, version (+zxing)
 libs/slide     -> common  (Swing slideshow UI for QR playback)
-libs/capture   -> zxing + javacv/opencv  (camera/UVC capture pipeline, QR dedupe)
+libs/capture   -> common + zxing + javacv/opencv  (camera/UVC capture pipeline, QR dedupe)
 libs/packager  -> picocli  (identify/pack/unpack archive-rewrite helpers)
 ```
 

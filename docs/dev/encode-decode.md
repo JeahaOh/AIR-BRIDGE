@@ -19,6 +19,7 @@
 - `apps/receiver/src/main/java/airbridge/receiver/gui/ReceiverGui.java`
 - `apps/receiver/src/main/java/airbridge/receiver/FileChunks.java`
 - `apps/receiver/src/main/java/airbridge/receiver/QrDecodeSupport.java`
+- `libs/common/src/main/java/airbridge/common/qr/QrImageDecoder.java` (공유 디코드 머신)
 - `libs/common/src/main/java/airbridge/common/QrPayloadSupport.java`
 - `libs/common/src/main/java/airbridge/common/CodecSupport.java`
 
@@ -148,16 +149,19 @@ data     : 나머지 바이트 (현재 청크의 GZIP 윈도우)
 
 ## QR 읽기 전략
 
-`QrDecodeSupport.decodeQrPayloadWithRetries(...)`는 한 이미지에 대해 여러 변형을 순차 시도합니다.
+디코드 머신은 `libs/common`의 `airbridge.common.qr.QrImageDecoder`에 공유돼 있고,
+receiver(`QrDecodeSupport`)와 capture(`CaptureQrDecodeSupport`)가 각자 `Strategy`를 넘겨 호출한다.
+한 이미지에 대해 여러 변형을 순차 시도한다.
 
 - 기본 방향 + 90/180/270도 회전
 - Hybrid / GlobalHistogram binarizer
-- `TRY_HARDER` 힌트 유무
-- 1.5x / 2x / 3x 스케일업
-- 중앙 crop
-- grid crop
+- `TRY_HARDER` 힌트 유무 (charset은 `ISO-8859-1` 고정)
+- 스케일업, 중앙 crop, grid crop (개수/비율은 `Strategy`로 조절)
+- color 변형(gray/B&W): capture만 사용(`colorVariants=true`), 깨끗한 PNG를 읽는 receiver는 미사용
 
-이 단계는 payload 문자열을 얻는 데만 집중하고, 이후 payload 파싱과 파일 조립은 `DecodeService`가 처리한다.
+즉 디코드 알고리즘·charset은 한 곳(`QrImageDecoder`)이고, receiver는 스케일·crop을 더 넓게,
+capture는 카메라 노이즈 대비 color 변형을 더 시도하도록 전략만 다르다.
+이 단계는 payload 문자열(ISO-8859-1)을 얻는 데만 집중하고, 이후 payload 파싱과 파일 조립은 `DecodeService`가 처리한다.
 
 ## decode 파일 조립
 

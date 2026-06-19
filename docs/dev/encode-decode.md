@@ -171,22 +171,24 @@ QR 하나를 읽으면 `QrDecodedChunk`가 만들어지고, `relPath` 기준으�
 
 청크 번호 범위를 벗어나면 즉시 오류다. 같은 청크 번호가 여러 번 들어오면 마지막 값으로 덮어쓴다.
 
-복원 단계는 파일별로 아래 순서다.
+파일은 모든 청크가 모이는(`FileChunks.isComplete()`) 즉시 복원되고 `fileChunkMap`에서 제거된다.
+따라서 메모리에는 "아직 진행 중인 파일"의 청크만 남고, 전송 전체의 청크가 한꺼번에 쌓이지 않는다.
+이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 청크는 `finalizedPaths`로 무시한다.
+QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 완성되지 못한(INCOMPLETE) 파일뿐이다.
 
-1. 누락 청크 검사
-2. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
-3. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`) Base64 decode + GZIP 해제한 결과를
+복원 한 파일의 순서(`restoreCompletedFile`):
+
+1. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
+2. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`) Base64 decode + GZIP 해제한 결과를
    출력 디렉터리의 임시파일(`.airbridge-restore-*.part`)에 스트리밍 기록
    (`CodecSupport.decodeDecompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
    메모리에 통째로 들고 있지 않는다.
-4. 계산된 SHA-256 앞 16자리를 payload의 `hash16`과 비교
-5. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
+3. 계산된 SHA-256 앞 16자리를 payload의 `hash16`과 비교
+4. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
    남지 않는다)
-6. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
+5. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
 
-decode 한 파일의 복원 자체는 메모리 O(buffer)로 끝나지만, 현재 구조는 모든 QR을 먼저 읽어
-`FileChunks`에 청크 문자열을 모아둔 뒤 복원하므로 전송 전체의 base64 청크는 메모리에 남는다.
-파일 완료 즉시 복원·해제하는 추가 개선은 후속 과제다.
+즉 한 파일 복원은 메모리 O(buffer)이고, 전체 decode 메모리도 진행 중 파일 수에 비례하도록 묶인다.
 
 예:
 

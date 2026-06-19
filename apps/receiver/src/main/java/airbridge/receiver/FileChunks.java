@@ -40,6 +40,12 @@ final class FileChunks {
         return new ArrayList<>(qrFiles);
     }
 
+    // addChunk dedupes by chunk index and rejects out-of-range indices, so having one entry
+    // per index (size == totalChunks) means every chunk is present. O(1) completeness check.
+    boolean isComplete() {
+        return chunks.size() == totalChunks;
+    }
+
     List<Integer> findMissingChunks() {
         List<Integer> missing = new ArrayList<>();
         for (int i = 1; i <= totalChunks; i++) {

@@ -86,11 +86,13 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
   스트리밍 기록하고(같은 패스에서 SHA-256), 해시 검증 후 최종 경로로 move. 거대 join String과
   full 복원 바이트(2N) 동시 적재 제거. 잘못된 payload는 임시파일만 남기고 최종 경로엔 안 씀.
   (대용량 round-trip 수동 검증 완료)
-  남은 것(부분): decode는 여전히 모든 QR을 먼저 모은 뒤 복원하므로 전송 전체의 base64 청크
-  문자열이 메모리에 남는다. 파일 완료 즉시 복원·evict하면 총 메모리도 묶을 수 있으나,
-  중복/지연 청크·success-move·보고 의미에 영향이 있어 별도 과제로 둔다.
+- [완료] decode "완료 즉시 복원+evict". 파일이 `FileChunks.isComplete()`가 되는 즉시 복원하고
+  `fileChunkMap`에서 제거 → 메모리에는 진행 중 파일의 청크만 남고 전송 전체가 한꺼번에 쌓이지
+  않는다. 이미 종료된 파일의 지연/중복 청크는 `finalizedPaths`로 무시(1회만 복원). 루프 후
+  남은 항목은 INCOMPLETE만. 보고는 `contains` 기반이라 순서 변경 무해, 카운트 의미 보존.
+  (다파일 병렬 decode + 중복 청크 단위테스트 + 대용량 round-trip 검증 완료)
 - 큰 파일이나 많은 파일에서 heap 사용량이 급증하지 않도록 스트리밍 또는 단계별 처리 방식을 검토한다.
-  (encode/reencode/decode 파일별 복원까지 반영. decode의 "완료 즉시 evict"는 후속.)
+  (encode/reencode/decode 모두 반영 완료.)
 - [완료] `print-html`(모든 PNG를 base64 inline으로 한 파일에 모으던 메모리 폭탄)은
   분할/외부참조 개선 대신 기능 자체를 제거했다. CLI `--print-html` 옵션, GUI 체크박스,
   `EncodeWorkflow.Request.printHtml`, `EncodeService.generatePrintHtml`, 리소스 키,

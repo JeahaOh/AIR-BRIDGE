@@ -8,9 +8,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
@@ -30,7 +32,10 @@ final class DecodeService {
         DecodeListener effectiveListener = listener != null ? listener : line -> { };
         Files.createDirectories(outPath);
         Map<String, FileChunks> fileChunkMap = new LinkedHashMap<>();
+        Set<String> finalizedPaths = new HashSet<>();
         List<String> reportLines = new ArrayList<>();
+        int restoredCount = 0;
+        int hashMismatchCount = 0;
         int decodeErrorCount = 0;
 
         ExecutorService decodeExecutor = Executors.newFixedThreadPool(decodeWorkers);
@@ -83,6 +88,12 @@ final class DecodeService {
                     continue;
                 }
 
+                // The file was already restored (or failed terminally) when it completed earlier;
+                // ignore late/duplicate chunks for it so it is not resurrected or reprocessed.
+                if (finalizedPaths.contains(normalizedRelPath)) {
+                    continue;
+                }
+
                 FileChunks fileChunks = fileChunkMap.get(normalizedRelPath);
                 if (fileChunks == null) {
                     fileChunks = new FileChunks(chunk.project, normalizedRelPath, chunk.totalChunks, chunk.hash16);
@@ -90,82 +101,94 @@ final class DecodeService {
 
                 try {
                     fileChunks.addChunk(chunk, result.qrFile);
-                    fileChunkMap.put(normalizedRelPath, fileChunks);
                 } catch (Exception e) {
                     effectiveListener.onLog(String.format("  [WARN] QR decode 실패: %s",
                             QrDecodeSupport.formatDecodeException(e)));
                     reportLines.add("! " + srcPath.relativize(result.qrFile) + " - QR_READ_ERROR");
                     decodeErrorCount++;
+                    continue;
+                }
+                fileChunkMap.put(normalizedRelPath, fileChunks);
+
+                // Restore as soon as a file has all its chunks, then drop it from the map so the
+                // accumulated chunk strings are freed. This bounds total decode memory to the
+                // chunks of files still in progress, instead of the whole transfer at once.
+                if (fileChunks.isComplete()) {
+                    switch (restoreCompletedFile(fileChunks, outPath, reportLines, effectiveListener)) {
+                        case RESTORED -> restoredCount++;
+                        case HASH_MISMATCH -> hashMismatchCount++;
+                        case DECODE_ERROR, INVALID_PATH -> decodeErrorCount++;
+                    }
+                    fileChunkMap.remove(normalizedRelPath);
+                    finalizedPaths.add(normalizedRelPath);
                 }
             }
         } finally {
             decodeExecutor.shutdownNow();
         }
 
-        int restoredCount = 0;
+        // Anything still buffered never reached completeness.
         int incompleteCount = 0;
-        int hashMismatchCount = 0;
-
         for (FileChunks fileChunks : fileChunkMap.values()) {
             List<Integer> missingChunks = fileChunks.findMissingChunks();
-            if (!missingChunks.isEmpty()) {
-                reportLines.add("X " + fileChunks.relPath + " - INCOMPLETE (누락: " + missingChunks + ")");
-                effectiveListener.onLog(String.format("  [INCOMPLETE] %s - 누락 %s", fileChunks.relPath, missingChunks));
-                incompleteCount++;
-                continue;
-            }
-
-            Path restoredFile;
-            try {
-                restoredFile = RelativePathSupport.resolveUnderRoot(outPath, fileChunks.relPath);
-            } catch (IllegalArgumentException e) {
-                reportLines.add("X " + fileChunks.relPath + " - INVALID_PATH");
-                effectiveListener.onLog(String.format("  [INVALID_PATH] %s - %s", fileChunks.relPath, e.getMessage()));
-                decodeErrorCount++;
-                continue;
-            }
-            Path parent = restoredFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-
-            // Stream base64 -> gzip -> a temp file in the destination directory, computing the
-            // hash in the same pass, so memory does not scale with file size. Only move the temp
-            // file into place once the hash matches, so a bad payload never lands at the target.
-            Path stagingDir = (parent != null) ? parent : outPath;
-            Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
-            String actualHash16;
-            try {
-                actualHash16 = CodecSupport.decodeDecompressToFile(fileChunks.orderedEncodedStream(), tempFile)
-                        .substring(0, 16);
-            } catch (Exception e) {
-                Files.deleteIfExists(tempFile);
-                reportLines.add("X " + fileChunks.relPath + " - DECODE_ERROR");
-                effectiveListener.onLog(String.format("  [DECODE_ERROR] %s - %s", fileChunks.relPath, e.getMessage()));
-                decodeErrorCount++;
-                continue;
-            }
-
-            if (!actualHash16.equals(fileChunks.hash16)) {
-                Files.deleteIfExists(tempFile);
-                reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
-                effectiveListener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
-                        fileChunks.relPath, fileChunks.hash16, actualHash16));
-                hashMismatchCount++;
-                continue;
-            }
-
-            Files.move(tempFile, restoredFile, StandardCopyOption.REPLACE_EXISTING);
-            List<Path> movedTargets = moveDecodedQrFilesToSuccess(fileChunks.qrFiles());
-
-            reportLines.add("O " + fileChunks.relPath + " - OK" + formatMovedTargets(movedTargets));
-            effectiveListener.onLog(String.format("  [RESTORED] %s", fileChunks.relPath));
-            restoredCount++;
+            reportLines.add("X " + fileChunks.relPath + " - INCOMPLETE (누락: " + missingChunks + ")");
+            effectiveListener.onLog(String.format("  [INCOMPLETE] %s - 누락 %s", fileChunks.relPath, missingChunks));
+            incompleteCount++;
         }
 
         Path reportPath = outPath.resolve("_restore_result.txt");
         Files.write(reportPath, String.join(System.lineSeparator(), reportLines).getBytes(StandardCharsets.UTF_8));
         return new DecodeSummary(reportPath, restoredCount, incompleteCount, hashMismatchCount, decodeErrorCount);
+    }
+
+    private enum RestoreOutcome { RESTORED, HASH_MISMATCH, DECODE_ERROR, INVALID_PATH }
+
+    private RestoreOutcome restoreCompletedFile(FileChunks fileChunks,
+                                                Path outPath,
+                                                List<String> reportLines,
+                                                DecodeListener listener) throws java.io.IOException {
+        Path restoredFile;
+        try {
+            restoredFile = RelativePathSupport.resolveUnderRoot(outPath, fileChunks.relPath);
+        } catch (IllegalArgumentException e) {
+            reportLines.add("X " + fileChunks.relPath + " - INVALID_PATH");
+            listener.onLog(String.format("  [INVALID_PATH] %s - %s", fileChunks.relPath, e.getMessage()));
+            return RestoreOutcome.INVALID_PATH;
+        }
+        Path parent = restoredFile.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+
+        // Stream base64 -> gzip -> a temp file in the destination directory, computing the
+        // hash in the same pass, so memory does not scale with file size. Only move the temp
+        // file into place once the hash matches, so a bad payload never lands at the target.
+        Path stagingDir = (parent != null) ? parent : outPath;
+        Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
+        String actualHash16;
+        try {
+            actualHash16 = CodecSupport.decodeDecompressToFile(fileChunks.orderedEncodedStream(), tempFile)
+                    .substring(0, 16);
+        } catch (Exception e) {
+            Files.deleteIfExists(tempFile);
+            reportLines.add("X " + fileChunks.relPath + " - DECODE_ERROR");
+            listener.onLog(String.format("  [DECODE_ERROR] %s - %s", fileChunks.relPath, e.getMessage()));
+            return RestoreOutcome.DECODE_ERROR;
+        }
+
+        if (!actualHash16.equals(fileChunks.hash16)) {
+            Files.deleteIfExists(tempFile);
+            reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
+            listener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
+                    fileChunks.relPath, fileChunks.hash16, actualHash16));
+            return RestoreOutcome.HASH_MISMATCH;
+        }
+
+        Files.move(tempFile, restoredFile, StandardCopyOption.REPLACE_EXISTING);
+        List<Path> movedTargets = moveDecodedQrFilesToSuccess(fileChunks.qrFiles());
+        reportLines.add("O " + fileChunks.relPath + " - OK" + formatMovedTargets(movedTargets));
+        listener.onLog(String.format("  [RESTORED] %s", fileChunks.relPath));
+        return RestoreOutcome.RESTORED;
     }
 
     private static List<Path> moveDecodedQrFilesToSuccess(List<Path> qrFiles) {

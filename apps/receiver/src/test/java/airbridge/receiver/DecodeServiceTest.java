@@ -65,6 +65,32 @@ class DecodeServiceTest {
     }
 
     @Test
+    void decodeRestoresOnceAndIgnoresDuplicateChunksAfterCompletion() throws Exception {
+        Path inputDir = tempDir.resolve("qr");
+        Path batch1 = inputDir.resolve("batch1");
+        Path batch2 = inputDir.resolve("batch2");
+        Path outputDir = tempDir.resolve("restored");
+        Files.createDirectories(batch1);
+        Files.createDirectories(batch2);
+
+        byte[] sourceData = randomBytes(900, 53L);
+        // Two independent copies of the same file's chunks: once the first copy completes the
+        // file it is restored and evicted, so the second copy must be ignored, not re-restored
+        // or reported as an error.
+        writeQrChunks(batch1, "TESTPROJ", "docs/dup.bin", sourceData, 30, null, List.of());
+        writeQrChunks(batch2, "TESTPROJ", "docs/dup.bin", sourceData, 30, null, List.of());
+
+        DecodeSummary summary = new DecodeService(4)
+                .decode(inputDir, outputDir, QrDecodeSupport.collectQrImageFiles(inputDir), null);
+
+        assertEquals(1, summary.restoredCount());
+        assertEquals(0, summary.incompleteCount());
+        assertEquals(0, summary.hashMismatchCount());
+        assertEquals(0, summary.decodeErrorCount());
+        assertArrayEquals(sourceData, Files.readAllBytes(outputDir.resolve("docs/dup.bin")));
+    }
+
+    @Test
     void decodeReportsIncompleteHashMismatchAndQrReadErrors() throws Exception {
         Path inputDir = tempDir.resolve("qr");
         Path batchDir = inputDir.resolve("batch");

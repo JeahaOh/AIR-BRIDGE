@@ -14,6 +14,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -34,14 +35,17 @@ final class QrImageWriter {
         this.qrErrorLevel = qrErrorLevel;
     }
 
-    BufferedImage generateQrImage(String data, String labelLine1, String labelLine2) throws WriterException {
+    BufferedImage generateQrImage(byte[] data, String labelLine1, String labelLine2) throws WriterException {
         QRCodeWriter writer = new QRCodeWriter();
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
         hints.put(EncodeHintType.ERROR_CORRECTION, qrErrorLevel);
-        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        // ISO-8859-1 maps one byte to one char, so ZXing encodes the raw bytes in QR 8-bit byte
+        // mode with no ECI segment; the decoder recovers the bytes with the same charset.
+        hints.put(EncodeHintType.CHARACTER_SET, "ISO-8859-1");
         hints.put(EncodeHintType.MARGIN, 2);
 
-        BitMatrix matrix = writer.encode(data, BarcodeFormat.QR_CODE, qrImageSize, qrImageSize, hints);
+        String content = new String(data, StandardCharsets.ISO_8859_1);
+        BitMatrix matrix = writer.encode(content, BarcodeFormat.QR_CODE, qrImageSize, qrImageSize, hints);
 
         BufferedImage qrImage = MatrixToImageWriter.toBufferedImage(matrix);
         int qrW = qrImage.getWidth();

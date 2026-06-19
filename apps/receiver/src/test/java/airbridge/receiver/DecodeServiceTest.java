@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -151,9 +152,9 @@ class DecodeServiceTest {
                                             int chunkDataSize,
                                             String forcedHash16,
                                             List<Integer> missingChunks) throws Exception {
-        String encoded = CodecSupport.compressAndEncode(data);
+        byte[] encoded = CodecSupport.compress(data);
         String hash16 = forcedHash16 != null ? forcedHash16 : CodecSupport.sha256Hex(data).substring(0, 16);
-        int totalChunks = Math.max(1, (int) Math.ceil((double) encoded.length() / chunkDataSize));
+        int totalChunks = Math.max(1, (int) Math.ceil((double) encoded.length / chunkDataSize));
         List<Path> paths = new ArrayList<>();
 
         for (int index = 0; index < totalChunks; index++) {
@@ -162,14 +163,14 @@ class DecodeServiceTest {
                 continue;
             }
             int start = index * chunkDataSize;
-            int end = Math.min(encoded.length(), start + chunkDataSize);
-            String payload = QrPayloadSupport.buildPayload(
+            int end = Math.min(encoded.length, start + chunkDataSize);
+            byte[] payload = QrPayloadSupport.buildPayload(
                     project,
                     relPath,
                     chunkIdx,
                     totalChunks,
                     hash16,
-                    encoded.substring(start, end)
+                    Arrays.copyOfRange(encoded, start, end)
             );
 
             String prefix = relPath.replace('/', '_').replace('.', '_');
@@ -181,14 +182,15 @@ class DecodeServiceTest {
         return paths;
     }
 
-    private static void writeQrFile(Path path, String payload) throws Exception {
+    private static void writeQrFile(Path path, byte[] payload) throws Exception {
         QRCodeWriter writer = new QRCodeWriter();
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        hints.put(EncodeHintType.CHARACTER_SET, "ISO-8859-1");
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.MARGIN, 2);
 
-        var matrix = writer.encode(payload, BarcodeFormat.QR_CODE, 420, 420, hints);
+        String content = new String(payload, StandardCharsets.ISO_8859_1);
+        var matrix = writer.encode(content, BarcodeFormat.QR_CODE, 420, 420, hints);
         BufferedImage image = new BufferedImage(matrix.getWidth(), matrix.getHeight(), BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < matrix.getHeight(); y++) {
             for (int x = 0; x < matrix.getWidth(); x++) {

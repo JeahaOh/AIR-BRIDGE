@@ -6,10 +6,10 @@
 source directory
   -> SourceCollector
   -> FileEncodingPlan per file
-  -> GZIP + Base64 string
-  -> string chunks by chunkDataSize
-  -> HDR payload strings
-  -> QR PNG files
+  -> GZIP bytes
+  -> byte chunks by chunkDataSize
+  -> binary payload frames
+  -> QR PNG files (8-bit byte mode)
   -> sender slide or another display path
   -> receiver capture or imported PNG files
   -> payload decode
@@ -25,11 +25,11 @@ Current `sender encode` behavior:
 source file
   -> optional office conversion
   -> SHA-256 over converted bytes
-  -> GZIP + Base64 string
-  -> split by chunkDataSize characters
-  -> payload:
-       HDR + HEADER_SEP + header + HEADER_SEP + chunkData
-  -> ZXing QR render
+  -> GZIP bytes
+  -> split by chunkDataSize bytes
+  -> binary payload frame:
+       magic 'A','B' + project + relPath + chunkIdx + total + hash + data
+  -> ZXing QR render (8-bit byte mode, ISO-8859-1)
   -> PNG written to output directory
 ```
 
@@ -39,7 +39,7 @@ Additional encode outputs:
 
 Important current rule:
 
-- chunking is based on encoded string length, not on raw byte length
+- chunking is based on gzip byte length (no Base64)
 
 ## Decode Flow Details
 
@@ -52,8 +52,8 @@ PNG files
   -> parsed payload fields
   -> grouped by relPath + project + totalChunks + hash16
   -> missing chunk check
-  -> concatenate chunkData strings
-  -> Base64 decode + GZIP inflate
+  -> concatenate chunk data bytes
+  -> GZIP inflate
   -> SHA-256 prefix compare
   -> RelativePathSupport safety check
   -> restored file write
@@ -122,11 +122,11 @@ PNG filenames and label text are convenience only.
 Validate in roughly this order:
 
 1. the PNG can be read as an image
-2. a QR payload string can be extracted
-3. payload header fields parse correctly
+2. QR payload bytes can be extracted (ISO-8859-1, 1:1)
+3. the binary frame parses correctly
 4. chunk indexes are in range
 5. all required chunks are present
-6. concatenated chunk data can be Base64-decoded and GZIP-inflated
+6. concatenated chunk data can be GZIP-inflated
 7. restored bytes match the payload `hash16`
 8. restored output path is safe under the output root
 9. successful input PNGs are moved to the matching `*-success` directory

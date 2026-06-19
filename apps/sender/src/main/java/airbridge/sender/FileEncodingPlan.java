@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -17,7 +16,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Encode plan for a single source file. The compressed+base64 payload is staged to a
+ * Encode plan for a single source file. The gzip-compressed payload is staged to a
  * temporary file (streamed with bounded memory) rather than held in memory, so encoding
  * large files no longer scales heap usage with file size. Callers must {@link #close()}
  * the plan to release the chunk reader and delete the temp file.
@@ -87,20 +86,20 @@ final class FileEncodingPlan implements AutoCloseable {
             convertedType = "PPTX\u2192TXT";
         }
 
-        Path tempFile = Files.createTempFile("airbridge-encode-", ".b64");
+        Path tempFile = Files.createTempFile("airbridge-encode-", ".gz");
         tempFile.toFile().deleteOnExit();
         try {
-            CodecSupport.EncodedStreamInfo info;
+            CodecSupport.CompressedStreamInfo info;
             try (InputStream source = (convertedData != null)
                     ? new ByteArrayInputStream(convertedData)
                     : Files.newInputStream(file)) {
-                info = CodecSupport.compressAndEncodeToFile(source, tempFile);
+                info = CodecSupport.compressToFile(source, tempFile);
             }
 
-            if (info.encodedByteCount() > Integer.MAX_VALUE) {
-                throw new IOException("encoded payload too large to chunk: " + info.encodedByteCount() + " bytes");
+            if (info.compressedByteCount() > Integer.MAX_VALUE) {
+                throw new IOException("encoded payload too large to chunk: " + info.compressedByteCount() + " bytes");
             }
-            int encodedSize = (int) info.encodedByteCount();
+            int encodedSize = (int) info.compressedByteCount();
             int totalChunks = (int) Math.ceil((double) encodedSize / chunkDataSize);
             if (totalChunks == 0) {
                 totalChunks = 1;
@@ -124,8 +123,8 @@ final class FileEncodingPlan implements AutoCloseable {
         }
     }
 
-    /** Reads the base64 payload window {@code [start, end)} from the staged temp file. */
-    String readChunk(int start, int end) throws IOException {
+    /** Reads the gzip payload window {@code [start, end)} from the staged temp file. */
+    byte[] readChunk(int start, int end) throws IOException {
         int length = end - start;
         if (chunkChannel == null) {
             chunkChannel = Files.newByteChannel(encodedTempFile, StandardOpenOption.READ);
@@ -137,8 +136,9 @@ final class FileEncodingPlan implements AutoCloseable {
                 break;
             }
         }
-        // Base64 is ASCII, so one byte maps to one character.
-        return new String(buffer.array(), 0, buffer.position(), StandardCharsets.US_ASCII);
+        byte[] out = new byte[buffer.position()];
+        System.arraycopy(buffer.array(), 0, out, 0, buffer.position());
+        return out;
     }
 
     @Override

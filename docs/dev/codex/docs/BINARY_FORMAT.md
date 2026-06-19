@@ -17,8 +17,7 @@ There is no explicit payload version field today.
 
 That means:
 
-- field order changes are breaking
-- separator changes are breaking
+- field order / framing changes are breaking
 - header growth is breaking unless sender and receiver are updated together
 - tests and docs must change in the same patch as payload changes
 
@@ -26,44 +25,35 @@ Do not write new code as if version negotiation already exists.
 
 ## Payload Layout
 
-Current payload shape:
+The payload carries gzip bytes directly in QR 8-bit byte mode (no Base64). It is
+a binary frame, not a text-separator string. All integers are big-endian.
 
 ```text
-"HDR" + HEADER_SEP + header + HEADER_SEP + chunkData
+magic    : 2 bytes  'A','B'
+project  : u8 length  + UTF-8 bytes
+relPath  : u16 length + UTF-8 bytes
+chunkIdx : u32
+total    : u32
+hash     : 8 bytes  (first 8 bytes / 16 hex chars of the file SHA-256)
+data     : remaining bytes (current chunk's gzip window)
 ```
 
-Constants from `QrPayloadSupport`:
-
-```text
-HEADER_SEP = U+001E
-FIELD_SEP  = U+001F
-```
+Built and parsed by `QrPayloadSupport.buildPayload(...)` /
+`QrPayloadSupport.parsePayload(byte[])`.
 
 ## Header Fields
-
-Current header field order:
-
-1. `project`
-2. `relPath`
-3. `chunkIdx`
-4. `totalChunks`
-5. `hash16`
-
-Encoded form:
-
-```text
-project FIELD_SEP relPath FIELD_SEP chunkIdx FIELD_SEP totalChunks FIELD_SEP hash16
-```
 
 Important current facts:
 
 - `chunkIdx` is one-based
-- `hash16` is the first 16 hex characters of SHA-256
+- `hash` is the first 8 bytes (16 hex chars) of SHA-256; `parsePayload` exposes it
+  as the 16-char lowercase hex `hash16`
 - `project` is a grouping label, not a guaranteed-unique transfer id
+- `project` length ≤ 255 bytes, `relPath` length ≤ 65535 bytes (UTF-8)
 
 ## Chunk Data Rule
 
-`chunkData` is not raw file bytes.
+`data` is not raw file bytes.
 
 Current pipeline:
 
@@ -71,14 +61,12 @@ Current pipeline:
 file bytes
   -> optional office conversion
   -> GZIP
-  -> Base64 string
-  -> substring slices of length chunkDataSize
+  -> byte slices of length chunkDataSize
 ```
 
 Important current fact:
 
-- `chunkDataSize` counts characters in the encoded string, not bytes in the
-  original file
+- `chunkDataSize` counts bytes of the gzip stream (no Base64 inflation)
 
 ## Decode Grouping Rule
 
@@ -96,12 +84,12 @@ Duplicate chunk indexes currently overwrite earlier chunk data for that slot.
 
 Current integrity check is:
 
-1. read QR payload string from PNG
-2. parse the five header fields
+1. read QR payload bytes from PNG (ISO-8859-1 recovers bytes 1:1)
+2. parse the binary frame (magic + header fields)
 3. ensure `chunkIdx` is in range
 4. collect all required chunks
-5. concatenate `chunkData`
-6. Base64-decode and GZIP-inflate
+5. concatenate the chunk `data` bytes
+6. GZIP-inflate
 7. compute SHA-256 and compare the first 16 hex chars with `hash16`
 8. validate restore path under the output root
 
@@ -122,7 +110,7 @@ Decode must keep relying on payload metadata, not filenames.
 
 Current QR images are produced with:
 
-- ZXing QR generation
+- ZXing QR generation in 8-bit byte mode (ISO-8859-1 charset, no ECI segment)
 - configurable QR image size
 - configurable QR error correction level
 - configurable label height

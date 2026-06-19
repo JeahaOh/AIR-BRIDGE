@@ -63,14 +63,14 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델"이 병목이라는
 판단에 따른 개선안. ROI(이득/비용) 순서로 1 → 2 → 3 으로 진행한다.
 
-- [ ] **1. Base64 제거 → QR 8-bit 바이트 모드 직접 사용** (이득 ≈ 1.33×, 정확도 손실 0)
-  - 현재 `gzip → Base64 → QR 텍스트` 에서 Base64는 데이터를 33% 부풀리는 순수 낭비.
-  - QR 바이트 모드로 gzip 바이트를 직접 싣고, `QrPayloadSupport`의 구분자 텍스트
-    헤더를 바이너리 프레이밍으로 교체.
-  - 영향 범위: `CodecSupport`(Base64 단계 제거), `QrPayloadSupport`(헤더 포맷),
-    `QrImageWriter`(byte 모드), `QrDecodeSupport`/`DecodeService`(파싱).
-    payload 포맷 변경이므로 sender·receiver·tests·docs 동시 갱신(§5 기준).
-  - 가장 싸고 무위험 → 먼저.
+- [x] **1. Base64 제거 → QR 8-bit 바이트 모드 직접 사용** (이득 ≈ 1.33×, 정확도 손실 0) — 완료
+  - `gzip → Base64 → QR 텍스트`에서 Base64(33% 부풀림)를 제거.
+  - QR 바이트 모드로 gzip 바이트를 직접 싣고(`ISO-8859-1` 1:1 charset, ECI 없음),
+    `QrPayloadSupport`의 구분자 텍스트 헤더를 바이너리 프레이밍(magic+길이접두 헤더+raw data)으로 교체.
+  - 반영: `CodecSupport`(gzip 전용 `compress/decompress`·`compressToFile/decompressToFile`),
+    `QrPayloadSupport`(바이너리 build/parse), `QrImageWriter`(byte 모드),
+    `QrDecodeSupport`/`QrDecodedChunk`/`FileChunks`/`DecodeService`(byte[] 청크·파싱),
+    `FileEncodingPlan`(gzip 임시파일·`readChunk` byte[]). tests·docs 동시 갱신, round-trip 검증 완료.
 
 - [ ] **2. Fountain code(RaptorQ, RFC 6330) 도입** (단방향 채널의 신뢰도·실효 처리율)
   - 현재 순차 인덱스 청크는 특정 프레임 드롭 시 그 청크가 다시 올 때까지 대기 →

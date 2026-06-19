@@ -6,9 +6,9 @@ final class QrDecodedChunk {
     final int chunkIdx;
     final int totalChunks;
     final String hash16;
-    final String chunkData;
+    final byte[] chunkData;
 
-    QrDecodedChunk(String project, String relPath, int chunkIdx, int totalChunks, String hash16, String chunkData) {
+    QrDecodedChunk(String project, String relPath, int chunkIdx, int totalChunks, String hash16, byte[] chunkData) {
         this.project = project;
         this.relPath = relPath;
         this.chunkIdx = chunkIdx;

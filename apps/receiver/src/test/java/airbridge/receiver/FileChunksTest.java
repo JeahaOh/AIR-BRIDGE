@@ -16,12 +16,12 @@ class FileChunksTest {
     void addChunkTracksMissingChunksAndStreamsDataInChunkOrder() throws Exception {
         FileChunks fileChunks = new FileChunks("TESTPROJ", "docs/sample.bin", 3, "hash-1234");
 
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 2, 3, "hash-1234", "B"), Path.of("qr-2.png"));
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 1, 3, "hash-1234", "A"), Path.of("qr-1.png"));
+        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 2, 3, "hash-1234", bytes("B")), Path.of("qr-2.png"));
+        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 1, 3, "hash-1234", bytes("A")), Path.of("qr-1.png"));
 
         assertEquals(List.of(3), fileChunks.findMissingChunks());
 
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 3, 3, "hash-1234", "C"), Path.of("qr-3.png"));
+        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 3, 3, "hash-1234", bytes("C")), Path.of("qr-3.png"));
 
         assertEquals(List.of(), fileChunks.findMissingChunks());
         try (InputStream stream = fileChunks.orderedEncodedStream()) {
@@ -36,11 +36,15 @@ class FileChunksTest {
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
                 fileChunks.addChunk(
-                        new QrDecodedChunk("OTHER", "docs/sample.bin", 1, 2, "hash-1234", "A"),
+                        new QrDecodedChunk("OTHER", "docs/sample.bin", 1, 2, "hash-1234", bytes("A")),
                         Path.of("qr-1.png")
                 )
         );
 
         assertEquals("동일 파일에 대한 메타데이터가 일치하지 않습니다: qr-1.png", error.getMessage());
+    }
+
+    private static byte[] bytes(String s) {
+        return s.getBytes(StandardCharsets.US_ASCII);
     }
 }

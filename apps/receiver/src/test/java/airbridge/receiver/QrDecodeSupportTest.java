@@ -11,12 +11,14 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,8 +42,8 @@ class QrDecodeSupportTest {
 
     @Test
     void decodeTaskReturnsChunkForValidQrImage() throws Exception {
-        byte[] sourceData = "receiver decode smoke".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-        String encoded = CodecSupport.compressAndEncode(sourceData);
+        byte[] sourceData = "receiver decode smoke".getBytes(StandardCharsets.UTF_8);
+        byte[] encoded = CodecSupport.compress(sourceData);
         String hash16 = CodecSupport.sha256Hex(sourceData).substring(0, 16);
         Path qrFile = tempDir.resolve("valid.png");
         writeQrFile(qrFile, QrPayloadSupport.buildPayload("TESTPROJ", "docs/sample.txt", 1, 1, hash16, encoded));
@@ -58,7 +60,7 @@ class QrDecodeSupportTest {
         assertEquals(1, result.chunk.chunkIdx);
         assertEquals(1, result.chunk.totalChunks);
         assertEquals(hash16, result.chunk.hash16);
-        assertEquals(encoded, result.chunk.chunkData);
+        assertArrayEquals(encoded, result.chunk.chunkData);
     }
 
     @Test
@@ -75,14 +77,15 @@ class QrDecodeSupportTest {
         assertEquals(1, result.attempts);
     }
 
-    private static void writeQrFile(Path path, String payload) throws Exception {
+    private static void writeQrFile(Path path, byte[] payload) throws Exception {
         QRCodeWriter writer = new QRCodeWriter();
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
-        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        hints.put(EncodeHintType.CHARACTER_SET, "ISO-8859-1");
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.MARGIN, 2);
 
-        var matrix = writer.encode(payload, BarcodeFormat.QR_CODE, 420, 420, hints);
+        String content = new String(payload, StandardCharsets.ISO_8859_1);
+        var matrix = writer.encode(content, BarcodeFormat.QR_CODE, 420, 420, hints);
         BufferedImage image = new BufferedImage(matrix.getWidth(), matrix.getHeight(), BufferedImage.TYPE_INT_RGB);
         for (int y = 0; y < matrix.getHeight(); y++) {
             for (int x = 0; x < matrix.getWidth(); x++) {

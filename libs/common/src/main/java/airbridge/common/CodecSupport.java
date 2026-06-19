@@ -9,37 +9,39 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
-import java.util.Base64;
 import java.util.zip.Deflater;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+/**
+ * GZIP compression helpers for the QR payload. The QR carries the gzip bytes directly in
+ * 8-bit byte mode (no Base64), so these methods produce and consume raw compressed bytes.
+ */
 public final class CodecSupport {
     private CodecSupport() {
     }
 
-    public static String compressAndEncode(byte[] data) throws IOException {
+    /** GZIP-compresses {@code data} with best compression and returns the raw compressed bytes. */
+    public static byte[] compress(byte[] data) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (GZIPOutputStream gzos = new GZIPOutputStream(baos) {{
             def.setLevel(Deflater.BEST_COMPRESSION);
         }}) {
             gzos.write(data);
         }
-        return Base64.getEncoder().encodeToString(baos.toByteArray());
+        return baos.toByteArray();
     }
 
     /**
-     * Streams {@code source} through gzip (best compression) and base64 into {@code target},
-     * using bounded memory regardless of source size, while computing the SHA-256 of the raw
-     * bytes in the same pass. The produced file is byte-identical to
-     * {@code compressAndEncode(allBytesOf(source))}, so the QR payload format is unchanged.
+     * Streams {@code source} through gzip (best compression) into {@code target}, using bounded
+     * memory regardless of source size, while computing the SHA-256 of the raw bytes in the same
+     * pass. The produced file holds the gzip bytes the QR payload carries directly.
      */
-    public static EncodedStreamInfo compressAndEncodeToFile(InputStream source, Path target) throws IOException {
+    public static CompressedStreamInfo compressToFile(InputStream source, Path target) throws IOException {
         MessageDigest digest = newSha256();
         long rawByteCount = 0;
         try (OutputStream fileOut = Files.newOutputStream(target);
-             OutputStream base64Out = Base64.getEncoder().wrap(fileOut);
-             GZIPOutputStream gzos = new GZIPOutputStream(base64Out) {{
+             GZIPOutputStream gzos = new GZIPOutputStream(fileOut) {{
                  def.setLevel(Deflater.BEST_COMPRESSION);
              }}) {
             byte[] buffer = new byte[8192];
@@ -50,23 +52,22 @@ public final class CodecSupport {
                 rawByteCount += read;
             }
         }
-        return new EncodedStreamInfo(toHex(digest.digest()), rawByteCount, Files.size(target));
+        return new CompressedStreamInfo(toHex(digest.digest()), rawByteCount, Files.size(target));
     }
 
-    /** Result of {@link #compressAndEncodeToFile(InputStream, Path)}. */
-    public record EncodedStreamInfo(String sha256Hex, long rawByteCount, long encodedByteCount) {
+    /** Result of {@link #compressToFile(InputStream, Path)}. */
+    public record CompressedStreamInfo(String sha256Hex, long rawByteCount, long compressedByteCount) {
     }
 
     /**
-     * Streams a base64+gzip {@code source} into {@code target} (the restored file) using
-     * bounded memory, returning the SHA-256 (hex) of the decompressed bytes computed in the
-     * same pass. The inverse of {@link #compressAndEncodeToFile(InputStream, java.nio.file.Path)};
-     * callers verify the returned hash before committing the file.
+     * Streams a gzip {@code source} into {@code target} (the restored file) using bounded memory,
+     * returning the SHA-256 (hex) of the decompressed bytes computed in the same pass. The inverse
+     * of {@link #compressToFile(InputStream, Path)}; callers verify the returned hash before
+     * committing the file.
      */
-    public static String decodeDecompressToFile(InputStream base64Source, Path target) throws IOException {
+    public static String decompressToFile(InputStream compressedSource, Path target) throws IOException {
         MessageDigest digest = newSha256();
-        try (InputStream compressed = Base64.getDecoder().wrap(base64Source);
-             GZIPInputStream gzis = new GZIPInputStream(compressed);
+        try (GZIPInputStream gzis = new GZIPInputStream(compressedSource);
              DigestInputStream digestIn = new DigestInputStream(gzis, digest);
              OutputStream out = Files.newOutputStream(target)) {
             digestIn.transferTo(out);
@@ -74,8 +75,8 @@ public final class CodecSupport {
         return toHex(digest.digest());
     }
 
-    public static byte[] decodeAndDecompress(String encoded) throws IOException {
-        byte[] compressed = Base64.getDecoder().decode(encoded);
+    /** GZIP-inflates {@code compressed} and returns the raw decompressed bytes. */
+    public static byte[] decompress(byte[] compressed) throws IOException {
         try (ByteArrayInputStream bais = new ByteArrayInputStream(compressed);
              GZIPInputStream gzis = new GZIPInputStream(bais);
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {

@@ -89,12 +89,12 @@ libs/packager  -> picocli  (identify/pack/unpack archive-rewrite helpers)
   logging. Core behavior works fully offline.
 - **Path safety:** decode/unpack must never write outside the selected output dir —
   preserve `RelativePathSupport`-style checks when touching restoration logic.
-- **Payload compatibility:** the QR payload is `"HDR" + HEADER_SEP + header + HEADER_SEP +
-  chunkData`, where the header is field-separated `project / relPath / chunkIdx /
-  totalChunks / fileHash[0:16]`. Separators are ASCII control chars (`HEADER_SEP` = U+001E,
-  `FIELD_SEP` = U+001F) defined in `QrPayloadSupport`. There is **no** version field,
-  transfer id, or frame checksum — do not invent one. Any field/separator change touches
-  sender, receiver, tests, and docs together.
+- **Payload compatibility:** the QR carries gzip bytes directly in QR 8-bit byte mode (no
+  Base64), framed as a binary record in `QrPayloadSupport`: `magic 'A','B'` + u8-len `project`
+  + u16-len `relPath` + u32 `chunkIdx` + u32 `totalChunks` + 8-byte `hash` (first 16 hex chars
+  of the SHA-256) + raw `data`. Encoder/decoder use the `ISO-8859-1` charset so bytes survive
+  1:1 with no ECI. There is **no** version field, transfer id, or frame checksum — do not
+  invent one. Any frame change touches sender, receiver, tests, and docs together.
 - **Decode semantics:** chunks group by payload metadata, not PNG filename; successful
   decode moves source PNGs into sibling `*-success` dirs; missing chunks / QR-read failures
   / hash mismatches / invalid paths are explicit first-class outcomes.

@@ -31,8 +31,8 @@ Current responsibilities:
 
 - collect source files from a directory
 - optionally convert selected office formats before encoding
-- compress and Base64-encode file content
-- split encoded data into QR payload chunks
+- GZIP-compress file content
+- split compressed bytes into QR payload chunks (binary frames, 8-bit byte mode)
 - render QR PNG files plus `_manifest.txt`
 - launch the Swing slideshow app for playback
 - unpack a previously packed `zip` back into its original archive shape

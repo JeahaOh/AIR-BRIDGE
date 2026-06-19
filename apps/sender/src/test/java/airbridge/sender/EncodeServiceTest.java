@@ -84,9 +84,10 @@ class EncodeServiceTest {
         }
 
         assertEquals(summary.totalQrCount(), qrFiles.size());
-        String decodedPayload = decodeQrText(qrFiles.getFirst());
-        assertTrue(decodedPayload.startsWith("HDR" + QrPayloadSupport.HEADER_SEP));
-        assertTrue(decodedPayload.contains("docs/sample.txt"));
+        QrPayloadSupport.ParsedPayload parsed = decodeQrPayload(qrFiles.getFirst());
+        assertEquals("TESTPROJ", parsed.project());
+        assertEquals("docs/sample.txt", parsed.relPath());
+        assertEquals(1, parsed.chunkIdx());
     }
 
     @Test
@@ -294,15 +295,15 @@ class EncodeServiceTest {
                 safePrefix, chunkIdx, totalChunks);
     }
 
-    private static String decodeQrText(Path imagePath) throws Exception {
+    private static QrPayloadSupport.ParsedPayload decodeQrPayload(Path imagePath) throws Exception {
         BufferedImage image = ImageIO.read(imagePath.toFile());
         Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
-        hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
+        hints.put(DecodeHintType.CHARACTER_SET, "ISO-8859-1");
         hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
         hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
 
         BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(new BufferedImageLuminanceSource(image)));
         Result result = new MultiFormatReader().decode(bitmap, hints);
-        return result.getText();
+        return QrPayloadSupport.parsePayload(result.getText().getBytes(StandardCharsets.ISO_8859_1));
     }
 }

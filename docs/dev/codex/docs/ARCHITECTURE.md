@@ -54,8 +54,8 @@ Key classes:
 
 - shared CLI/banner/version helpers
 - relative path safety helpers
-- QR payload helpers
-- compression/Base64 helpers
+- QR payload helpers (binary framing)
+- GZIP compression helpers
 
 Key classes:
 

@@ -19,6 +19,7 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -209,7 +210,8 @@ final class QrDecodeSupport {
 
     private static List<Map<DecodeHintType, ?>> buildDecodeHintsList() {
         Map<DecodeHintType, Object> normalHints = new EnumMap<>(DecodeHintType.class);
-        normalHints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
+        // Match the encoder: ISO-8859-1 recovers the raw bytes one char per byte, with no ECI.
+        normalHints.put(DecodeHintType.CHARACTER_SET, "ISO-8859-1");
         normalHints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
 
         Map<DecodeHintType, Object> tryHarderHints = new EnumMap<>(normalHints);
@@ -329,23 +331,17 @@ final class QrDecodeSupport {
     }
 
     private static QrDecodedChunk parsePayload(String payload) {
-        String[] payloadParts = payload.split(QrPayloadSupport.HEADER_SEP, 3);
-        if (payloadParts.length != 3 || !"HDR".equals(payloadParts[0])) {
-            throw new IllegalArgumentException("지원하지 않는 페이로드 형식");
-        }
-
-        String[] fields = payloadParts[1].split(QrPayloadSupport.FIELD_SEP, -1);
-        if (fields.length != 5) {
-            throw new IllegalArgumentException("헤더 필드 수가 올바르지 않습니다");
-        }
-
+        // The decode pipeline returns the payload as an ISO-8859-1 string (one char per byte);
+        // recover the original bytes losslessly before parsing the binary frame.
+        byte[] bytes = payload.getBytes(StandardCharsets.ISO_8859_1);
+        QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(bytes);
         return new QrDecodedChunk(
-                fields[0],
-                fields[1],
-                Integer.parseInt(fields[2]),
-                Integer.parseInt(fields[3]),
-                fields[4],
-                payloadParts[2]
+                parsed.project(),
+                parsed.relPath(),
+                parsed.chunkIdx(),
+                parsed.totalChunks(),
+                parsed.hash16(),
+                parsed.chunkData()
         );
     }
 }

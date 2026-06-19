@@ -39,10 +39,10 @@
 - `fileName`: QR 라벨에 표시할 파일명
 - `convertedType`: 변환 여부 표시용 문자열
 - `fileHash`: 전처리 후 바이트 기준 SHA-256
-- `encodedSize`: GZIP + Base64 결과의 길이(문자 수)
+- `encodedSize`: GZIP 결과의 길이(바이트 수)
 - `totalChunks`: `encodedSize / chunkDataSize` 기준 청크 수
 
-GZIP + Base64 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 임시파일에 스트리밍으로
+GZIP 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 임시파일에 스트리밍으로
 1회 기록한다. 따라서 큰 파일을 encode해도 heap 사용량이 파일 크기에 비례해 늘지 않는다.
 청크는 이 임시파일에서 윈도우 단위로 읽고, 파일 처리가 끝나면 임시파일을 삭제한다
 (`FileEncodingPlan`은 `AutoCloseable`).
@@ -51,34 +51,34 @@ GZIP + Base64 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 �
 
 ## payload 형식
 
-QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다.
+QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다. Base64 없이 GZIP 바이트를 QR
+8-bit 바이트 모드로 직접 싣기 때문에, payload는 텍스트 구분자가 아니라 **바이너리 프레이밍**이다.
+정수는 모두 big-endian.
 
-구조:
+```
+magic    : 2 bytes  'A','B'
+project  : u8 길이  + UTF-8 바이트
+relPath  : u16 길이 + UTF-8 바이트
+chunkIdx : u32
+total    : u32
+hash     : 8 bytes  (파일 SHA-256의 앞 8바이트 = 16 hex chars)
+data     : 나머지 바이트 (현재 청크의 GZIP 윈도우)
+```
 
-1. `"HDR"`
-2. header separator `\u001E`
-3. 필드 5개를 field separator `\u001F`로 연결한 헤더
-4. header separator `\u001E`
-5. 현재 청크의 Base64 substring
-
-헤더 필드 순서:
-
-1. `project`
-2. `relPath`
-3. `chunkIdx`
-4. `totalChunks`
-5. `fileHash.substring(0, 16)`
-
-해시는 전체 SHA-256 중 앞 16자리만 payload에 실립니다.
+- 해시는 전체 SHA-256 중 앞 16자리(8바이트)만 payload에 실린다.
+- 바이트를 QR에 무손실로 싣기 위해 인코더/디코더 모두 `ISO-8859-1` charset을 쓴다(바이트↔문자
+  1:1, QR 바이트 모드 기본 ECI라 ECI 세그먼트 없음). `QrImageWriter`는 `new String(bytes,
+  ISO_8859_1)`로 인코딩하고, `QrDecodeSupport`는 `getText().getBytes(ISO_8859_1)`로 바이트를
+  복원한 뒤 `QrPayloadSupport.parsePayload(byte[])`로 프레임을 해석한다.
 
 ## encode 청크 생성
 
 파일 하나당 처리 순서는 아래와 같다.
 
-1. 전처리 후 바이트를 `CodecSupport.compressAndEncodeToFile(...)`로 GZIP + Base64 해서
+1. 전처리 후 바이트를 `CodecSupport.compressToFile(...)`로 GZIP 압축해서
    임시파일에 스트리밍 기록한다(같은 패스에서 SHA-256도 계산). 메모리는 O(buffer)로 제한된다.
-2. 임시파일을 `chunkDataSize` 단위 윈도우로 읽는다(`FileEncodingPlan.readChunk`).
-3. 각 청크마다 payload 문자열을 만든다.
+2. 임시파일을 `chunkDataSize`(바이트) 단위 윈도우로 읽는다(`FileEncodingPlan.readChunk`, byte[] 반환).
+3. 각 청크마다 payload 바이트 프레임을 만든다.
 4. `QrImageWriter.generateQrImage(...)`로 QR PNG를 만든다.
 5. 파일별 진행 로그를 남긴다.
 
@@ -179,9 +179,9 @@ QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 완성되지 못한(I
 복원 한 파일의 순서(`restoreCompletedFile`):
 
 1. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
-2. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`) Base64 decode + GZIP 해제한 결과를
+2. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`, GZIP 바이트) GZIP 해제한 결과를
    출력 디렉터리의 임시파일(`.airbridge-restore-*.part`)에 스트리밍 기록
-   (`CodecSupport.decodeDecompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
+   (`CodecSupport.decompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
    메모리에 통째로 들고 있지 않는다.
 3. 계산된 SHA-256 앞 16자리를 payload의 `hash16`과 비교
 4. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
@@ -212,7 +212,7 @@ QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 완성되지 못한(I
 
 - `QR_READ_ERROR`: 이미지에서 QR payload를 읽지 못했거나 payload 처리 중 예외
 - `INCOMPLETE`: 어떤 청크가 아예 없음
-- `DECODE_ERROR`: Base64 또는 GZIP 복원 실패
+- `DECODE_ERROR`: GZIP 복원 실패
 - `HASH_MISMATCH`: 복원 바이트는 나왔지만 hash16 불일치
 - `INVALID_REL_PATH` / `INVALID_PATH`: 경로 traversal 등 안전하지 않은 상대경로
 
@@ -244,7 +244,8 @@ encode와 decode 모두 상대경로 안전성은 `RelativePathSupport`에 의�
   (중첩 경로, `--encode-root` 상위 경로 상대화 포함)
 - `DecodeServiceTest`: 성공 복원, success 폴더 이동, incomplete, hash mismatch, QR read error,
   path traversal 차단, 완료 후 중복 청크 무시(1회 복원)
-- `CodecSupportTest`: 스트리밍 encode/decode가 in-memory 경로와 바이트 동일 + round-trip
+- `CodecSupportTest`: 스트리밍 GZIP 압축/해제가 in-memory 경로와 바이트 동일 + round-trip
+- `QrPayloadSupportTest`: 바이너리 프레임 build/parse round trip(매직·UTF-8 경로·잘린 프레임 거부)
 
 ## 벤치마크 (메모리/시간 측정)
 
@@ -286,7 +287,7 @@ encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> dec
 
 - payload 포맷을 바꾸면 `encode`, `decode`, 테스트, 기존 산출물 호환성이 동시에 깨진다.
 - hash 비교는 전체 SHA-256이 아니라 앞 16자리만 사용한다.
-- chunking 기준은 바이트가 아니라 Base64 문자열 길이다.
+- chunking 기준은 GZIP 바이트 길이다(Base64 단계 없음). QR은 8-bit 바이트 모드를 쓴다.
 - QR 파일명은 decode의 복원 근거가 아니다. 실제 복원 기준은 payload다.
 - 성공 시 QR 원본 PNG를 `*-success`로 이동하므로, decode 입력 디렉터리를 후처리 파이프라인과 공유할 때 주의가 필요하다.
 - GUI 실행 중 입력 잠금과 취소 동작은 core service가 아니라 GUI adapter와 workflow 계약에서 관리한다.

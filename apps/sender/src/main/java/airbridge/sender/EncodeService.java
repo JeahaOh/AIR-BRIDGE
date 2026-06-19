@@ -116,11 +116,11 @@ final class EncodeService {
                     if (plan.convertedType() != null) {
                         effectiveListener.onLog(String.format("[FILE %d/%d] %s (%s 변환)",
                                 fi + 1, sourceFiles.size(), plan.relPath(), plan.convertedType()));
-                        effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
+                        effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장",
                                 plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
                     } else {
                         effectiveListener.onLog(String.format("[FILE %d/%d] %s", fi + 1, sourceFiles.size(), plan.relPath()));
-                        effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축+B64: %,d bytes -> QR %d장",
+                        effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장",
                                 plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
                     }
 
@@ -140,9 +140,9 @@ final class EncodeService {
                         // long math: (i + 1) * chunkDataSize can exceed Integer.MAX_VALUE for
                         // payloads near the 2GB encodedSize cap before Math.min clamps it.
                         int end = (int) Math.min((long) (i + 1) * chunkDataSize, plan.encodedSize());
-                        String chunkData = plan.readChunk(start, end);
+                        byte[] chunkData = plan.readChunk(start, end);
 
-                        String payload = QrPayloadSupport.buildPayload(
+                        byte[] payload = QrPayloadSupport.buildPayload(
                                 projectName,
                                 plan.relPath(),
                                 i + 1,
@@ -266,9 +266,9 @@ final class EncodeService {
 
                     int start = (chunkIdx - 1) * chunkDataSize;
                     int end = (int) Math.min((long) chunkIdx * chunkDataSize, plan.encodedSize());
-                    String chunkData = plan.readChunk(start, end);
+                    byte[] chunkData = plan.readChunk(start, end);
 
-                    String payload = QrPayloadSupport.buildPayload(
+                    byte[] payload = QrPayloadSupport.buildPayload(
                             projectName,
                             plan.relPath(),
                             chunkIdx,

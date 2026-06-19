@@ -1,7 +1,6 @@
 package airbridge.receiver;
 
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -15,7 +14,7 @@ final class FileChunks {
     final String relPath;
     final int totalChunks;
     final String hash16;
-    private final Map<Integer, String> chunks = new TreeMap<>();
+    private final Map<Integer, byte[]> chunks = new TreeMap<>();
     private final Set<Path> qrFiles = new LinkedHashSet<>();
 
     FileChunks(String project, String relPath, int totalChunks, String hash16) {
@@ -57,9 +56,9 @@ final class FileChunks {
     }
 
     /**
-     * Streams the ordered base64 chunks as ASCII bytes without materializing the full
-     * payload string. Holds only one chunk's bytes at a time, so decode memory does not
-     * scale with file size. Requires all chunks to be present (call after completeness check).
+     * Streams the ordered gzip chunk bytes without materializing the full payload. Holds only
+     * one chunk's bytes at a time, so decode memory does not scale with file size. Requires all
+     * chunks to be present (call after completeness check).
      */
     InputStream orderedEncodedStream() {
         return new InputStream() {
@@ -94,11 +93,11 @@ final class FileChunks {
                     if (nextChunk > totalChunks) {
                         return false;
                     }
-                    String chunk = chunks.get(nextChunk++);
+                    byte[] chunk = chunks.get(nextChunk++);
                     if (chunk == null) {
                         throw new IllegalStateException("누락 청크 존재");
                     }
-                    current = chunk.getBytes(StandardCharsets.US_ASCII);
+                    current = chunk;
                     pos = 0;
                 }
                 return true;

@@ -160,14 +160,14 @@ final class DecodeService {
             Files.createDirectories(parent);
         }
 
-        // Stream base64 -> gzip -> a temp file in the destination directory, computing the
-        // hash in the same pass, so memory does not scale with file size. Only move the temp
-        // file into place once the hash matches, so a bad payload never lands at the target.
+        // Stream gzip -> a temp file in the destination directory, computing the hash in the
+        // same pass, so memory does not scale with file size. Only move the temp file into
+        // place once the hash matches, so a bad payload never lands at the target.
         Path stagingDir = (parent != null) ? parent : outPath;
         Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
         String actualHash16;
         try {
-            actualHash16 = CodecSupport.decodeDecompressToFile(fileChunks.orderedEncodedStream(), tempFile)
+            actualHash16 = CodecSupport.decompressToFile(fileChunks.orderedEncodedStream(), tempFile)
                     .substring(0, 16);
         } catch (Exception e) {
             Files.deleteIfExists(tempFile);

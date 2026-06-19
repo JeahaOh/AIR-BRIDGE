@@ -4,14 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodecSupportTest {
 
@@ -19,58 +18,58 @@ class CodecSupportTest {
     Path tempDir;
 
     @Test
-    void compressAndEncodeRoundTripsBinaryData() throws Exception {
+    void compressRoundTripsBinaryData() throws Exception {
         byte[] source = new byte[1024];
         new Random(12345L).nextBytes(source);
 
-        String encoded = CodecSupport.compressAndEncode(source);
+        byte[] compressed = CodecSupport.compress(source);
 
-        assertFalse(encoded.isBlank());
-        assertArrayEquals(source, CodecSupport.decodeAndDecompress(encoded));
+        assertTrue(compressed.length > 0);
+        assertArrayEquals(source, CodecSupport.decompress(compressed));
     }
 
     @Test
-    void compressAndEncodeRoundTripsEmptyPayload() throws Exception {
+    void compressRoundTripsEmptyPayload() throws Exception {
         byte[] source = new byte[0];
 
-        String encoded = CodecSupport.compressAndEncode(source);
+        byte[] compressed = CodecSupport.compress(source);
 
-        assertFalse(encoded.isBlank());
-        assertArrayEquals(source, CodecSupport.decodeAndDecompress(encoded));
+        assertTrue(compressed.length > 0);
+        assertArrayEquals(source, CodecSupport.decompress(compressed));
     }
 
     @Test
-    void compressAndEncodeToFileMatchesInMemoryAndRoundTrips() throws Exception {
+    void compressToFileMatchesInMemoryAndRoundTrips() throws Exception {
         byte[] source = new byte[20_000];
         new Random(98765L).nextBytes(source);
 
-        Path target = tempDir.resolve("encoded.b64");
-        CodecSupport.EncodedStreamInfo info =
-                CodecSupport.compressAndEncodeToFile(new ByteArrayInputStream(source), target);
+        Path target = tempDir.resolve("encoded.gz");
+        CodecSupport.CompressedStreamInfo info =
+                CodecSupport.compressToFile(new ByteArrayInputStream(source), target);
 
-        // Streaming must produce byte-identical output to the in-memory path so the QR
-        // payload format is unchanged, and must report the raw size, encoded size, and hash.
-        String streamed = Files.readString(target, StandardCharsets.US_ASCII);
-        assertEquals(CodecSupport.compressAndEncode(source), streamed);
+        // Streaming must produce byte-identical output to the in-memory path, and must report
+        // the raw size, compressed size, and hash.
+        byte[] streamed = Files.readAllBytes(target);
+        assertArrayEquals(CodecSupport.compress(source), streamed);
         assertEquals(source.length, info.rawByteCount());
-        assertEquals(streamed.length(), info.encodedByteCount());
+        assertEquals(streamed.length, info.compressedByteCount());
         assertEquals(CodecSupport.sha256Hex(source), info.sha256Hex());
-        assertArrayEquals(source, CodecSupport.decodeAndDecompress(streamed));
+        assertArrayEquals(source, CodecSupport.decompress(streamed));
     }
 
     @Test
-    void streamingEncodeAndDecodeToFileRoundTrip() throws Exception {
+    void streamingCompressAndDecompressToFileRoundTrip() throws Exception {
         byte[] source = new byte[20_000];
         new Random(24680L).nextBytes(source);
 
-        Path encoded = tempDir.resolve("rt.b64");
-        CodecSupport.EncodedStreamInfo info =
-                CodecSupport.compressAndEncodeToFile(new ByteArrayInputStream(source), encoded);
+        Path encoded = tempDir.resolve("rt.gz");
+        CodecSupport.CompressedStreamInfo info =
+                CodecSupport.compressToFile(new ByteArrayInputStream(source), encoded);
 
         Path restored = tempDir.resolve("rt.out");
         String restoredHash;
         try (var in = Files.newInputStream(encoded)) {
-            restoredHash = CodecSupport.decodeDecompressToFile(in, restored);
+            restoredHash = CodecSupport.decompressToFile(in, restored);
         }
 
         assertArrayEquals(source, Files.readAllBytes(restored));
@@ -79,16 +78,16 @@ class CodecSupportTest {
     }
 
     @Test
-    void compressAndEncodeToFileHandlesEmptySource() throws Exception {
-        Path target = tempDir.resolve("empty.b64");
-        CodecSupport.EncodedStreamInfo info =
-                CodecSupport.compressAndEncodeToFile(new ByteArrayInputStream(new byte[0]), target);
+    void compressToFileHandlesEmptySource() throws Exception {
+        Path target = tempDir.resolve("empty.gz");
+        CodecSupport.CompressedStreamInfo info =
+                CodecSupport.compressToFile(new ByteArrayInputStream(new byte[0]), target);
 
-        String streamed = Files.readString(target, StandardCharsets.US_ASCII);
-        assertEquals(CodecSupport.compressAndEncode(new byte[0]), streamed);
+        byte[] streamed = Files.readAllBytes(target);
+        assertArrayEquals(CodecSupport.compress(new byte[0]), streamed);
         assertEquals(0, info.rawByteCount());
-        assertFalse(streamed.isBlank());
-        assertArrayEquals(new byte[0], CodecSupport.decodeAndDecompress(streamed));
+        assertTrue(streamed.length > 0);
+        assertArrayEquals(new byte[0], CodecSupport.decompress(streamed));
     }
 
     @Test

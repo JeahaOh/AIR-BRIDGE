@@ -13,3 +13,24 @@ dependencies {
 application {
     mainClass = 'airbridge.receiver.Receiver'
 }
+
+// Lightweight (no JMH) encode/decode round-trip benchmark. Reuses the test runtime
+// classpath because it drives both :sender and :receiver. Parameters are passed as
+// -Pbench.* project properties, e.g.:
+//   ./gradlew :receiver:benchmark -Pbench.fileCount=20 -Pbench.fileSizeKb=4096 \
+//       -Pbench.chunkSize=2000 -Pbench.compressible=false -Pbench.maxHeapMb=256
+tasks.register('benchmark', JavaExec) {
+    group = 'verification'
+    description = 'Run the lightweight encode/decode round-trip benchmark (time + peak heap).'
+    dependsOn tasks.named('testClasses')
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'airbridge.bench.RoundTripBenchmark'
+    project.properties.each { k, v ->
+        if (k.startsWith('bench.') && k != 'bench.maxHeapMb') {
+            systemProperty(k, v)
+        }
+    }
+    if (project.hasProperty('bench.maxHeapMb')) {
+        maxHeapSize = "${project.property('bench.maxHeapMb')}m"
+    }
+}

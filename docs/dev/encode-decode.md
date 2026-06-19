@@ -241,7 +241,31 @@ encode와 decode 모두 상대경로 안전성은 `RelativePathSupport`에 의�
 현재 테스트 기준 핵심 보장:
 
 - `ReceiverRoundTripTest`: `sender encode` -> `receiver decode` end-to-end round trip
-- `DecodeServiceTest`: 성공 복원, success 폴더 이동, incomplete, hash mismatch, QR read error, path traversal 차단
+  (중첩 경로, `--encode-root` 상위 경로 상대화 포함)
+- `DecodeServiceTest`: 성공 복원, success 폴더 이동, incomplete, hash mismatch, QR read error,
+  path traversal 차단, 완료 후 중복 청크 무시(1회 복원)
+- `CodecSupportTest`: 스트리밍 encode/decode가 in-memory 경로와 바이트 동일 + round-trip
+
+## 벤치마크 (메모리/시간 측정)
+
+JMH 없이 stdlib만 쓰는 경량 하니스가 있다. 합성 소스 트리를 만들어 encode -> decode를
+돌리고 단계별 wall-clock과 peak heap(백그라운드 샘플러로 측정한 동시 사용량)을 출력한다.
+
+- 코드: `apps/receiver/src/test/java/airbridge/bench/RoundTripBenchmark.java`
+- 실행: `./gradlew :receiver:benchmark -Pbench.*=...`
+- 파라미터: `bench.fileCount`, `bench.fileSizeKb`, `bench.chunkSize`,
+  `bench.compressible`, `bench.decodeWorkers`, `bench.seed`, `bench.maxHeapMb`
+
+예) 200MB 소스를 128MB 힙에서 돌려도 OOM 없이 round-trip 되는지 확인:
+
+```
+./gradlew :receiver:benchmark -Pbench.fileCount=1 -Pbench.fileSizeKb=204800 \
+    -Pbench.compressible=true -Pbench.maxHeapMb=128
+```
+
+스트리밍 적용 후에는 peak heap이 소스 크기와 분리된다(예: 위 케이스 encode peak ~52MB).
+타이트한 힙에서는 GC가 한계 근처까지 garbage를 모았다가 회수하므로 decode peak는 maxHeap에
+가깝게 보일 수 있다(작업 집합 크기가 아니라 GC 동작의 반영).
 
 ## 개발 시 주의점
 

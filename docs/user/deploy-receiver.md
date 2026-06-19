@@ -58,6 +58,11 @@ java \
 
 처음에는 기본 실행으로 시작하고, 실제 입력 규모나 캡처 환경에서 메모리 부족이 보일 때만 조정하는 편이 안전합니다.
 
+`--in`/`--out`을 생략하면 jar가 있는 폴더 기준 기본 디렉터리를 씁니다
+(capture 출력: `captured`, decode: `captured` → `decoded`). 디렉터리 이름은 jar 옆
+`airbridge-paths.properties`로 바꿀 수 있습니다(자세한 내용은 `encode-decode.md`의
+"기본 경로"). capture는 카메라가 준비되면 READY 배너를 출력합니다.
+
 ## 자주 쓰는 작업
 
 QR PNG를 원본 파일로 복원하기:
@@ -68,12 +73,14 @@ java -jar build/libs/receiver-<version>.jar decode \
   --out /path/restore
 ```
 
-카메라에서 QR을 수집하기:
+카메라에서 QR을 수집하기(`--out` 생략 시 jar 옆 `captured`):
 
 ```bash
-java -jar build/libs/receiver-<version>.jar capture \
-  --out /path/capture-out
+java -jar build/libs/receiver-<version>.jar capture
 ```
+
+장치는 `--device`에 정수 인덱스 또는 장치 이름 일부를 줄 수 있습니다
+(`--device FaceTime`). GUI에서는 `Devices` 버튼으로 목록을 불러와 드롭다운에서 고릅니다.
 
 GUI에서 카메라 캡처 또는 QR PNG 복원하기:
 

@@ -19,6 +19,28 @@
 - QR PNG를 저장할 디렉터리
 - 복원 결과를 저장할 디렉터리
 
+## 기본 경로
+
+`--in`/`--out`을 생략하면 **jar가 있는 폴더 기준**의 기본 디렉터리를 씁니다. 기본 파이프라인:
+
+```
+encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> decode( captured -> decoded )
+```
+
+- 즉 jar를 둔 폴더에서 `encode`만 실행하면 `source`를 읽어 `encoded`에 씁니다.
+- 디렉터리 이름을 바꾸려면 jar 옆에 `airbridge-paths.properties`를 두고 키를 덮어씁니다.
+
+  ```properties
+  dir.source=source
+  dir.encoded=encoded
+  dir.captured=captured
+  dir.decoded=decoded
+  ```
+
+- GUI도 각 입력/출력 칸을 같은 기본 경로로 채웁니다.
+
+명령을 실행하면 시작 시 배너가 출력됩니다.
+
 ## 1. encode
 
 입력 디렉터리의 대상 파일을 읽어 QR PNG로 변환합니다.
@@ -49,15 +71,15 @@ exclude, 변환 옵션, folder structure입니다. 실행 중단이 필요하면
 manifest 파일은 정리하고, 기존에 있던 파일이나 비어 있지 않은
 디렉터리는 유지합니다.
 
-Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
-native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
-내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
-유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows/리눅스에서는
+폴더 선택 전용 Swing 디렉터리 선택창을 사용합니다(시스템 Look&Feel 적용). 입력칸
+경로가 유효하면 그 위치에서 시작하고, 비어 있거나 유효하지 않으면 앱을 시작한
+위치에서 시작합니다.
 
 주요 입력:
 
-- `--in`: 인코딩할 파일이 있는 디렉터리
-- `--out`: QR PNG를 저장할 디렉터리
+- `--in`: 인코딩할 파일이 있는 디렉터리 (생략 시 jar 옆 `source`)
+- `--out`: QR PNG를 저장할 디렉터리 (생략 시 jar 옆 `encoded`)
 - `--project-name`: QR payload 안에 들어가는 프로젝트 이름
 
 주요 산출물:
@@ -124,15 +146,15 @@ java -jar build/libs/receiver-<version>.jar gui
 `Decode` 탭에서 QR PNG 입력 디렉터리와 복원 출력 디렉터리를 선택한 뒤
 `Decode`를 누릅니다. CLI `decode`와 같은 복원 로직을 사용합니다.
 복원이 실행되는 동안에는 Decode 탭의 입력값을 바꿀 수 없습니다.
-Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
-native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
-내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
-유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows/리눅스에서는
+폴더 선택 전용 Swing 디렉터리 선택창을 사용합니다(시스템 Look&Feel 적용). 입력칸
+경로가 유효하면 그 위치에서 시작하고, 비어 있거나 유효하지 않으면 앱을 시작한
+위치에서 시작합니다.
 
 주요 입력:
 
-- `--in`: QR PNG가 들어 있는 디렉터리
-- `--out`: 복원 결과를 저장할 디렉터리
+- `--in`: QR PNG가 들어 있는 디렉터리 (생략 시 jar 옆 `captured`)
+- `--out`: 복원 결과를 저장할 디렉터리 (생략 시 jar 옆 `decoded`)
 - `--decode-workers`: QR 읽기 작업 스레드 수
 
 주요 산출물:

@@ -41,6 +41,10 @@ java -jar build/libs/sender-<version>.jar --help
 
 - `sender`는 단일 fat jar 기준으로 배포하는 편이 가장 단순합니다.
 - 대부분의 경우 별도 JVM 옵션 없이 `java -jar ...`로 바로 실행하면 됩니다.
+- `--in`/`--out`을 생략하면 jar가 있는 폴더 기준 기본 디렉터리를 씁니다
+  (encode: `source` → `encoded`, slide 입력: `encoded`). 디렉터리 이름은 jar 옆
+  `airbridge-paths.properties`로 바꿀 수 있습니다. 자세한 내용은 `encode-decode.md`의
+  "기본 경로" 참고.
 - 이 문서는 공개 명령만 다룹니다. 유지보수용 숨김 명령은 별도 사용자 문서로 다루지 않습니다.
 
 ## 자주 쓰는 작업

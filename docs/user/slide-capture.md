@@ -27,7 +27,7 @@
 
 ## 1. 송신 측: slide
 
-기본 실행:
+기본 실행(입력 미지정 시 jar 옆 `encoded` 디렉터리를 엽니다):
 
 ```bash
 java -jar build/libs/sender-<version>.jar slide
@@ -57,10 +57,10 @@ java -jar build/libs/sender-<version>.jar slide --help
 2. 필요하면 `Page(ms)`, `Black(ms)`, `Loop`를 조정한다.
 3. `Play`로 재생을 시작한다.
 
-Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
-native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
-내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
-유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows/리눅스에서는
+폴더 선택 전용 Swing 디렉터리 선택창을 사용합니다(시스템 Look&Feel 적용). 입력칸
+경로가 유효하면 그 위치에서 시작하고, 비어 있거나 유효하지 않으면 앱을 시작한
+위치에서 시작합니다.
 
 주요 UI:
 
@@ -92,7 +92,16 @@ native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉�
 
 ## 2. 수신 측: capture
 
-기본 실행:
+기본 실행(`--out` 미지정 시 jar 옆 `captured` 디렉터리에 저장):
+
+```bash
+java -jar build/libs/receiver-<version>.jar capture
+```
+
+카메라가 열려 수신 준비가 끝나면 **READY 배너**가 출력됩니다. 그때 송신 측에서
+`slide` 재생을 시작하면 됩니다.
+
+출력 디렉터리를 직접 지정:
 
 ```bash
 java -jar build/libs/receiver-<version>.jar capture \
@@ -106,8 +115,9 @@ java -jar build/libs/receiver-<version>.jar gui
 ```
 
 GUI의 `Capture` 탭은 CLI `capture`와 같은 `CaptureService`를 사용합니다.
-출력 디렉터리와 장치 설정을 입력한 뒤 `Start`로 캡처를 시작하고,
-필요하면 `Stop`으로 종료합니다.
+출력 디렉터리와 장치를 고른 뒤 `Start`로 캡처를 시작하고, 필요하면 `Stop`으로
+종료합니다. 장치는 `Devices` 버튼으로 목록을 불러와 **드롭다운에서 선택**합니다
+(정수 인덱스 입력 대신).
 GUI에서는 `duration`, `max payloads`, `same signal` 값을 직접 입력하지 않고
 내부 기본값을 사용합니다. 캡처가 실행되는 동안에는 Capture 탭의 입력값이
 잠기고 `Decode` 버튼도 비활성화됩니다. `Preview`와 `Preview FPS`는 캡처
@@ -124,7 +134,7 @@ Decode 탭에서 복원을 실행하는 동안에는 QR PNG 입력 디렉터리,
 java -jar build/libs/receiver-<version>.jar capture --list-devices
 ```
 
-장치와 해상도를 직접 지정:
+장치와 해상도를 직접 지정(`--device`는 정수 인덱스 또는 장치 이름 일부로 지정 가능):
 
 ```bash
 java -jar build/libs/receiver-<version>.jar capture \
@@ -133,6 +143,12 @@ java -jar build/libs/receiver-<version>.jar capture \
   --width 1920 \
   --height 1080 \
   --fps 15
+```
+
+이름으로 지정하는 예(대소문자 무시, 부분일치):
+
+```bash
+java -jar build/libs/receiver-<version>.jar capture --device FaceTime
 ```
 
 중단 후 이어서 저장:
@@ -151,11 +167,19 @@ java -jar build/libs/receiver-<version>.jar capture \
 
 ## 3. capture 후 decode
 
-캡처가 끝나면 저장된 PNG를 `decode`로 복원한다.
+캡처가 끝나면 저장된 PNG를 `decode`로 복원한다. `decode`는 입력 디렉터리를
+재귀적으로 훑으므로 `captured` 디렉터리를 그대로 입력해도 그 안의
+`captured-images`를 찾습니다(옵션 미지정 시 기본 입력이 `captured`).
+
+```bash
+java -jar build/libs/receiver-<version>.jar decode
+```
+
+경로를 직접 지정:
 
 ```bash
 java -jar build/libs/receiver-<version>.jar decode \
-  --in /path/capture-out/captured-images \
+  --in /path/capture-out \
   --out /path/restore
 ```
 

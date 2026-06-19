@@ -25,7 +25,9 @@ public final class DirectoryChooser {
             return chooseDirectoryWithMacFileDialog(parent, title, rawCurrentPath, fallbackDirectory);
         }
         if (osName.contains("win")) {
-            return chooseDirectoryWithWindowsFileDialogOrFallback(parent, title, rawCurrentPath, fallbackDirectory);
+            // AWT FileDialog cannot select directories on Windows; use the Swing chooser,
+            // which provides a proper directories-only folder picker there.
+            return chooseDirectoryWithChooser(parent, title, rawCurrentPath, fallbackDirectory);
         }
         return chooseDirectoryWithChooser(parent, title, rawCurrentPath, fallbackDirectory);
     }
@@ -54,19 +56,6 @@ public final class DirectoryChooser {
                 System.setProperty("apple.awt.fileDialogForDirectories", oldValue);
             }
         }
-    }
-
-    private static Path chooseDirectoryWithWindowsFileDialogOrFallback(Component parent, String title,
-                                                                       String rawCurrentPath, Path fallbackDirectory) {
-        try {
-            Path selected = chooseDirectoryWithFileDialogOrNull(parent, title, rawCurrentPath, fallbackDirectory, false);
-            if (selected != null) {
-                return selected;
-            }
-        } catch (RuntimeException | Error e) {
-            // Fall through to the Swing chooser when the native dialog is unavailable or rejects the selection.
-        }
-        return chooseDirectoryWithChooser(parent, title, rawCurrentPath, fallbackDirectory);
     }
 
     private static Path chooseDirectoryWithFileDialogOrNull(Component parent, String title, String rawCurrentPath,

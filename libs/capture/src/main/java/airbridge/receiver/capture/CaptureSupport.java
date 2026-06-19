@@ -12,9 +12,15 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public final class CaptureSupport {
+    private static final long PROBE_TIMEOUT_MS = 4000L;
+
     private CaptureSupport() {
     }
 
@@ -39,6 +45,27 @@ public final class CaptureSupport {
     }
 
     public static boolean canOpenDevice(int index) {
+        // Opening a camera can block (busy/broken device, permission prompts), so cap each
+        // probe with a timeout instead of hanging the whole device scan.
+        ExecutorService executor = Executors.newSingleThreadExecutor(runnable -> {
+            Thread thread = new Thread(runnable, "qe-device-probe-" + index);
+            thread.setDaemon(true);
+            return thread;
+        });
+        Future<Boolean> future = executor.submit(() -> openAndGrab(index));
+        try {
+            return future.get(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            return false;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private static boolean openAndGrab(int index) {
         try (OpenCVFrameGrabber grabber = new OpenCVFrameGrabber(index)) {
             grabber.setImageWidth(640);
             grabber.setImageHeight(480);
@@ -56,7 +83,60 @@ public final class CaptureSupport {
         if (osName.contains("mac")) {
             return listMacAvFoundationVideoDeviceNames();
         }
+        if (osName.contains("win")) {
+            return listWindowsDirectShowVideoDeviceNames();
+        }
         return Collections.emptyMap();
+    }
+
+    private static Map<Integer, String> listWindowsDirectShowVideoDeviceNames() {
+        LinkedHashMap<Integer, String> result = new LinkedHashMap<>();
+        Process process = null;
+        try {
+            // Mirrors the macOS path but for DirectShow. Relies on an "ffmpeg" binary on PATH;
+            // when absent, the caller falls back to brute-force index probing.
+            process = new ProcessBuilder(
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-f", "dshow",
+                    "-list_devices", "true",
+                    "-i", "dummy"
+            ).redirectErrorStream(true).start();
+
+            List<String> lines = new ArrayList<>();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    lines.add(line);
+                }
+            }
+            process.waitFor(5, TimeUnit.SECONDS);
+
+            // dshow lists devices by name, not index. Video devices appear in enumeration
+            // order, which matches the integer index OpenCVFrameGrabber expects.
+            int index = 0;
+            for (String line : lines) {
+                if (!line.contains("(video)")) {
+                    continue;
+                }
+                int left = line.indexOf('"');
+                int right = line.indexOf('"', left + 1);
+                if (left < 0 || right < 0) {
+                    continue;
+                }
+                String name = line.substring(left + 1, right).trim();
+                if (!name.isEmpty()) {
+                    result.put(index++, name);
+                }
+            }
+        } catch (Exception ignored) {
+            return Collections.emptyMap();
+        } finally {
+            if (process != null) {
+                process.destroyForcibly();
+            }
+        }
+        return result;
     }
 
     private static Map<Integer, String> listMacAvFoundationVideoDeviceNames() {

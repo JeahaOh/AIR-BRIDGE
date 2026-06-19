@@ -28,6 +28,7 @@ import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.UIManager;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -56,7 +57,16 @@ public final class ReceiverGui {
     private ReceiverGui() {
     }
 
+    private static void applySystemLookAndFeel() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+            // keep the default look and feel
+        }
+    }
+
     public static JFrame createFrame() {
+        applySystemLookAndFeel();
         JFrame frame = new JFrame("air-bridge receiver");
         ReceiverPanel panel = new ReceiverPanel();
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);

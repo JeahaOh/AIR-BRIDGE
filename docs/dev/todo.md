@@ -157,8 +157,17 @@ QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델
    → `CaptureListener.onReady()` 추가, `grabber.start()` 직후 호출. CLI는 onReady에서
    실제 배너(BannerSupport.render)를 다시 출력해 "지금 slide 재생" 신호. GUI는 상태/로그 표시.
 3. windows 문제
-   3 - 1. windows에서 receiver가 정상 동작 하지 않음
-   3 - 2. windows sender에서 폴더 선택 하는 화면 개선 가능?
+   3 - 1. [코드 반영, Windows 검증 필요] windows에서 receiver가 정상 동작 하지 않음
+      - 원인: fat jar에 Windows OpenCV DLL은 포함됨(네이티브 누락 아님). 진짜 문제는
+        디바이스 이름 열거가 macOS만 구현, probe 타임아웃 없음.
+      - 반영: `CaptureSupport`에 Windows DirectShow 이름 열거(`ffmpeg -f dshow -list_devices`,
+        mac 경로와 동일하게 시스템 ffmpeg 사용; 없으면 brute-force 폴백). probe `canOpenDevice`에
+        4초 타임아웃 추가(`--list-devices`가 멈추지 않도록). mac에서 타임아웃 동작 확인(4.5s).
+      - 남음: Windows 실기에서 카메라 인식/캡처 동작 최종 확인. (ffmpeg 미설치 시 이름은 안 뜨고
+        brute-force로 동작 — 필요하면 번들 ffmpeg 사용으로 후속 개선.)
+   3 - 2. [완료] windows sender에서 폴더 선택 화면 개선
+      - Windows는 폴더 선택 불가한 AWT FileDialog 대신 `JFileChooser`(DIRECTORIES_ONLY) 사용.
+      - sender/receiver GUI에 시스템 Look&Feel 적용(`createFrame`)으로 폴더 picker가 네이티브하게 보이도록.
    3 - 3.
 4. [완료] encode, decode, capture, slide에 in, out 경로를 optional로 받고 기본 값 경로 고정.
    - jar 위치 기준 기본 파이프라인: encode(source→encoded) → slide(encoded) → capture(→captured) → decode(captured→decoded).

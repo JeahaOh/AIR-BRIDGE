@@ -21,6 +21,7 @@ import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
+import javax.swing.UIManager;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
@@ -37,10 +38,20 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class SenderGui {
+
+    private static void applySystemLookAndFeel() {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+            // keep the default look and feel
+        }
+    }
+
     private SenderGui() {
     }
 
     public static JFrame createFrame() {
+        applySystemLookAndFeel();
         JFrame frame = new JFrame("air-bridge sender");
         SenderPanel panel = new SenderPanel();
         frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);

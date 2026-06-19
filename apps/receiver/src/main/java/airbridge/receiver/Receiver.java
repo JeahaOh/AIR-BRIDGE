@@ -43,6 +43,8 @@ import java.util.concurrent.CountDownLatch;
         }
 )
 public class Receiver implements Runnable {
+    static final String RECEIVER_TITLE = "air-bridge receiver";
+
     private enum Lang {
         ko,
         en
@@ -92,7 +94,7 @@ public class Receiver implements Runnable {
 
     static CommandLine newCommandLine() {
         CommandLine commandLine = new CommandLine(new Receiver());
-        BannerSupport.apply(commandLine, "air-bridge receiver");
+        BannerSupport.apply(commandLine, RECEIVER_TITLE);
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
         applySubcommandDescriptions(commandLine, bundle);
@@ -121,6 +123,7 @@ public class Receiver implements Runnable {
     static final class GuiCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(RECEIVER_TITLE);
             if (GraphicsEnvironment.isHeadless()) {
                 System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
                 return 2;
@@ -156,6 +159,7 @@ public class Receiver implements Runnable {
 
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(RECEIVER_TITLE);
             Path srcPath = sourceDir.toAbsolutePath();
             Path outPath = outputDir.toAbsolutePath();
             if (!Files.isDirectory(srcPath)) {
@@ -240,6 +244,7 @@ public class Receiver implements Runnable {
 
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(RECEIVER_TITLE);
             if (listDevices) {
                 listCaptureDevices();
                 return 0;
@@ -251,8 +256,23 @@ public class Receiver implements Runnable {
                 public void onLog(String line) {
                     System.out.println(line);
                 }
+
+                @Override
+                public void onReady() {
+                    printCaptureReadyBanner();
+                }
             }).run();
             return 0;
+        }
+
+        // Re-print the full banner at the moment the camera is open and capture has started,
+        // so the operator gets an unmistakable visual marker of when to begin playing slides.
+        private void printCaptureReadyBanner() {
+            System.out.println();
+            System.out.println(BannerSupport.render("air-bridge receiver — CAPTURE READY"));
+            System.out.println("[CAPTURE][READY] 카메라 준비 완료 — 지금 송신측에서 slide 재생을 시작하세요.");
+            System.out.println("[CAPTURE][READY] Camera is live — start playing the slides now.");
+            System.out.println();
         }
 
         private void listCaptureDevices() {

@@ -43,6 +43,8 @@ import java.util.concurrent.CountDownLatch;
         }
 )
 public class Sender implements Runnable {
+    static final String SENDER_TITLE = "air-bridge sender";
+
     private enum Lang {
         ko,
         en
@@ -58,6 +60,7 @@ public class Sender implements Runnable {
         }
         String[] slideArgs = extractDirectSlideArgs(args);
         if (slideArgs != null) {
+            BannerSupport.print(SENDER_TITLE);
             SlideApp.launch(slideArgs);
             return;
         }
@@ -123,7 +126,7 @@ public class Sender implements Runnable {
 
     static CommandLine newCommandLine() {
         CommandLine commandLine = new CommandLine(new Sender());
-        BannerSupport.apply(commandLine, "air-bridge sender");
+        BannerSupport.apply(commandLine, SENDER_TITLE);
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
         applySubcommandDescriptions(commandLine, bundle);
@@ -152,6 +155,7 @@ public class Sender implements Runnable {
     static final class GuiCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(SENDER_TITLE);
             if (GraphicsEnvironment.isHeadless()) {
                 System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
                 return 2;
@@ -262,6 +266,7 @@ public class Sender implements Runnable {
 
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
             Path srcPath = options.sourceDir.toAbsolutePath();
             Path outPath = options.outputDir.toAbsolutePath();
@@ -336,6 +341,7 @@ public class Sender implements Runnable {
 
         @Override
         public Integer call() throws Exception {
+            BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
             Path srcPath = options.sourceDir.toAbsolutePath();
             Path outPath = options.outputDir.toAbsolutePath();
@@ -390,6 +396,7 @@ public class Sender implements Runnable {
     static final class SlideCommand implements Callable<Integer> {
         @Override
         public Integer call() {
+            BannerSupport.print(SENDER_TITLE);
             SlideApp.launch(new String[0]);
             return 0;
         }

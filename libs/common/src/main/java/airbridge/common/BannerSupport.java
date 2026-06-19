@@ -42,6 +42,11 @@ public final class BannerSupport {
         return render(title, VersionSupport.version());
     }
 
+    /** Prints the banner block to stdout. Used at the start of each command run. */
+    public static void print(String title) {
+        System.out.println(render(title));
+    }
+
     public static String render(String title, String versionText) {
         String normalizedTitle = normalize(title, "title");
         String normalizedVersion = normalize(versionText, "versionText");

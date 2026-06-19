@@ -131,6 +131,9 @@ public final class CaptureService {
             grabber.setFrameRate(options.fps());
             grabber.start();
 
+            // Camera is open and we are about to start grabbing: signal "ready to receive".
+            listener.onReady();
+
             long startedMillis = System.currentTimeMillis();
             long lastStatusLogAt = startedMillis;
 

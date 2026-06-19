@@ -114,3 +114,54 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 - receiver code가 sender 전용 UI 동작에 의존하지 않는다.
 - QR payload 형식 변경은 sender, receiver, tests, docs를 함께 갱신한다.
 - `capture`는 카메라/프레임 수집 책임을 중심으로 유지한다.
+
+### 6. 전송 포맷 · 처리율(throughput) 개선
+
+QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델"이 병목이라는
+판단에 따른 개선안. ROI(이득/비용) 순서로 1 → 2 → 3 으로 진행한다.
+
+- [ ] **1. Base64 제거 → QR 8-bit 바이트 모드 직접 사용** (이득 ≈ 1.33×, 정확도 손실 0)
+  - 현재 `gzip → Base64 → QR 텍스트` 에서 Base64는 데이터를 33% 부풀리는 순수 낭비.
+  - QR 바이트 모드로 gzip 바이트를 직접 싣고, `QrPayloadSupport`의 구분자 텍스트
+    헤더를 바이너리 프레이밍으로 교체.
+  - 영향 범위: `CodecSupport`(Base64 단계 제거), `QrPayloadSupport`(헤더 포맷),
+    `QrImageWriter`(byte 모드), `QrDecodeSupport`/`DecodeService`(파싱).
+    payload 포맷 변경이므로 sender·receiver·tests·docs 동시 갱신(§5 기준).
+  - 가장 싸고 무위험 → 먼저.
+
+- [ ] **2. Fountain code(RaptorQ, RFC 6330) 도입** (단방향 채널의 신뢰도·실효 처리율)
+  - 현재 순차 인덱스 청크는 특정 프레임 드롭 시 그 청크가 다시 올 때까지 대기 →
+    단방향 카메라 채널에서 비효율.
+  - 파일을 동등 심볼 스트림으로 인코딩하고, 수신측이 임의의 K(1+ε)개만 모이면 복원.
+    "빠진 청크 재전송" 협상 자체를 제거.
+  - 영향 범위: 인코딩 측 청크 생성(`FileEncodingPlan`/`EncodeService`),
+    수신 측 수집·복원(`FileChunks`의 TreeMap 인덱스 모델 → fountain 디코더로 대체),
+    payload 헤더에 심볼 메타(블록/심볼 id) 추가.
+
+- [ ] **3. 4색 컬러 심볼 (흰/녹/적/흑, 2 bit/셀)** (net ≈ 1.4~1.6×)
+  - 휘도 255/150/76/0 으로 네 단계가 또렷 → 채도가 압축으로 무너져도 밝기만으로
+    구분 가능(5색의 Blue↔Black 충돌 회피). 모노크롬에 가까운 견고함 유지.
+  - 필수 동반 작업:
+    - 프레임마다 고정 위치 **컬러 캘리브레이션 패치**(화이트밸런스/감마/조명 정규화).
+    - RGB 유클리드 거리 대신 **휘도 우선 + 색상(hue) 보조 분류기**.
+    - 크로마 서브샘플링(4:2:0) 대비 **셀 크기 하한** 확보.
+  - 가장 엔지니어링 비용이 큰 항목 → 1·2 적용 후에도 추가 처리율이 필요할 때 진행.
+  - 영향 범위: `QrImageWriter`(컬러 렌더링) 또는 별도 carrier 모듈, `QrDecodeSupport`
+    (컬러 분류·캘리브레이션), payload 비트 패킹.
+
+---
+
+1. [완료] 모든 프로세스가 시작 전에 banner를 print 했으면 좋겠음
+   → encode/decode/capture/slide/gui 각 `call()` 시작에서 `BannerSupport.print(...)`.
+2. [완료] 특히 capture시 준비가 끝난 순간을 인식하기에 banner가 최고인 듯 함
+   → `CaptureListener.onReady()` 추가, `grabber.start()` 직후 호출. CLI는 onReady에서
+   실제 배너(BannerSupport.render)를 다시 출력해 "지금 slide 재생" 신호. GUI는 상태/로그 표시.
+3. windows 문제
+   3 - 1. windows에서 receiver가 정상 동작 하지 않음
+   3 - 2. windows sender에서 폴더 선택 하는 화면 개선 가능?
+   3 - 3.
+4. encode, decode, capture, slide에 in, out 경로를 optional로 받고 기본 값 경로 고정할 수 있나? jar 위치 기준으로 `./captured`, `./decoded`, `./encoded` 이런 식으로
+
+- gui 에서도 해당 경로를 기본으로 잡도록
+
+5. receiver에서 capture 도구 선택하는 방법이 좀 더 사용자 친화적이였으면 좋겠음

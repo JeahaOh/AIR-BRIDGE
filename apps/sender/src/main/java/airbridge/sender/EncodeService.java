@@ -137,7 +137,9 @@ final class EncodeService {
                     for (int i = 0; i < plan.totalChunks(); i++) {
                         throwIfCancelled(effectiveCancelled);
                         int start = i * chunkDataSize;
-                        int end = Math.min((i + 1) * chunkDataSize, plan.encodedSize());
+                        // long math: (i + 1) * chunkDataSize can exceed Integer.MAX_VALUE for
+                        // payloads near the 2GB encodedSize cap before Math.min clamps it.
+                        int end = (int) Math.min((long) (i + 1) * chunkDataSize, plan.encodedSize());
                         String chunkData = plan.readChunk(start, end);
 
                         String payload = QrPayloadSupport.buildPayload(
@@ -263,7 +265,7 @@ final class EncodeService {
                     }
 
                     int start = (chunkIdx - 1) * chunkDataSize;
-                    int end = Math.min(chunkIdx * chunkDataSize, plan.encodedSize());
+                    int end = (int) Math.min((long) chunkIdx * chunkDataSize, plan.encodedSize());
                     String chunkData = plan.readChunk(start, end);
 
                     String payload = QrPayloadSupport.buildPayload(

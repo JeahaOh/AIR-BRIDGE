@@ -30,7 +30,7 @@ final class FileEncodingPlan implements AutoCloseable {
     private final Path encodedTempFile;
     private final int encodedSize;
     private final int totalChunks;
-    private final int fileSize;
+    private final long fileSize;
     private final String safePrefix;
     private final String flatSafePrefix;
     private SeekableByteChannel chunkChannel;
@@ -42,7 +42,7 @@ final class FileEncodingPlan implements AutoCloseable {
                                 Path encodedTempFile,
                                 int encodedSize,
                                 int totalChunks,
-                                int fileSize,
+                                long fileSize,
                                 String safePrefix,
                                 String flatSafePrefix) {
         this.relPath = relPath;
@@ -114,7 +114,7 @@ final class FileEncodingPlan implements AutoCloseable {
                     tempFile,
                     encodedSize,
                     totalChunks,
-                    (int) info.rawByteCount(),
+                    info.rawByteCount(),
                     buildSafePrefix(effectiveFileName),
                     buildFlatSafePrefix(effectiveRelPath)
             );
@@ -202,7 +202,7 @@ final class FileEncodingPlan implements AutoCloseable {
         return totalChunks;
     }
 
-    int fileSize() {
+    long fileSize() {
         return fileSize;
     }
 

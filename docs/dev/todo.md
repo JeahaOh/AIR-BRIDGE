@@ -28,25 +28,25 @@
 
 #### 예상 버그
 
-- `EncodeService`: `--no-folder-structure` 사용 시 QR 파일명이 basename 기반이라
+- [완료] `EncodeService`: `--no-folder-structure` 사용 시 QR 파일명이 basename 기반이라
   `a/sample.txt`, `b/sample.txt`처럼 같은 이름의 파일이 같은 출력 폴더에서
-  덮어써질 수 있다. 상대경로 또는 충돌 방지 suffix를 포함하도록 수정한다.
+  덮어써질 수 있다. → 평탄화 출력 시 상대경로 기반 `flatSafePrefix`를 쓰도록 수정.
+  `reencode`도 항상 평탄화하므로 동일 적용. (회귀 테스트 추가)
 - `EncodeService`: `--encode-root`가 실제 소스 파일의 상위 경로인지 검증하지
   않는다. 잘못 지정하면 payload 상대경로에 `../`가 들어가 receiver에서
   복원 실패할 수 있으므로 encode 시작 전에 검증한다.
-- `SlideApp`: `imageCache`와 `loadingImages`가 EDT와 이미지 로더 스레드에서
-  동시에 접근된다. `clear()`, `size()` 등 잠금 없는 접근을 정리해 reload와
-  빠른 탐색 중 race 가능성을 줄인다.
-- `SourceCollector`: exclude path 비교가 문자열 `startsWith`라 `/src/a` 제외 시
-  `/src/abc`도 제외될 수 있다. `Path.startsWith(...)` 기반의 경계 있는 비교로
-  바꾼다.
+- [완료] `SlideApp`: `imageCache`와 `loadingImages`가 EDT와 이미지 로더 스레드에서
+  동시에 접근된다. → EDT 쪽 `clear()`/`size()`도 `imageCache` 모니터로 보호
+  (로더와 동일 락). `cacheSize()` 헬퍼 추가.
+- [완료] `SourceCollector`: exclude path 비교가 문자열 `startsWith`라 `/src/a` 제외 시
+  `/src/abc`도 제외될 수 있다. → `Path.equals`/`Path.startsWith` 기반 경계 비교로
+  변경(`isExcluded`). 제외 디렉터리는 `SKIP_SUBTREE`로 가지치기. (회귀 테스트 추가)
 
 #### 불필요 파일과 정리 대상
 
-- git에 tracked 된 `apps/*/bin/main/*`, `libs/*/bin/main/*` 리소스 파일은 빌드
-  산출물 성격이다. 일부는 `src/main/resources`와 내용도 달라 혼동을 만들 수
-  있으므로 저장소에서 제거한다.
-- `.gitignore`에 `**/bin/`을 추가해 IDE/Gradle이 만든 `bin` 출력물이 다시
+- [완료] git에 tracked 된 `apps/*/bin/main/*`, `libs/*/bin/main/*` 리소스 파일은 빌드
+  산출물 성격이다. → `git rm --cached`로 추적 해제.
+- [완료] `.gitignore`에 `**/bin/`을 추가해 IDE/Gradle이 만든 `bin` 출력물이 다시
   들어오지 않게 한다.
 - `command.gui.description` 리소스 키는 현재 `@Command(description = "...")`
   하드코딩 때문에 실제 help 출력에 쓰이지 않는다. description을 리소스 키 기반으로

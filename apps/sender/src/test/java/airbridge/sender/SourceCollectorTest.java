@@ -37,4 +37,23 @@ class SourceCollectorTest {
 
         assertEquals(List.of(upperTxt, csv).stream().sorted().toList(), files);
     }
+
+    @Test
+    void excludePathMatchesOnPathBoundariesNotStringPrefix() throws Exception {
+        Path excluded = Files.createDirectories(tempDir.resolve("src/a"));
+        Path siblingWithSharedPrefix = Files.createDirectories(tempDir.resolve("src/abc"));
+
+        Files.writeString(excluded.resolve("excluded.txt"), "alpha");
+        Path keep = Files.writeString(siblingWithSharedPrefix.resolve("keep.txt"), "beta");
+
+        List<Path> files = SourceCollector.collectSourceFiles(
+                tempDir,
+                List.of("txt"),
+                List.of(),
+                List.of(excluded.toString())
+        );
+
+        // /src/a is excluded but /src/abc must NOT be, because it only shares a string prefix.
+        assertEquals(List.of(keep), files);
+    }
 }

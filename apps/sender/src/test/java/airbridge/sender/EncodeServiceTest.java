@@ -92,6 +92,43 @@ class EncodeServiceTest {
     }
 
     @Test
+    void encodeWithoutFolderStructureKeepsSameBasenameFilesDistinct() throws Exception {
+        Path srcDir = tempDir.resolve("src");
+        Path fileA = srcDir.resolve("a/sample.txt");
+        Path fileB = srcDir.resolve("b/sample.txt");
+        Files.createDirectories(fileA.getParent());
+        Files.createDirectories(fileB.getParent());
+        Files.write(fileA, randomBytes(64, 101L));
+        Files.write(fileB, randomBytes(64, 103L));
+
+        Path outDir = tempDir.resolve("encoded");
+        EncodeSummary summary = new EncodeService(
+                new QrImageWriter(450, 70, ErrorCorrectionLevel.M),
+                40,
+                false,
+                false,
+                false,
+                500
+        ).encode(srcDir, outDir, srcDir, "TESTPROJ", List.of("txt"), List.of(), List.of(), false, null);
+
+        assertEquals(2, summary.totalFileCount());
+
+        List<Path> qrFiles;
+        try (Stream<Path> stream = Files.walk(outDir)) {
+            qrFiles = stream
+                    .filter(path -> path.getFileName().toString().endsWith(".png"))
+                    .sorted()
+                    .toList();
+        }
+
+        // Both source files have basename sample.txt; without distinct names one would
+        // overwrite the other and we would lose QR files.
+        assertEquals(summary.totalQrCount(), qrFiles.size());
+        long distinctNames = qrFiles.stream().map(p -> p.getFileName().toString()).distinct().count();
+        assertEquals(qrFiles.size(), distinctNames);
+    }
+
+    @Test
     void reencodeRegeneratesOnlyRequestedChunksAndCountsMissingSources() throws Exception {
         Path srcDir = tempDir.resolve("src");
         Files.createDirectories(srcDir.resolve("docs"));
@@ -139,10 +176,10 @@ class EncodeServiceTest {
         }
 
         assertEquals(summary.totalQrCount(), outputNames.size());
-        assertTrue(outputNames.contains(qrFileName(firstPlan.safePrefix(), 2, firstPlan.totalChunks())));
-        assertTrue(outputNames.contains(qrFileName(firstPlan.safePrefix(), 4, firstPlan.totalChunks())));
-        assertTrue(outputNames.contains(qrFileName(secondPlan.safePrefix(), 1, secondPlan.totalChunks())));
-        assertFalse(outputNames.contains(qrFileName(firstPlan.safePrefix(), 1, firstPlan.totalChunks())));
+        assertTrue(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 2, firstPlan.totalChunks())));
+        assertTrue(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 4, firstPlan.totalChunks())));
+        assertTrue(outputNames.contains(qrFileName(secondPlan.flatSafePrefix(), 1, secondPlan.totalChunks())));
+        assertFalse(outputNames.contains(qrFileName(firstPlan.flatSafePrefix(), 1, firstPlan.totalChunks())));
     }
 
     @Test

@@ -24,7 +24,7 @@ final class SourceCollector {
         List<Path> files = new ArrayList<>();
         Set<String> normalizedTargetExtensions = normalizeTargetExtensions(targetExtensions);
         Set<String> skipDirSet = normalizeSkipDirs(skipDirs);
-        List<String> normalizedExcludePaths = normalizeExcludePaths(excludePaths);
+        List<Path> normalizedExcludePaths = normalizeExcludePaths(excludePaths);
 
         Files.walkFileTree(rootDir, new SimpleFileVisitor<>() {
             @Override
@@ -33,16 +33,16 @@ final class SourceCollector {
                 if (skipDirSet.contains(dirName) || dirName.startsWith(".")) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
+                if (isExcluded(dir, normalizedExcludePaths)) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
                 return FileVisitResult.CONTINUE;
             }
 
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                String absPath = file.toAbsolutePath().toString();
-                for (String excludePath : normalizedExcludePaths) {
-                    if (!excludePath.isEmpty() && absPath.startsWith(excludePath)) {
-                        return FileVisitResult.CONTINUE;
-                    }
+                if (isExcluded(file, normalizedExcludePaths)) {
+                    return FileVisitResult.CONTINUE;
                 }
 
                 String fileName = file.getFileName().toString();
@@ -82,13 +82,24 @@ final class SourceCollector {
         return skipDirSet;
     }
 
-    private static List<String> normalizeExcludePaths(List<String> excludePaths) {
-        List<String> normalizedExcludePaths = new ArrayList<>();
+    private static List<Path> normalizeExcludePaths(List<String> excludePaths) {
+        List<Path> normalizedExcludePaths = new ArrayList<>();
         for (String path : excludePaths) {
             if (path != null && !path.trim().isEmpty()) {
-                normalizedExcludePaths.add(Paths.get(path.trim()).toAbsolutePath().toString());
+                normalizedExcludePaths.add(Paths.get(path.trim()).toAbsolutePath().normalize());
             }
         }
         return normalizedExcludePaths;
+    }
+
+    // Path.startsWith compares whole path elements, so /src/a does not match /src/abc.
+    private static boolean isExcluded(Path candidate, List<Path> excludePaths) {
+        Path normalized = candidate.toAbsolutePath().normalize();
+        for (Path excludePath : excludePaths) {
+            if (normalized.equals(excludePath) || normalized.startsWith(excludePath)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

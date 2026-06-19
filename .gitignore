@@ -43,6 +43,9 @@ replay_pid*
 .gradle/
 build/
 
+# IDE/Gradle compiled output dirs
+**/bin/
+
 # Maven
 target/
 pom.xml.tag

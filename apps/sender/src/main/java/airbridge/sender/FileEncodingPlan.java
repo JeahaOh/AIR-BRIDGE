@@ -19,6 +19,7 @@ final class FileEncodingPlan {
     private final int totalChunks;
     private final int fileSize;
     private final String safePrefix;
+    private final String flatSafePrefix;
 
     private FileEncodingPlan(String relPath,
                                 String fileName,
@@ -28,7 +29,8 @@ final class FileEncodingPlan {
                                 int encodedSize,
                                 int totalChunks,
                                 int fileSize,
-                                String safePrefix) {
+                                String safePrefix,
+                                String flatSafePrefix) {
         this.relPath = relPath;
         this.fileName = fileName;
         this.convertedType = convertedType;
@@ -38,6 +40,7 @@ final class FileEncodingPlan {
         this.totalChunks = totalChunks;
         this.fileSize = fileSize;
         this.safePrefix = safePrefix;
+        this.flatSafePrefix = flatSafePrefix;
     }
 
     static FileEncodingPlan fromSourceFile(Path file,
@@ -89,7 +92,8 @@ final class FileEncodingPlan {
                 encodedSize,
                 totalChunks,
                 rawData.length,
-                buildSafePrefix(effectiveFileName)
+                buildSafePrefix(effectiveFileName),
+                buildFlatSafePrefix(effectiveRelPath)
         );
     }
 
@@ -154,6 +158,10 @@ final class FileEncodingPlan {
         return safePrefix;
     }
 
+    String flatSafePrefix() {
+        return flatSafePrefix;
+    }
+
     private static String detectExtension(String fileName) {
         int dotIdx = fileName.lastIndexOf('.');
         if (dotIdx <= 0) {
@@ -174,5 +182,14 @@ final class FileEncodingPlan {
         String baseName = (dotIdx > 0) ? fileName.substring(0, dotIdx) : fileName;
         String ext = (dotIdx > 0) ? fileName.substring(dotIdx + 1) : "";
         return baseName + "_" + ext;
+    }
+
+    // When the output is flattened (no folder structure), the QR file name must stay
+    // unique across the whole source tree; basename alone collides for files such as
+    // a/sample.txt and b/sample.txt. Derive the prefix from the relative path so each
+    // source file maps to a distinct file name.
+    private static String buildFlatSafePrefix(String relPath) {
+        String sanitized = relPath.replaceAll("[^A-Za-z0-9._-]", "_");
+        return buildSafePrefix(sanitized);
     }
 }

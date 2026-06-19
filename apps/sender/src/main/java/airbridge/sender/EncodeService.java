@@ -162,7 +162,8 @@ final class EncodeService {
                         createDirectory(fileOutDir, createdDirs);
                     }
 
-                    String qrFileName = buildQrFileName(plan.safePrefix(), i + 1, plan.totalChunks());
+                    String prefix = folderStructure ? plan.safePrefix() : plan.flatSafePrefix();
+                    String qrFileName = buildQrFileName(prefix, i + 1, plan.totalChunks());
                     Path qrFilePath = fileOutDir.resolve(qrFileName);
                     ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
                     allQrPaths.add(qrFilePath);
@@ -294,7 +295,9 @@ final class EncodeService {
                     Files.createDirectories(fileOutDir);
                 }
 
-                String qrFileName = buildQrFileName(plan.safePrefix(), chunkIdx, plan.totalChunks());
+                // reencode never rebuilds the relDir tree, so output is always flat;
+                // use the path-derived prefix to keep names unique across files.
+                String qrFileName = buildQrFileName(plan.flatSafePrefix(), chunkIdx, plan.totalChunks());
                 Path qrFilePath = fileOutDir.resolve(qrFileName);
                 ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
 

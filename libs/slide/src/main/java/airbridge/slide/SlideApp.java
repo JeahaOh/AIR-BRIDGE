@@ -414,8 +414,10 @@ public class SlideApp {
         pausePlayback(false);
         imageLoadGeneration.incrementAndGet();
         imageFiles.clear();
-        imageCache.clear();
-        loadingImages.clear();
+        synchronized (imageCache) {
+            imageCache.clear();
+            loadingImages.clear();
+        }
         treeNodeIndex.clear();
         slideCanvas.setImage(null);
         playback.reset(0);
@@ -451,7 +453,7 @@ public class SlideApp {
         preloadInitial();
         updateImageCountLabel();
         showCurrentImage();
-        System.out.printf("[SLIDE] preload initial=%d cache=%d%n", Math.min(SlideDefaults.PRELOAD_COUNT, imageFiles.size()), imageCache.size());
+        System.out.printf("[SLIDE] preload initial=%d cache=%d%n", Math.min(SlideDefaults.PRELOAD_COUNT, imageFiles.size()), cacheSize());
     }
 
     private void onPlayPause() {
@@ -652,6 +654,12 @@ public class SlideApp {
         }
     }
 
+    private int cacheSize() {
+        synchronized (imageCache) {
+            return imageCache.size();
+        }
+    }
+
     private void queueImageLoad(Path path, int generation, boolean repaintIfCurrent) {
         synchronized (imageCache) {
             if (imageCache.containsKey(path)) {
@@ -757,7 +765,7 @@ public class SlideApp {
                 getSpinnerValue(blackFrameSpinner),
                 currentLoop,
                 loopText,
-                imageCache.size()
+                cacheSize()
         );
     }
 
@@ -767,7 +775,7 @@ public class SlideApp {
 
     private void updateImageCountLabel() {
         imageCountLabel.setText(String.format("Images: %d | Cache: %d/%d",
-                imageFiles.size(), imageCache.size(), SlideDefaults.MAX_CACHE_SIZE));
+                imageFiles.size(), cacheSize(), SlideDefaults.MAX_CACHE_SIZE));
     }
 
     private void printShortcutHelp(PrintStream out) {

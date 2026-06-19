@@ -169,4 +169,8 @@ QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델
 
 - [완료] gui 에서도 해당 경로를 기본으로 잡도록
 
-5. receiver에서 capture 도구 선택하는 방법이 좀 더 사용자 친화적이였으면 좋겠음
+5. [완료] receiver에서 capture 도구 선택을 더 사용자 친화적으로.
+   - GUI: 정수 스피너 → 디바이스 드롭다운(`JComboBox<CaptureDeviceInfo>`). "Devices" 버튼으로 probe해서
+     콤보를 채우고, 선택 항목의 index로 capture. 첫 available 디바이스를 기본 선택.
+   - CLI: `--device`가 인덱스뿐 아니라 **장치 이름 부분일치**(대소문자 무시)도 허용. 매칭 실패 시 친절한 에러.
+   - (참고) probe(`canOpenDevice`)가 디바이스마다 카메라를 열어 느림 → 타임아웃은 #3에서 개선.

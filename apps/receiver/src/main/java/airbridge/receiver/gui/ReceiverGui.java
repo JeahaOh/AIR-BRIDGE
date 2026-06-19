@@ -15,6 +15,7 @@ import airbridge.receiver.capture.CaptureSupport;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -74,7 +75,7 @@ public final class ReceiverGui {
 
     private static final class ReceiverPanel extends JPanel {
         private final JTextField outputDirField = new JTextField(AppPaths.capturedDir().toString(), 36);
-        private final JSpinner deviceSpinner = intSpinner(CaptureDefaults.DEFAULT_DEVICE_INDEX, 0, 999, 1);
+        private final JComboBox<CaptureDeviceInfo> deviceCombo = new JComboBox<>();
         private final JSpinner widthSpinner = intSpinner(CaptureDefaults.DEFAULT_WIDTH, 1, 16384, 1);
         private final JSpinner heightSpinner = intSpinner(CaptureDefaults.DEFAULT_HEIGHT, 1, 16384, 1);
         private final JSpinner fpsSpinner = doubleSpinner(CaptureDefaults.DEFAULT_FPS, 0.1d, 240.0d, 0.1d);
@@ -153,7 +154,8 @@ public final class ReceiverGui {
 
             int row = 0;
             addField(form, row++, "Output", outputDirField, outputBrowseButton);
-            addField(form, row++, "Device", deviceSpinner, widthSpinner, "Width");
+            deviceCombo.setEditable(false);
+            addField(form, row++, "Device", deviceCombo, widthSpinner, "Width");
             addField(form, row++, "Height", heightSpinner, fpsSpinner, "FPS");
             addField(form, row++, "Workers", captureDecodeWorkersSpinner, statusIntervalSpinner, "Status ms");
             addField(form, row++, "Preview", previewCheck, previewFpsSpinner, "Preview FPS");
@@ -304,7 +306,7 @@ public final class ReceiverGui {
             }
             return new CaptureOptions(
                     Path.of(outputDir),
-                    intValue(deviceSpinner),
+                    selectedDeviceIndex(),
                     intValue(widthSpinner),
                     intValue(heightSpinner),
                     doubleValue(fpsSpinner),
@@ -354,6 +356,7 @@ public final class ReceiverGui {
                 protected void done() {
                     try {
                         List<CaptureDeviceInfo> devices = get();
+                        populateDeviceCombo(devices);
                         if (devices.isEmpty()) {
                             appendLog("[GUI][INFO] no devices found");
                             return;
@@ -373,6 +376,38 @@ public final class ReceiverGui {
             }.execute();
         }
 
+        private void populateDeviceCombo(List<CaptureDeviceInfo> devices) {
+            CaptureDeviceInfo previous = (CaptureDeviceInfo) deviceCombo.getSelectedItem();
+            deviceCombo.removeAllItems();
+            for (CaptureDeviceInfo device : devices) {
+                deviceCombo.addItem(device);
+            }
+            // Keep the previous selection (by index) if it still exists, else prefer the
+            // first available device.
+            if (previous != null) {
+                for (int i = 0; i < deviceCombo.getItemCount(); i++) {
+                    if (deviceCombo.getItemAt(i).index() == previous.index()) {
+                        deviceCombo.setSelectedIndex(i);
+                        return;
+                    }
+                }
+            }
+            for (int i = 0; i < deviceCombo.getItemCount(); i++) {
+                if (deviceCombo.getItemAt(i).available()) {
+                    deviceCombo.setSelectedIndex(i);
+                    return;
+                }
+            }
+        }
+
+        private int selectedDeviceIndex() {
+            Object selected = deviceCombo.getSelectedItem();
+            if (selected instanceof CaptureDeviceInfo info) {
+                return info.index();
+            }
+            return CaptureDefaults.DEFAULT_DEVICE_INDEX;
+        }
+
         private boolean isCaptureRunning() {
             return captureWorker != null && !captureWorker.isDone();
         }
@@ -387,7 +422,7 @@ public final class ReceiverGui {
             listDevicesButton.setEnabled(!running);
             outputBrowseButton.setEnabled(!running);
             outputDirField.setEnabled(!running);
-            deviceSpinner.setEnabled(!running);
+            deviceCombo.setEnabled(!running);
             widthSpinner.setEnabled(!running);
             heightSpinner.setEnabled(!running);
             fpsSpinner.setEnabled(!running);

@@ -211,8 +211,9 @@ public class Receiver implements Runnable {
         @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out")
         private Path outputDir;
 
+        // Accepts a numeric index or a (case-insensitive) device-name substring.
         @Option(names = "--device", defaultValue = "0", descriptionKey = "option.device")
-        private int captureDevice = CaptureDefaults.DEFAULT_DEVICE_INDEX;
+        private String captureDevice = String.valueOf(CaptureDefaults.DEFAULT_DEVICE_INDEX);
 
         @Option(names = "--width", defaultValue = "1920", descriptionKey = "option.width")
         private int captureWidth = CaptureDefaults.DEFAULT_WIDTH;
@@ -252,8 +253,16 @@ public class Receiver implements Runnable {
                 return 0;
             }
 
+            int deviceIndex;
+            try {
+                deviceIndex = resolveDeviceIndex(captureDevice);
+            } catch (IllegalArgumentException e) {
+                System.out.println("[ERROR] " + e.getMessage());
+                return 0;
+            }
+
             Path outDir = (outputDir != null ? outputDir : AppPaths.capturedDir()).toAbsolutePath().normalize();
-            new CaptureService(buildCaptureOptions(outDir), new CaptureListener() {
+            new CaptureService(buildCaptureOptions(outDir, deviceIndex), new CaptureListener() {
                 @Override
                 public void onLog(String line) {
                     System.out.println(line);
@@ -289,10 +298,39 @@ public class Receiver implements Runnable {
             }
         }
 
-        private CaptureOptions buildCaptureOptions(Path outDir) {
+        // Resolves a --device value (numeric index or name substring) to a device index.
+        private static int resolveDeviceIndex(String spec) {
+            if (spec == null || spec.isBlank()) {
+                return CaptureDefaults.DEFAULT_DEVICE_INDEX;
+            }
+            String value = spec.trim();
+            try {
+                return Integer.parseInt(value);
+            } catch (NumberFormatException ignored) {
+                // not an index; fall through to name matching
+            }
+
+            String needle = value.toLowerCase(Locale.ROOT);
+            List<CaptureDeviceInfo> devices = CaptureSupport.listDevices();
+            CaptureDeviceInfo match = devices.stream()
+                    .filter(d -> d.available() && d.name().toLowerCase(Locale.ROOT).contains(needle))
+                    .findFirst()
+                    .orElseGet(() -> devices.stream()
+                            .filter(d -> d.name().toLowerCase(Locale.ROOT).contains(needle))
+                            .findFirst()
+                            .orElse(null));
+            if (match == null) {
+                throw new IllegalArgumentException(
+                        "일치하는 캡처 디바이스를 찾을 수 없습니다: \"" + value + "\" (사용 가능한 목록: --list-devices)");
+            }
+            System.out.printf("[CAPTURE] 디바이스 선택: index=%d name=%s%n", match.index(), match.name());
+            return match.index();
+        }
+
+        private CaptureOptions buildCaptureOptions(Path outDir, int deviceIndex) {
             return new CaptureOptions(
                     outDir,
-                    captureDevice,
+                    deviceIndex,
                     captureWidth,
                     captureHeight,
                     captureFps,

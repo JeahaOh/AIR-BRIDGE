@@ -1,5 +1,7 @@
 package airbridge.receiver.capture;
 
+import airbridge.common.CodecSupport;
+import airbridge.common.QrPayloadSupport;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.NotFoundException;
@@ -11,9 +13,11 @@ import org.junit.jupiter.api.Test;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.nio.charset.StandardCharsets;
 import java.util.EnumMap;
 import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -41,6 +45,24 @@ class CaptureQrDecodeSupportTest {
     }
 
     @Test
+    void decodesBinaryPayloadFrameInByteMode() throws Exception {
+        // A real §6.1 payload: gzip bytes wrapped in the binary frame, rendered in QR byte mode.
+        byte[] gzip = CodecSupport.compress("capture binary payload".getBytes(StandardCharsets.UTF_8));
+        String hash16 = CodecSupport.sha256Hex(gzip).substring(0, 16);
+        byte[] frame = QrPayloadSupport.buildPayload("PROJ", "docs/a.bin", 1, 1, hash16, gzip);
+
+        BufferedImage image = createByteModeQrImage(frame, 360);
+        String decodedText = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
+
+        // The capture path returns the ISO-8859-1 text; bytes must survive 1:1 so dedup keys on
+        // the true payload and the frame parses back to the original fields.
+        byte[] recovered = decodedText.getBytes(StandardCharsets.ISO_8859_1);
+        QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(recovered);
+        assertEquals("docs/a.bin", parsed.relPath());
+        assertArrayEquals(gzip, parsed.chunkData());
+    }
+
+    @Test
     void throwsNotFoundForImageWithoutQr() {
         BufferedImage blank = new BufferedImage(400, 400, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = blank.createGraphics();
@@ -58,6 +80,16 @@ class CaptureQrDecodeSupportTest {
         hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
         hints.put(EncodeHintType.MARGIN, 2);
         return MatrixToImageWriter.toBufferedImage(writer.encode(payload, BarcodeFormat.QR_CODE, size, size, hints));
+    }
+
+    private static BufferedImage createByteModeQrImage(byte[] payload, int size) throws Exception {
+        QRCodeWriter writer = new QRCodeWriter();
+        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+        hints.put(EncodeHintType.CHARACTER_SET, "ISO-8859-1");
+        hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+        hints.put(EncodeHintType.MARGIN, 2);
+        String content = new String(payload, StandardCharsets.ISO_8859_1);
+        return MatrixToImageWriter.toBufferedImage(writer.encode(content, BarcodeFormat.QR_CODE, size, size, hints));
     }
 
     private static BufferedImage rotate(BufferedImage source, int degrees) {

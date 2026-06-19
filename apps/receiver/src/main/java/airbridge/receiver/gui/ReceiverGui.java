@@ -537,10 +537,7 @@ public final class ReceiverGui {
 
                     @Override
                     public void onReady() {
-                        SwingUtilities.invokeLater(() -> {
-                            setStatus("READY — 카메라 준비 완료. 지금 slide 재생을 시작하세요.");
-                            appendLog("[CAPTURE][READY] 카메라 준비 완료 — 지금 송신측에서 slide 재생을 시작하세요.");
-                        });
+                        SwingUtilities.invokeLater(() -> setStatus("READY"));
                     }
 
                     @Override

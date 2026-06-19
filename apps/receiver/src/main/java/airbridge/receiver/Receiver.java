@@ -265,14 +265,11 @@ public class Receiver implements Runnable {
             return 0;
         }
 
-        // Re-print the full banner at the moment the camera is open and capture has started,
-        // so the operator gets an unmistakable visual marker of when to begin playing slides.
+        // Re-print the banner at the moment the camera is open and capture has started,
+        // as an unmistakable marker of when to begin playing slides.
         private void printCaptureReadyBanner() {
             System.out.println();
             System.out.println(BannerSupport.render("air-bridge receiver — CAPTURE READY"));
-            System.out.println("[CAPTURE][READY] 카메라 준비 완료 — 지금 송신측에서 slide 재생을 시작하세요.");
-            System.out.println("[CAPTURE][READY] Camera is live — start playing the slides now.");
-            System.out.println();
         }
 
         private void listCaptureDevices() {

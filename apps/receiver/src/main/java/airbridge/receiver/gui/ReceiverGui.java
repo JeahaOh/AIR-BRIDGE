@@ -1,5 +1,6 @@
 package airbridge.receiver.gui;
 
+import airbridge.common.AppPaths;
 import airbridge.common.gui.DirectoryChooser;
 import airbridge.receiver.DecodeWorkflow;
 import airbridge.receiver.capture.CaptureDefaults;
@@ -72,7 +73,7 @@ public final class ReceiverGui {
     }
 
     private static final class ReceiverPanel extends JPanel {
-        private final JTextField outputDirField = new JTextField(36);
+        private final JTextField outputDirField = new JTextField(AppPaths.capturedDir().toString(), 36);
         private final JSpinner deviceSpinner = intSpinner(CaptureDefaults.DEFAULT_DEVICE_INDEX, 0, 999, 1);
         private final JSpinner widthSpinner = intSpinner(CaptureDefaults.DEFAULT_WIDTH, 1, 16384, 1);
         private final JSpinner heightSpinner = intSpinner(CaptureDefaults.DEFAULT_HEIGHT, 1, 16384, 1);
@@ -89,8 +90,8 @@ public final class ReceiverGui {
         private final JLabel statusLabel = new JLabel("Idle");
         private final JTextArea logArea = new JTextArea();
         private final PreviewPanel previewPanel = new PreviewPanel();
-        private final JTextField decodeInputDirField = new JTextField(36);
-        private final JTextField decodeOutputDirField = new JTextField(36);
+        private final JTextField decodeInputDirField = new JTextField(AppPaths.capturedDir().toString(), 36);
+        private final JTextField decodeOutputDirField = new JTextField(AppPaths.decodedDir().toString(), 36);
         private final JSpinner decodeWorkersSpinner = intSpinner(DEFAULT_DECODE_WORKERS, 1, 256, 1);
         private final JButton decodeInputBrowseButton = new JButton("Browse");
         private final JButton decodeOutputBrowseButton = new JButton("Browse");

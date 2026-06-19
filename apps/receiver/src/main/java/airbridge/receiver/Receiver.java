@@ -1,5 +1,6 @@
 package airbridge.receiver;
 
+import airbridge.common.AppPaths;
 import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
@@ -148,10 +149,10 @@ public class Receiver implements Runnable {
     @Command(name = "decode", mixinStandardHelpOptions = true, resourceBundle = "Messages",
             description = "Decode QR image sets and restore original files.")
     static final class DecodeCommand implements Callable<Integer> {
-        @Option(names = "--in", paramLabel = "DIR", descriptionKey = "option.in", required = true)
+        @Option(names = "--in", paramLabel = "DIR", descriptionKey = "option.in")
         private Path sourceDir;
 
-        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out", required = true)
+        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out")
         private Path outputDir;
 
         @Option(names = "--decode-workers", defaultValue = "4", descriptionKey = "option.decode-workers")
@@ -160,8 +161,9 @@ public class Receiver implements Runnable {
         @Override
         public Integer call() throws Exception {
             BannerSupport.print(RECEIVER_TITLE);
-            Path srcPath = sourceDir.toAbsolutePath();
-            Path outPath = outputDir.toAbsolutePath();
+            // Default to jar-relative captured -> decoded when --in/--out are omitted.
+            Path srcPath = (sourceDir != null ? sourceDir : AppPaths.capturedDir()).toAbsolutePath().normalize();
+            Path outPath = (outputDir != null ? outputDir : AppPaths.decodedDir()).toAbsolutePath().normalize();
             if (!Files.isDirectory(srcPath)) {
                 System.out.println("[ERROR] QR 입력 디렉토리가 존재하지 않습니다: " + srcPath);
                 return 0;
@@ -206,7 +208,7 @@ public class Receiver implements Runnable {
     @Command(name = "capture", mixinStandardHelpOptions = true, resourceBundle = "Messages",
             description = "Capture QR frames from a UVC camera source.")
     static final class CaptureCommand implements Callable<Integer> {
-        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out", required = true)
+        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out")
         private Path outputDir;
 
         @Option(names = "--device", defaultValue = "0", descriptionKey = "option.device")
@@ -250,7 +252,7 @@ public class Receiver implements Runnable {
                 return 0;
             }
 
-            Path outDir = outputDir.toAbsolutePath();
+            Path outDir = (outputDir != null ? outputDir : AppPaths.capturedDir()).toAbsolutePath().normalize();
             new CaptureService(buildCaptureOptions(outDir), new CaptureListener() {
                 @Override
                 public void onLog(String line) {

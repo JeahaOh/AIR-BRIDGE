@@ -160,8 +160,13 @@ QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델
    3 - 1. windows에서 receiver가 정상 동작 하지 않음
    3 - 2. windows sender에서 폴더 선택 하는 화면 개선 가능?
    3 - 3.
-4. encode, decode, capture, slide에 in, out 경로를 optional로 받고 기본 값 경로 고정할 수 있나? jar 위치 기준으로 `./captured`, `./decoded`, `./encoded` 이런 식으로
+4. [완료] encode, decode, capture, slide에 in, out 경로를 optional로 받고 기본 값 경로 고정.
+   - jar 위치 기준 기본 파이프라인: encode(source→encoded) → slide(encoded) → capture(→captured) → decode(captured→decoded).
+   - 공통 헬퍼 `AppPaths`(common): jar 위치(없으면 user.dir) 기준으로 디렉터리 해석.
+   - 디렉터리 "이름"은 `airbridge-paths.properties`로 관리: 번들 기본값 + jar 옆 동일 파일로 런타임 오버라이드.
+   - CLI: encode/reencode/decode `--in`/`--out`, capture `--out` 모두 optional(미지정 시 기본값). slide 입력 미지정 시 encoded.
+   - GUI(sender/receiver): 각 입력/출력 필드 기본값을 동일 경로로 초기화.
 
-- gui 에서도 해당 경로를 기본으로 잡도록
+- [완료] gui 에서도 해당 경로를 기본으로 잡도록
 
 5. receiver에서 capture 도구 선택하는 방법이 좀 더 사용자 친화적이였으면 좋겠음

@@ -1,5 +1,6 @@
 package airbridge.sender;
 
+import airbridge.common.AppPaths;
 import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
@@ -178,11 +179,23 @@ public class Sender implements Runnable {
     }
 
     static final class EncodeSharedOptions {
-        @Option(names = "--in", paramLabel = "DIR", descriptionKey = "option.in", required = true)
+        @Option(names = "--in", paramLabel = "DIR", descriptionKey = "option.in")
         private Path sourceDir;
 
-        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out", required = true)
+        @Option(names = {"--out", "--out-dir"}, paramLabel = "DIR", descriptionKey = "option.out")
         private Path outputDir;
+
+        // Default to jar-relative directories when --in/--out are omitted, forming the
+        // pipeline source -> encoded -> ... See AppPaths.
+        Path resolvedSourceDir() {
+            Path dir = (sourceDir != null) ? sourceDir : AppPaths.sourceDir();
+            return dir.toAbsolutePath().normalize();
+        }
+
+        Path resolvedOutputDir() {
+            Path dir = (outputDir != null) ? outputDir : AppPaths.encodedDir();
+            return dir.toAbsolutePath().normalize();
+        }
 
         @Option(names = "--project-name", defaultValue = "PROJECT", descriptionKey = "option.project-name")
         private String projectName = SenderDefaults.DEFAULT_PROJECT_NAME;
@@ -268,8 +281,8 @@ public class Sender implements Runnable {
         public Integer call() throws Exception {
             BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
-            Path srcPath = options.sourceDir.toAbsolutePath();
-            Path outPath = options.outputDir.toAbsolutePath();
+            Path srcPath = options.resolvedSourceDir();
+            Path outPath = options.resolvedOutputDir();
 
             if (!Files.isDirectory(srcPath)) {
                 System.out.println("[ERROR] 소스 디렉토리가 존재하지 않습니다: " + srcPath);
@@ -343,8 +356,8 @@ public class Sender implements Runnable {
         public Integer call() throws Exception {
             BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
-            Path srcPath = options.sourceDir.toAbsolutePath();
-            Path outPath = options.outputDir.toAbsolutePath();
+            Path srcPath = options.resolvedSourceDir();
+            Path outPath = options.resolvedOutputDir();
             Path resultFilePath = reencodeResultPath != null
                     ? reencodeResultPath
                     : CliSupport.requirePath(this, restoreDir, "--restore-dir").resolve("_restore_result.txt");

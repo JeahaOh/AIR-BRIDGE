@@ -1,5 +1,6 @@
 package airbridge.sender.gui;
 
+import airbridge.common.AppPaths;
 import airbridge.common.gui.DirectoryChooser;
 import airbridge.sender.EncodeWorkflow;
 import airbridge.slide.SlideApp;
@@ -57,8 +58,8 @@ public final class SenderGui {
     }
 
     private static final class SenderPanel extends JPanel {
-        private final JTextField sourceDirField = new JTextField(36);
-        private final JTextField outputDirField = new JTextField(36);
+        private final JTextField sourceDirField = new JTextField(AppPaths.sourceDir().toString(), 36);
+        private final JTextField outputDirField = new JTextField(AppPaths.encodedDir().toString(), 36);
         private final JTextField encodeRootField = new JTextField(36);
         private final JTextField projectNameField = new JTextField(EncodeWorkflow.DEFAULT_PROJECT_NAME, 18);
         private final JSpinner chunkDataSizeSpinner = intSpinner(EncodeWorkflow.DEFAULT_CHUNK_DATA_SIZE, 1, Integer.MAX_VALUE, 100);
@@ -80,7 +81,7 @@ public final class SenderGui {
         private final JButton rootBrowseButton = new JButton("Browse");
         private final JLabel statusLabel = new JLabel("Idle");
         private final JTextArea logArea = new JTextArea();
-        private final JTextField slideInputDirField = new JTextField(36);
+        private final JTextField slideInputDirField = new JTextField(AppPaths.encodedDir().toString(), 36);
         private final JButton useEncodeOutputButton = new JButton("Use encode output");
         private final JButton launchSlideButton = new JButton("Launch slide");
         private final JLabel slideStatusLabel = new JLabel("Idle");

@@ -1,11 +1,11 @@
 package airbridge.slide;
 
+import airbridge.common.AppPaths;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 class SlideAppArgsTest {
     @Test
@@ -20,7 +20,8 @@ class SlideAppArgsTest {
     }
 
     @Test
-    void ignoresMissingInputDirectoryOptionValue() {
-        assertNull(SlideApp.initialInputDirFromArgs(new String[]{"--in"}));
+    void defaultsToEncodedDirWhenNoInputGiven() {
+        assertEquals(AppPaths.encodedDir(), SlideApp.initialInputDirFromArgs(new String[0]));
+        assertEquals(AppPaths.encodedDir(), SlideApp.initialInputDirFromArgs(new String[]{"--in"}));
     }
 }

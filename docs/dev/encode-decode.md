@@ -267,6 +267,21 @@ JMH 없이 stdlib만 쓰는 경량 하니스가 있다. 합성 소스 트리를 
 타이트한 힙에서는 GC가 한계 근처까지 garbage를 모았다가 회수하므로 decode peak는 maxHeap에
 가깝게 보일 수 있다(작업 집합 크기가 아니라 GC 동작의 반영).
 
+## 기본 경로(in/out)와 설정
+
+`--in`/`--out`을 생략하면 jar 위치 기준 기본 디렉터리를 쓴다(`AppPaths`, common 모듈).
+기본 파이프라인:
+
+```
+encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> decode( captured -> decoded )
+```
+
+- base 디렉터리: 실행 jar가 있는 폴더(비-jar 실행이면 `user.dir`).
+- 디렉터리 이름은 `airbridge-paths.properties`로 관리. 번들 기본값은 `libs/common/src/main/resources/`,
+  런타임 오버라이드는 **jar 옆에 같은 이름의 파일**을 두면 키별로 덮어쓴다
+  (`dir.source`/`dir.encoded`/`dir.captured`/`dir.decoded`).
+- CLI는 미지정 시 기본값, GUI는 입력/출력 필드 초기값으로 동일 경로를 채운다.
+
 ## 개발 시 주의점
 
 - payload 포맷을 바꾸면 `encode`, `decode`, 테스트, 기존 산출물 호환성이 동시에 깨진다.

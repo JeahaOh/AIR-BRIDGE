@@ -63,6 +63,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import airbridge.common.AppPaths;
 import airbridge.common.VersionSupport;
 
 public class SlideApp {
@@ -159,7 +160,8 @@ public class SlideApp {
 
     static Path initialInputDirFromArgs(String[] args) {
         if (args == null || args.length == 0) {
-            return null;
+            // No input given: default to the jar-relative "encoded" directory.
+            return AppPaths.encodedDir();
         }
         for (int index = 0; index < args.length; index++) {
             String arg = args[index];
@@ -168,7 +170,7 @@ public class SlideApp {
             }
             if ("--in".equals(arg) || "--input".equals(arg)) {
                 if (index + 1 >= args.length) {
-                    return null;
+                    return AppPaths.encodedDir();
                 }
                 return Path.of(args[index + 1]);
             }
@@ -182,7 +184,7 @@ public class SlideApp {
                 return Path.of(arg);
             }
         }
-        return null;
+        return AppPaths.encodedDir();
     }
 
     private void start() {

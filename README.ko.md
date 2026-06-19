@@ -61,6 +61,16 @@ build/libs/receiver-<version>.jar
 - `sender`: `encode`, `gui`, `slide`, `unpack`
 - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
+## 기본 경로
+
+`--in`/`--out`을 생략하면 jar가 있는 폴더 기준 기본 디렉터리를 사용합니다.
+
+```
+encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> decode( captured -> decoded )
+```
+
+디렉터리 이름은 jar 옆 `airbridge-paths.properties`(키: `dir.source`/`dir.encoded`/`dir.captured`/`dir.decoded`)로 바꿀 수 있습니다. GUI도 같은 기본 경로를 채웁니다.
+
 ## Quick Start
 
 최소 실행 확인은 아래 명령으로 충분합니다.

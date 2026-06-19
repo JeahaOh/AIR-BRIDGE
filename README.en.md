@@ -60,6 +60,17 @@ option such as `encode`, `decode`, or `--help` keeps the existing CLI behavior.
 - `sender`: `encode`, `gui`, `slide`, `unpack`
 - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
+## Default Paths
+
+When `--in`/`--out` are omitted, jar-relative directories are used:
+
+```
+encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> decode( captured -> decoded )
+```
+
+Override the directory names with an `airbridge-paths.properties` file next to the jar
+(keys: `dir.source`/`dir.encoded`/`dir.captured`/`dir.decoded`). The GUI uses the same defaults.
+
 ## Quick Start
 
 These commands are enough for a minimal smoke check.

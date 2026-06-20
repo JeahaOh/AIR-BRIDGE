@@ -41,7 +41,8 @@
     `FileEncodingPlan.readSymbol`(패딩), `EncodeService`(심볼 스트림·`reencode` 전체 재생성),
     `FileChunks`(TreeMap → `LtDecoder` 누산기), `DecodeService`/`QrDecodeSupport`.
     tests(코덱 손실 시뮬 + 손실 라운드트립)·docs 동시 갱신, round-trip·손실 복원 검증 완료.
-  - 후속(미착수): 복구 여유분(`--repair-overhead`) CLI/GUI 노출, Robust Soliton 등 효율 튜닝.
+  - [x] 복구 여유분 `--repair-overhead` CLI 옵션 + GUI 스피너 노출 — 완료(기본 0.5, EncodeService까지 배선).
+  - 후속(미착수): Robust Soliton 등 효율 튜닝, 페이싱 캘리브레이션 모드.
 
 ### 2. slide ↔ capture 페이싱 (완료, 2026-06-20)
 

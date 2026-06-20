@@ -43,6 +43,7 @@ final class EncodeService {
     private final boolean folderStructure;
     private final int filesPerFolder;
     private final int encodeWorkers;
+    private final double repairOverhead;
 
     EncodeService(QrImageWriter qrImageWriter,
                      int chunkDataSize,
@@ -51,7 +52,8 @@ final class EncodeService {
                      boolean folderStructure,
                      int filesPerFolder) {
         this(qrImageWriter, chunkDataSize, convertXlsxToCsv, convertOfficeToText,
-                folderStructure, filesPerFolder, SenderDefaults.DEFAULT_ENCODE_WORKERS);
+                folderStructure, filesPerFolder, SenderDefaults.DEFAULT_ENCODE_WORKERS,
+                SenderDefaults.DEFAULT_REPAIR_OVERHEAD);
     }
 
     EncodeService(QrImageWriter qrImageWriter,
@@ -60,12 +62,16 @@ final class EncodeService {
                      boolean convertOfficeToText,
                      boolean folderStructure,
                      int filesPerFolder,
-                     int encodeWorkers) {
+                     int encodeWorkers,
+                     double repairOverhead) {
         if (chunkDataSize < 1) {
             throw new IllegalArgumentException("chunkDataSize must be >= 1");
         }
         if (filesPerFolder < 1) {
             throw new IllegalArgumentException("filesPerFolder must be >= 1");
+        }
+        if (repairOverhead < 0) {
+            throw new IllegalArgumentException("repairOverhead must be >= 0");
         }
         this.qrImageWriter = qrImageWriter;
         this.chunkDataSize = chunkDataSize;
@@ -74,6 +80,7 @@ final class EncodeService {
         this.folderStructure = folderStructure;
         this.filesPerFolder = filesPerFolder;
         this.encodeWorkers = Math.max(1, encodeWorkers);
+        this.repairOverhead = repairOverhead;
     }
 
     EncodeSummary encode(Path srcPath,
@@ -265,12 +272,12 @@ final class EncodeService {
     // Total fountain symbols to emit for a k-source block: the k systematic symbols plus a
     // repair margin for the lossy one-way channel. The decoder needs slightly more than k
     // distinct symbols to recover any lost source symbols.
-    private static int symbolCount(int k) {
-        return symbolCount(k, SenderDefaults.DEFAULT_REPAIR_OVERHEAD);
+    private int symbolCount(int k) {
+        return symbolCount(k, repairOverhead);
     }
 
-    private static int symbolCount(int k, double repairOverhead) {
-        return k + (int) Math.ceil(k * repairOverhead);
+    private static int symbolCount(int k, double overhead) {
+        return k + (int) Math.ceil(k * overhead);
     }
 
     // Builds fountain symbol `esi` for the file: XOR of its source-symbol neighbors. For
@@ -378,9 +385,11 @@ final class EncodeService {
                     chunkDataSize
             )) {
                 // The previous capture failed, so re-emit the whole fountain stream with a
-                // larger repair margin: a fresh decode run reads only these PNGs, and the extra
+                // larger repair margin (at least REENCODE_REPAIR_OVERHEAD, never below the
+                // configured one): a fresh decode run reads only these PNGs, and the extra
                 // distinct symbols raise the odds the retry pass clears the file.
-                int totalSymbols = symbolCount(plan.totalChunks(), REENCODE_REPAIR_OVERHEAD);
+                int totalSymbols = symbolCount(plan.totalChunks(),
+                        Math.max(repairOverhead, REENCODE_REPAIR_OVERHEAD));
                 Path fileOutDir = outPath;
 
                 effectiveListener.onLog(String.format("%n[FILE %d/%d] %s (소스 %d, QR %d장 재생성)",

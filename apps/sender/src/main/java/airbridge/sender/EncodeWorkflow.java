@@ -18,6 +18,7 @@ public final class EncodeWorkflow {
     public static final boolean DEFAULT_FOLDER_STRUCTURE = SenderDefaults.DEFAULT_FOLDER_STRUCTURE;
     public static final int DEFAULT_FILES_PER_FOLDER = SenderDefaults.DEFAULT_FILES_PER_FOLDER;
     public static final int DEFAULT_ENCODE_WORKERS = SenderDefaults.DEFAULT_ENCODE_WORKERS;
+    public static final double DEFAULT_REPAIR_OVERHEAD = SenderDefaults.DEFAULT_REPAIR_OVERHEAD;
     public static final List<String> DEFAULT_TARGET_EXTENSIONS = SenderDefaults.DEFAULT_TARGET_EXTENSIONS;
     public static final List<String> DEFAULT_SKIP_DIRS = SenderDefaults.DEFAULT_SKIP_DIRS;
 
@@ -59,7 +60,8 @@ public final class EncodeWorkflow {
                     normalized.convertOfficeToText(),
                     normalized.folderStructure(),
                     normalized.filesPerFolder(),
-                    normalized.encodeWorkers()
+                    normalized.encodeWorkers(),
+                    normalized.repairOverhead()
             ).encode(
                     normalized.sourceDir(),
                     normalized.outputDir(),
@@ -98,6 +100,7 @@ public final class EncodeWorkflow {
             boolean folderStructure,
             int filesPerFolder,
             int encodeWorkers,
+            double repairOverhead,
             List<String> targetExtensions,
             List<String> skipDirs,
             List<String> excludePaths
@@ -116,6 +119,7 @@ public final class EncodeWorkflow {
                     DEFAULT_FOLDER_STRUCTURE,
                     DEFAULT_FILES_PER_FOLDER,
                     DEFAULT_ENCODE_WORKERS,
+                    DEFAULT_REPAIR_OVERHEAD,
                     DEFAULT_TARGET_EXTENSIONS,
                     DEFAULT_SKIP_DIRS,
                     List.of()
@@ -128,6 +132,9 @@ public final class EncodeWorkflow {
             requireMin("labelHeight", labelHeight, 0);
             requireMin("filesPerFolder", filesPerFolder, 1);
             requireMin("encodeWorkers", encodeWorkers, 1);
+            if (repairOverhead < 0) {
+                throw new IllegalArgumentException("repairOverhead must be >= 0 (was " + repairOverhead + ")");
+            }
             if (sourceDir == null) {
                 throw new IllegalArgumentException("sourceDir is required");
             }
@@ -147,6 +154,7 @@ public final class EncodeWorkflow {
                     folderStructure,
                     filesPerFolder,
                     encodeWorkers,
+                    repairOverhead,
                     copyList(targetExtensions),
                     copyList(skipDirs),
                     copyList(excludePaths)

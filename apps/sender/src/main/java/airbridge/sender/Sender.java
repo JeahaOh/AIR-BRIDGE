@@ -229,6 +229,9 @@ public class Sender implements Runnable {
         @Option(names = "--encode-workers", descriptionKey = "option.encode-workers")
         private int encodeWorkers = SenderDefaults.DEFAULT_ENCODE_WORKERS;
 
+        @Option(names = "--repair-overhead", descriptionKey = "option.repair-overhead")
+        private double repairOverhead = SenderDefaults.DEFAULT_REPAIR_OVERHEAD;
+
         @Option(names = "--target-extensions", split = ",", paramLabel = "EXT[,EXT...]", descriptionKey = "option.target-extensions")
         private List<String> targetExtensions = new ArrayList<>(SenderDefaults.DEFAULT_TARGET_EXTENSIONS);
 
@@ -243,6 +246,10 @@ public class Sender implements Runnable {
             requireMin(commandLine, "--files-per-folder", filesPerFolder, 1);
             requireMin(commandLine, "--qr-image-size", qrImageSize, 1);
             requireMin(commandLine, "--label-height", labelHeight, 0);
+            if (repairOverhead < 0) {
+                throw new CommandLine.ParameterException(commandLine,
+                        String.format("--repair-overhead must be >= 0 (was %s)", repairOverhead));
+            }
         }
 
         private QrImageWriter newQrImageWriter() {
@@ -257,7 +264,8 @@ public class Sender implements Runnable {
                     convertOfficeToText,
                     folderStructure,
                     filesPerFolder,
-                    encodeWorkers
+                    encodeWorkers,
+                    repairOverhead
             );
         }
 

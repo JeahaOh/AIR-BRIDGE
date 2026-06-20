@@ -283,6 +283,33 @@ class EncodeServiceTest {
         }
     }
 
+    @Test
+    void repairOverheadControlsEmittedSymbolCount() throws Exception {
+        Path srcDir = tempDir.resolve("src");
+        Files.createDirectories(srcDir.resolve("docs"));
+        Path file = srcDir.resolve("docs/sample.txt");
+        Files.write(file, randomBytes(960, 61L));
+
+        int chunkDataSize = 25;
+        int k;
+        try (FileEncodingPlan plan = FileEncodingPlan.fromSourceFile(file, "docs/sample.txt", false, false, chunkDataSize)) {
+            k = plan.totalChunks();
+        }
+        assertTrue(k >= 4);
+
+        EncodeSummary none = new EncodeService(
+                new QrImageWriter(450, 70, ErrorCorrectionLevel.M),
+                chunkDataSize, false, false, true, 500, 1, 0.0)
+                .encode(srcDir, tempDir.resolve("o0"), srcDir, List.of("txt"), List.of(), List.of(), null);
+        EncodeSummary doubled = new EncodeService(
+                new QrImageWriter(450, 70, ErrorCorrectionLevel.M),
+                chunkDataSize, false, false, true, 500, 1, 1.0)
+                .encode(srcDir, tempDir.resolve("o1"), srcDir, List.of("txt"), List.of(), List.of(), null);
+
+        assertEquals(k, none.totalQrCount());         // overhead 0 -> exactly k systematic symbols
+        assertEquals(2 * k, doubled.totalQrCount());   // overhead 1.0 -> k + ceil(k*1.0) = 2k
+    }
+
     private static byte[] randomBytes(int size, long seed) {
         byte[] data = new byte[size];
         new Random(seed).nextBytes(data);

@@ -2,26 +2,33 @@ package airbridge.common;
 
 import picocli.CommandLine;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Objects;
 
 public final class BannerSupport {
-    private static final String BANNER = """
-  ____  ____  ____         ____   ____   ____  ___     ____    ___ 
- /    ||    ||    \\\\       |    \\\\ |    \\\\ |    ||   \\\\   /    |  /  _]
-|  o  | |  | |  D  )_____ |  o  )|  D  ) |  | |    \\\\ |   __| /  [_ 
-|     | |  | |    /|     ||     ||    /  |  | |  D  ||  |  ||    _]
-|  _  | |  | |    \\\\|_____||  O  ||    \\\\  |  | |     ||  |_ ||   [_ 
-|  |  | |  | |  .  \\\\      |     ||  .  \\\\ |  | |     ||     ||     |
-|__|__||____||__|\\\\_|      |_____||__|\\\\_||____||_____||___,_||_____|
-                                                                   
-""";
+    /** Banner art resource path; the single source of truth shared with the Gradle build. */
+    public static final String BANNER_RESOURCE = "/banner.txt";
+    private static final String BANNER = loadBanner();
     private static final int BANNER_WIDTH = Arrays.stream(BANNER.split("\\R", -1))
             .mapToInt(String::length)
             .max()
             .orElse(0);
 
     private BannerSupport() {
+    }
+
+    private static String loadBanner() {
+        try (InputStream in = BannerSupport.class.getResourceAsStream(BANNER_RESOURCE)) {
+            if (in == null) {
+                return "air-bridge" + System.lineSeparator();
+            }
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return "air-bridge" + System.lineSeparator();
+        }
     }
 
     public static void apply(CommandLine commandLine, String title) {

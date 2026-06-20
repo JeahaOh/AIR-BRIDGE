@@ -50,6 +50,23 @@ tasks.register('printRootLibs') {
             println String.format(Locale.ROOT, '  %s (%.1f MB)', file.name, sizeMb)
         }
     }
+    // Print the air-bridge banner once the build finishes. Reuses the same banner.txt the
+    // runtime banner loads, so the build and the apps never drift. Runs regardless of whether
+    // the artifact listing above returned early.
+    doLast {
+        def bannerFile = rootProject.file('libs/common/src/main/resources/banner.txt')
+        if (!bannerFile.exists()) {
+            return
+        }
+        def bannerText = bannerFile.getText('UTF-8')
+        int width = bannerText.readLines().collect { it.length() }.max() ?: 0
+        String footer = "air-bridge - ${project.version}"
+        int pad = Math.max(0, width - footer.length())
+        String footerLine = (' ' * pad) + footer
+        println ''
+        print bannerText
+        println footerLine
+    }
 }
 
 tasks.named('build') {

@@ -1,6 +1,7 @@
 package airbridge.receiver;
 
 import airbridge.common.AppPaths;
+import airbridge.common.BannerExecutionStrategy;
 import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
@@ -96,6 +97,9 @@ public class Receiver implements Runnable {
     static CommandLine newCommandLine() {
         CommandLine commandLine = new CommandLine(new Receiver());
         BannerSupport.apply(commandLine, RECEIVER_TITLE);
+        // Print the banner once before any subcommand runs; capture opts out (it prints its own
+        // READY banner instead).
+        commandLine.setExecutionStrategy(new BannerExecutionStrategy(RECEIVER_TITLE, "capture"));
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
         applySubcommandDescriptions(commandLine, bundle);
@@ -124,7 +128,6 @@ public class Receiver implements Runnable {
     static final class GuiCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(RECEIVER_TITLE);
             if (GraphicsEnvironment.isHeadless()) {
                 System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
                 return 2;
@@ -160,7 +163,6 @@ public class Receiver implements Runnable {
 
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(RECEIVER_TITLE);
             // Default to jar-relative captured -> decoded when --in/--out are omitted.
             Path srcPath = (sourceDir != null ? sourceDir : AppPaths.capturedDir()).toAbsolutePath().normalize();
             Path outPath = (outputDir != null ? outputDir : AppPaths.decodedDir()).toAbsolutePath().normalize();
@@ -247,8 +249,8 @@ public class Receiver implements Runnable {
 
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(RECEIVER_TITLE);
             if (listDevices) {
+                BannerSupport.print(RECEIVER_TITLE);
                 listCaptureDevices();
                 return 0;
             }

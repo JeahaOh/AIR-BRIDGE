@@ -1,6 +1,7 @@
 package airbridge.sender;
 
 import airbridge.common.AppPaths;
+import airbridge.common.BannerExecutionStrategy;
 import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
@@ -128,6 +129,8 @@ public class Sender implements Runnable {
     static CommandLine newCommandLine() {
         CommandLine commandLine = new CommandLine(new Sender());
         BannerSupport.apply(commandLine, SENDER_TITLE);
+        // Print the banner once before any subcommand runs (encode/slide/unpack/gui/reencode).
+        commandLine.setExecutionStrategy(new BannerExecutionStrategy(SENDER_TITLE));
         ResourceBundle bundle = ResourceBundle.getBundle("Messages", Locale.getDefault());
         commandLine.getCommandSpec().usageMessage().description(bundle.getString("command.description"));
         applySubcommandDescriptions(commandLine, bundle);
@@ -156,7 +159,6 @@ public class Sender implements Runnable {
     static final class GuiCommand implements Callable<Integer> {
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(SENDER_TITLE);
             if (GraphicsEnvironment.isHeadless()) {
                 System.err.println("[ERROR] GUI mode requires a graphical desktop environment.");
                 return 2;
@@ -279,7 +281,6 @@ public class Sender implements Runnable {
 
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
             Path srcPath = options.resolvedSourceDir();
             Path outPath = options.resolvedOutputDir();
@@ -354,7 +355,6 @@ public class Sender implements Runnable {
 
         @Override
         public Integer call() throws Exception {
-            BannerSupport.print(SENDER_TITLE);
             options.validate(spec.commandLine());
             Path srcPath = options.resolvedSourceDir();
             Path outPath = options.resolvedOutputDir();
@@ -409,7 +409,6 @@ public class Sender implements Runnable {
     static final class SlideCommand implements Callable<Integer> {
         @Override
         public Integer call() {
-            BannerSupport.print(SENDER_TITLE);
             SlideApp.launch(new String[0]);
             return 0;
         }

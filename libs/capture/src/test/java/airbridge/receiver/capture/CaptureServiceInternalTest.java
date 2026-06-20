@@ -115,6 +115,25 @@ class CaptureServiceInternalTest {
         assertTrue(manifest.contains("\"stopReason\": \"stop \\\"quoted\\\"\\nnext\""));
     }
 
+    @Test
+    void recommendedDwellMsScalesWithObservedUniqueRate() throws Exception {
+        CaptureService service = new CaptureService(
+                new CaptureOptions(tempDir.resolve("o"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false),
+                null
+        );
+        Class<?>[] sig = {long.class, long.class};
+
+        // Too little captured to advise.
+        assertEquals(-1L, (long) (Long) invoke(service, "recommendedDwellMs", sig, 1L, 1000L));
+        assertEquals(-1L, (long) (Long) invoke(service, "recommendedDwellMs", sig, 0L, 5000L));
+
+        // 10 unique symbols in 5000ms -> 500ms/symbol * 1.3 safety = 650ms.
+        assertEquals(650L, (long) (Long) invoke(service, "recommendedDwellMs", sig, 10L, 5000L));
+        // Faster capture -> shorter recommended dwell.
+        assertTrue((long) (Long) invoke(service, "recommendedDwellMs", sig, 50L, 5000L)
+                < (long) (Long) invoke(service, "recommendedDwellMs", sig, 10L, 5000L));
+    }
+
     private static void writeQrPng(Path path, String payload) throws Exception {
         QRCodeWriter writer = new QRCodeWriter();
         Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);

@@ -45,6 +45,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public final class CaptureService {
     private static final Pattern SAVED_IMAGE_PATTERN = Pattern.compile("^frame_(\\d+)\\.png$", Pattern.CASE_INSENSITIVE);
+    // Margin applied to the observed per-symbol capture interval when recommending a slide
+    // dwell. There is no back-channel to the sender, so the recommendation is a guideline the
+    // operator applies by hand; fountain repair + slideshow looping absorb any mismatch.
+    private static final double PACING_SAFETY_FACTOR = 1.3;
 
     private final CaptureOptions options;
     private final CaptureListener listener;
@@ -87,6 +91,7 @@ public final class CaptureService {
     private final Set<String> seenPayloads = Collections.synchronizedSet(new HashSet<>());
 
     private volatile String stopReason = "completed";
+    private volatile long startedAtMillis;
 
     public CaptureService(CaptureOptions options, CaptureListener listener) {
         this.options = options;
@@ -135,6 +140,7 @@ public final class CaptureService {
             listener.onReady();
 
             long startedMillis = System.currentTimeMillis();
+            startedAtMillis = startedMillis;
             long lastStatusLogAt = startedMillis;
 
             while (!stopRequested.get()) {
@@ -204,6 +210,13 @@ public final class CaptureService {
                 blackFramesSkipped.get(),
                 decodeFailures.get()
         );
+        long recommendedDwell = recommendedDwellMs(seenPayloads.size(), elapsedMillis());
+        if (recommendedDwell >= 0) {
+            listener.onLog(String.format(Locale.ROOT,
+                    "[CAPTURE][INFO] 이번 실행 고유 %.1f QR/s -> 다음 패스 slide page-display-ms >= %dms 권장 "
+                            + "(fountain 복구+루프가 흡수하므로 가이드값)",
+                    seenPayloads.size() * 1000.0 / Math.max(1, elapsedMillis()), recommendedDwell));
+        }
         listener.onFinished(summary);
         return summary;
     }
@@ -391,12 +404,40 @@ public final class CaptureService {
                 stopReason
         );
         listener.onStatus(status);
-        listener.onLog(String.format("[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d",
+        listener.onLog(String.format("[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d%s",
                 status.totalFrames(),
                 status.analyzedFrames(),
                 status.decodedFrames(),
                 status.uniquePayloads(),
-                status.savedImages()));
+                status.savedImages(),
+                pacingHint(status.uniquePayloads(), elapsedMillis())));
+    }
+
+    private long elapsedMillis() {
+        long started = startedAtMillis;
+        return started > 0 ? System.currentTimeMillis() - started : 0;
+    }
+
+    // Slide-pacing guideline based on the unique-symbol capture rate observed so far. Empty
+    // until enough symbols are captured to advise.
+    private String pacingHint(long uniquePayloads, long elapsedMillis) {
+        long recommended = recommendedDwellMs(uniquePayloads, elapsedMillis);
+        if (recommended < 0) {
+            return "";
+        }
+        double uniquePerSec = uniquePayloads * 1000.0 / elapsedMillis;
+        return String.format(Locale.ROOT, " | 고유 %.1f/s -> slide 권장 >= %dms", uniquePerSec, recommended);
+    }
+
+    // Recommended slide page-display-ms for the next pass: roughly the average interval between
+    // capturing new unique symbols this run, plus a safety margin. Returns -1 when too little
+    // was captured to advise. Conservative by construction (recommends slower, never faster).
+    private static long recommendedDwellMs(long uniquePayloads, long elapsedMillis) {
+        if (uniquePayloads < 2 || elapsedMillis <= 0) {
+            return -1;
+        }
+        double msPerUnique = (double) elapsedMillis / uniquePayloads;
+        return (long) Math.ceil(msPerUnique * PACING_SAFETY_FACTOR);
     }
 
     private void requestStop(String reason) {

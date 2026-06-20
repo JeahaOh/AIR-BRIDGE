@@ -10,22 +10,20 @@ import java.util.Set;
 import java.util.TreeMap;
 
 final class FileChunks {
-    final String project;
     final String relPath;
     final int totalChunks;
     final String hash16;
     private final Map<Integer, byte[]> chunks = new TreeMap<>();
     private final Set<Path> qrFiles = new LinkedHashSet<>();
 
-    FileChunks(String project, String relPath, int totalChunks, String hash16) {
-        this.project = project;
+    FileChunks(String relPath, int totalChunks, String hash16) {
         this.relPath = relPath;
         this.totalChunks = totalChunks;
         this.hash16 = hash16;
     }
 
     void addChunk(QrDecodedChunk chunk, Path qrFile) {
-        if (!project.equals(chunk.project) || totalChunks != chunk.totalChunks || !hash16.equals(chunk.hash16)) {
+        if (totalChunks != chunk.totalChunks || !hash16.equals(chunk.hash16)) {
             throw new IllegalArgumentException("동일 파일에 대한 메타데이터가 일치하지 않습니다: " + qrFile.getFileName());
         }
         if (chunk.chunkIdx < 1 || chunk.chunkIdx > totalChunks) {

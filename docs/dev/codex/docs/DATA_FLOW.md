@@ -28,7 +28,7 @@ source file
   -> GZIP bytes
   -> split by chunkDataSize bytes
   -> binary payload frame:
-       magic 'A','B' + project + relPath + chunkIdx + total + hash + data
+       magic 'A','B' + relPath + chunkIdx + total + hash + data
   -> ZXing QR render (8-bit byte mode, ISO-8859-1)
   -> PNG written to output directory
 ```
@@ -50,7 +50,7 @@ PNG files
   -> recursive PNG collection
   -> QR decode retries with rotations / binarizers / scales / crops
   -> parsed payload fields
-  -> grouped by relPath + project + totalChunks + hash16
+  -> grouped by relPath + totalChunks + hash16
   -> missing chunk check
   -> concatenate chunk data bytes
   -> GZIP inflate
@@ -106,7 +106,6 @@ QR reconstruction must use payload metadata, not PNG filenames.
 
 Current grouping fields:
 
-- `project`
 - `relPath`
 - `totalChunks`
 - `hash16`

@@ -55,7 +55,7 @@ public final class RoundTripBenchmark {
             System.out.println();
 
             EncodeWorkflow.Request request = new EncodeWorkflow.Request(
-                    src, qr, null, EncodeWorkflow.DEFAULT_PROJECT_NAME,
+                    src, qr, null,
                     chunkSize, EncodeWorkflow.DEFAULT_QR_IMAGE_SIZE, EncodeWorkflow.DEFAULT_QR_ERROR_LEVEL,
                     EncodeWorkflow.DEFAULT_LABEL_HEIGHT, false, false,
                     EncodeWorkflow.DEFAULT_FOLDER_STRUCTURE, EncodeWorkflow.DEFAULT_FILES_PER_FOLDER,

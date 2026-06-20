@@ -136,7 +136,6 @@ final class QrDecodeSupport {
         byte[] bytes = payload.getBytes(StandardCharsets.ISO_8859_1);
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(bytes);
         return new QrDecodedChunk(
-                parsed.project(),
                 parsed.relPath(),
                 parsed.chunkIdx(),
                 parsed.totalChunks(),

@@ -106,8 +106,8 @@ embedded metadata, and converts back to `.jar` when appropriate.
 
 ## Critical Behaviors
 
-- QR payload metadata is currently very small: project name, relative path,
-  chunk index, total chunks, and a 16-hex SHA-256 prefix.
+- QR payload metadata is currently very small: relative path, chunk index,
+  total chunks, and a 16-hex SHA-256 prefix.
 - The current payload has no explicit format version field.
 - Decode ordering and grouping come from payload metadata, not PNG filenames.
 - Path traversal and unsafe restore paths must be rejected.

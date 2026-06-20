@@ -46,7 +46,7 @@ class QrDecodeSupportTest {
         byte[] encoded = CodecSupport.compress(sourceData);
         String hash16 = CodecSupport.sha256Hex(sourceData).substring(0, 16);
         Path qrFile = tempDir.resolve("valid.png");
-        writeQrFile(qrFile, QrPayloadSupport.buildPayload("TESTPROJ", "docs/sample.txt", 1, 1, hash16, encoded));
+        writeQrFile(qrFile, QrPayloadSupport.buildPayload("docs/sample.txt", 1, 1, hash16, encoded));
 
         QrDecodeTaskResult result = QrDecodeSupport.decodeTask(0, qrFile, 1, 0);
 
@@ -55,7 +55,6 @@ class QrDecodeSupportTest {
         assertEquals(0, result.index);
         assertEquals(qrFile, result.qrFile);
         assertEquals(1, result.attempts);
-        assertEquals("TESTPROJ", result.chunk.project);
         assertEquals("docs/sample.txt", result.chunk.relPath);
         assertEquals(1, result.chunk.chunkIdx);
         assertEquals(1, result.chunk.totalChunks);

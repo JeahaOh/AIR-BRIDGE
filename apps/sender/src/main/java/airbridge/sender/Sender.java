@@ -199,9 +199,6 @@ public class Sender implements Runnable {
             return dir.toAbsolutePath().normalize();
         }
 
-        @Option(names = "--project-name", defaultValue = "PROJECT", descriptionKey = "option.project-name")
-        private String projectName = SenderDefaults.DEFAULT_PROJECT_NAME;
-
         @Option(names = "--encode-root", paramLabel = "DIR", descriptionKey = "option.encode-root")
         private Path encodeRoot;
 
@@ -307,7 +304,6 @@ public class Sender implements Runnable {
 
             ConsoleSupport.printLine('=', 60);
             System.out.println("air-bridge sender");
-            System.out.println("프로젝트 : " + options.projectName);
             System.out.println("소스     : " + srcPath);
             System.out.println("출력     : " + outPath);
             System.out.println("파일수   : " + sourceFiles.size());
@@ -323,7 +319,6 @@ public class Sender implements Runnable {
                     srcPath,
                     outPath,
                     rootPath,
-                    options.projectName,
                     options.targetExtensions,
                     options.skipDirs,
                     options.excludePaths,
@@ -393,7 +388,7 @@ public class Sender implements Runnable {
             ConsoleSupport.printLine('=', 60);
 
             ReencodeSummary summary = options.newEncodeService()
-                    .reencode(srcPath, outPath, rootPath, resultPath, options.projectName, System.out::println);
+                    .reencode(srcPath, outPath, rootPath, resultPath, System.out::println);
 
             System.out.println();
             ConsoleSupport.printLine('=', 60);

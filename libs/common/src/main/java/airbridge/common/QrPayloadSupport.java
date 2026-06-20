@@ -9,7 +9,6 @@ import java.nio.charset.StandardCharsets;
  *
  * <pre>
  *   magic    : 2 bytes  {@code 'A','B'}
- *   project  : u8 length  + UTF-8 bytes
  *   relPath  : u16 length + UTF-8 bytes
  *   chunkIdx : u32
  *   total    : u32
@@ -30,25 +29,19 @@ public final class QrPayloadSupport {
      * Builds the binary frame for one chunk. {@code fileHash} may be the full SHA-256 hex or the
      * 16-char short hash; only its first 16 hex chars (8 bytes) are carried.
      */
-    public static byte[] buildPayload(String project, String relPath,
+    public static byte[] buildPayload(String relPath,
                                       int chunkIdx, int totalChunks,
                                       String fileHash, byte[] chunkData) {
-        byte[] projectBytes = project.getBytes(StandardCharsets.UTF_8);
         byte[] relPathBytes = relPath.getBytes(StandardCharsets.UTF_8);
-        if (projectBytes.length > 0xFF) {
-            throw new IllegalArgumentException("project name too long: " + projectBytes.length + " bytes");
-        }
         if (relPathBytes.length > 0xFFFF) {
             throw new IllegalArgumentException("relative path too long: " + relPathBytes.length + " bytes");
         }
         byte[] hashBytes = hash16ToBytes(fileHash);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream(
-                2 + 1 + projectBytes.length + 2 + relPathBytes.length + 4 + 4 + HASH_BYTES + chunkData.length);
+                2 + 2 + relPathBytes.length + 4 + 4 + HASH_BYTES + chunkData.length);
         out.write(MAGIC_0);
         out.write(MAGIC_1);
-        out.write(projectBytes.length);
-        out.writeBytes(projectBytes);
         writeU16(out, relPathBytes.length);
         out.writeBytes(relPathBytes);
         writeU32(out, chunkIdx);
@@ -65,22 +58,20 @@ public final class QrPayloadSupport {
             throw new IllegalArgumentException("지원하지 않는 페이로드 형식");
         }
         try {
-            int projectLen = r.readU8();
-            String project = r.readUtf8(projectLen);
             int relPathLen = r.readU16();
             String relPath = r.readUtf8(relPathLen);
             int chunkIdx = r.readU32();
             int totalChunks = r.readU32();
             String hash16 = bytesToHex(r.readBytes(HASH_BYTES));
             byte[] data = r.readRemaining();
-            return new ParsedPayload(project, relPath, chunkIdx, totalChunks, hash16, data);
+            return new ParsedPayload(relPath, chunkIdx, totalChunks, hash16, data);
         } catch (IndexOutOfBoundsException e) {
             throw new IllegalArgumentException("페이로드가 잘렸거나 손상되었습니다", e);
         }
     }
 
     /** Decoded view of one chunk frame. {@code hash16} is the 16-char lowercase hex short hash. */
-    public record ParsedPayload(String project, String relPath, int chunkIdx, int totalChunks,
+    public record ParsedPayload(String relPath, int chunkIdx, int totalChunks,
                                 String hash16, byte[] chunkData) {
     }
 

@@ -11,7 +11,6 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 public final class EncodeWorkflow {
-    public static final String DEFAULT_PROJECT_NAME = SenderDefaults.DEFAULT_PROJECT_NAME;
     public static final int DEFAULT_CHUNK_DATA_SIZE = SenderDefaults.DEFAULT_CHUNK_DATA_SIZE;
     public static final int DEFAULT_QR_IMAGE_SIZE = SenderDefaults.DEFAULT_QR_IMAGE_SIZE;
     public static final ErrorCorrectionLevel DEFAULT_QR_ERROR_LEVEL = SenderDefaults.DEFAULT_QR_ERROR_LEVEL;
@@ -65,7 +64,6 @@ public final class EncodeWorkflow {
                     normalized.sourceDir(),
                     normalized.outputDir(),
                     normalized.effectiveEncodeRoot(),
-                    normalized.projectName(),
                     normalized.targetExtensions(),
                     normalized.skipDirs(),
                     normalized.excludePaths(),
@@ -91,7 +89,6 @@ public final class EncodeWorkflow {
             Path sourceDir,
             Path outputDir,
             Path encodeRoot,
-            String projectName,
             int chunkDataSize,
             int qrImageSize,
             ErrorCorrectionLevel qrErrorLevel,
@@ -110,7 +107,6 @@ public final class EncodeWorkflow {
                     sourceDir,
                     outputDir,
                     null,
-                    DEFAULT_PROJECT_NAME,
                     DEFAULT_CHUNK_DATA_SIZE,
                     DEFAULT_QR_IMAGE_SIZE,
                     DEFAULT_QR_ERROR_LEVEL,
@@ -142,7 +138,6 @@ public final class EncodeWorkflow {
                     sourceDir.toAbsolutePath().normalize(),
                     outputDir.toAbsolutePath().normalize(),
                     encodeRoot != null ? encodeRoot.toAbsolutePath().normalize() : null,
-                    (projectName == null || projectName.isBlank()) ? DEFAULT_PROJECT_NAME : projectName,
                     chunkDataSize,
                     qrImageSize,
                     qrErrorLevel != null ? qrErrorLevel : DEFAULT_QR_ERROR_LEVEL,

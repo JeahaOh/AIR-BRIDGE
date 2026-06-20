@@ -30,7 +30,6 @@ a binary frame, not a text-separator string. All integers are big-endian.
 
 ```text
 magic    : 2 bytes  'A','B'
-project  : u8 length  + UTF-8 bytes
 relPath  : u16 length + UTF-8 bytes
 chunkIdx : u32
 total    : u32
@@ -48,8 +47,7 @@ Important current facts:
 - `chunkIdx` is one-based
 - `hash` is the first 8 bytes (16 hex chars) of SHA-256; `parsePayload` exposes it
   as the 16-char lowercase hex `hash16`
-- `project` is a grouping label, not a guaranteed-unique transfer id
-- `project` length ≤ 255 bytes, `relPath` length ≤ 65535 bytes (UTF-8)
+- `relPath` length ≤ 65535 bytes (UTF-8)
 
 ## Chunk Data Rule
 
@@ -73,7 +71,6 @@ Important current fact:
 Current decode logic treats chunks as belonging to the same file when these
 fields match:
 
-- `project`
 - `relPath`
 - `totalChunks`
 - `hash16`

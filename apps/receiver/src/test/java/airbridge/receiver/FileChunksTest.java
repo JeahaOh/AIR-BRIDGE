@@ -14,14 +14,14 @@ class FileChunksTest {
 
     @Test
     void addChunkTracksMissingChunksAndStreamsDataInChunkOrder() throws Exception {
-        FileChunks fileChunks = new FileChunks("TESTPROJ", "docs/sample.bin", 3, "hash-1234");
+        FileChunks fileChunks = new FileChunks("docs/sample.bin", 3, "hash-1234");
 
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 2, 3, "hash-1234", bytes("B")), Path.of("qr-2.png"));
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 1, 3, "hash-1234", bytes("A")), Path.of("qr-1.png"));
+        fileChunks.addChunk(new QrDecodedChunk("docs/sample.bin", 2, 3, "hash-1234", bytes("B")), Path.of("qr-2.png"));
+        fileChunks.addChunk(new QrDecodedChunk("docs/sample.bin", 1, 3, "hash-1234", bytes("A")), Path.of("qr-1.png"));
 
         assertEquals(List.of(3), fileChunks.findMissingChunks());
 
-        fileChunks.addChunk(new QrDecodedChunk("TESTPROJ", "docs/sample.bin", 3, 3, "hash-1234", bytes("C")), Path.of("qr-3.png"));
+        fileChunks.addChunk(new QrDecodedChunk("docs/sample.bin", 3, 3, "hash-1234", bytes("C")), Path.of("qr-3.png"));
 
         assertEquals(List.of(), fileChunks.findMissingChunks());
         try (InputStream stream = fileChunks.orderedEncodedStream()) {
@@ -32,11 +32,11 @@ class FileChunksTest {
 
     @Test
     void addChunkRejectsMismatchedMetadata() {
-        FileChunks fileChunks = new FileChunks("TESTPROJ", "docs/sample.bin", 2, "hash-1234");
+        FileChunks fileChunks = new FileChunks("docs/sample.bin", 2, "hash-1234");
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () ->
                 fileChunks.addChunk(
-                        new QrDecodedChunk("OTHER", "docs/sample.bin", 1, 2, "hash-1234", bytes("A")),
+                        new QrDecodedChunk("docs/sample.bin", 1, 2, "hash-9999", bytes("A")),
                         Path.of("qr-1.png")
                 )
         );

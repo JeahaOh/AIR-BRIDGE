@@ -29,7 +29,7 @@ java -jar sender-<version>.jar
 | 1 | 실행 | `java -jar sender-<version>.jar`로 sender GUI를 엽니다. | 없음 |
 | 2 | `Encode` | 보낼 파일이 들어 있는 입력 폴더를 선택합니다. | 기본값 유지 |
 | 3 | `Encode` | QR 이미지가 저장될 출력 폴더를 선택합니다. | 기본값 유지 |
-| 4 | `Encode` | 프로젝트 이름을 입력하고 `Encode`를 누릅니다. | 기본값 유지 |
+| 4 | `Encode` | 옵션은 기본값 그대로 두고 `Encode`를 누릅니다. | 기본값 유지 |
 | 5 | `Encode` | 출력 폴더에 QR PNG가 생겼는지 확인합니다. | 없음 |
 | 6 | `Slide` | 수신 PC에서 `Capture`가 시작된 뒤 QR PNG 출력 폴더를 선택합니다. | 기본값 유지 |
 | 7 | `Slide` | `Play`를 눌러 QR 이미지를 재생합니다. | 기본값 유지 |

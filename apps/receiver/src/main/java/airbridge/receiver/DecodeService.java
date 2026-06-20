@@ -96,7 +96,7 @@ final class DecodeService {
 
                 FileChunks fileChunks = fileChunkMap.get(normalizedRelPath);
                 if (fileChunks == null) {
-                    fileChunks = new FileChunks(chunk.project, normalizedRelPath, chunk.totalChunks, chunk.hash16);
+                    fileChunks = new FileChunks(normalizedRelPath, chunk.totalChunks, chunk.hash16);
                 }
 
                 try {

@@ -74,18 +74,16 @@ final class EncodeService {
     EncodeSummary encode(Path srcPath,
                             Path outPath,
                             Path rootPath,
-                            String projectName,
                             List<String> targetExtensions,
                             List<String> skipDirs,
                             List<String> excludePaths,
                             EncodeListener listener) throws Exception {
-        return encode(srcPath, outPath, rootPath, projectName, targetExtensions, skipDirs, excludePaths, listener, () -> false);
+        return encode(srcPath, outPath, rootPath, targetExtensions, skipDirs, excludePaths, listener, () -> false);
     }
 
     EncodeSummary encode(Path srcPath,
                             Path outPath,
                             Path rootPath,
-                            String projectName,
                             List<String> targetExtensions,
                             List<String> skipDirs,
                             List<String> excludePaths,
@@ -115,7 +113,6 @@ final class EncodeService {
         int totalFileCount = 0;
         long totalOrigBytes = 0;
         StringBuilder manifest = new StringBuilder();
-        manifest.append("PROJECT: ").append(projectName).append("\n");
         manifest.append("SOURCE : ").append(srcPath).append("\n");
         manifest.append("DATE   : ").append(new Date()).append("\n");
         manifest.append(ConsoleSupport.line('=', 60)).append("\n\n");
@@ -196,7 +193,7 @@ final class EncodeService {
                                     cancelledObserved.set(true);
                                     return;
                                 }
-                                writeChunk(planRef, chunkIndex, projectName, folderModeOutDir,
+                                writeChunk(planRef, chunkIndex, folderModeOutDir,
                                         outPath, pngCounter, createdDirs, createdFiles);
                                 totalQrCount.incrementAndGet();
                             } catch (Throwable t) {
@@ -263,7 +260,6 @@ final class EncodeService {
     // folder counter (flat mode), idempotent directory creation, and concurrent output tracking.
     private void writeChunk(FileEncodingPlan plan,
                             int chunkIndex,
-                            String projectName,
                             Path folderModeOutDir,
                             Path outPath,
                             AtomicInteger pngCounter,
@@ -277,7 +273,7 @@ final class EncodeService {
         int chunkIdx = chunkIndex + 1;
 
         byte[] payload = QrPayloadSupport.buildPayload(
-                projectName, plan.relPath(), chunkIdx, plan.totalChunks(), plan.fileHash(), chunkData);
+                plan.relPath(), chunkIdx, plan.totalChunks(), plan.fileHash(), chunkData);
 
         String line1 = buildQrLabel(plan.fileName(), chunkIdx, plan.totalChunks());
         String line2 = plan.relPath();
@@ -312,7 +308,6 @@ final class EncodeService {
                                 Path outPath,
                                 Path rootPath,
                                 Path resultPath,
-                                String projectName,
                                 EncodeListener listener) throws Exception {
         EncodeListener effectiveListener = listener != null ? listener : line -> { };
         List<String> lines = Files.readAllLines(resultPath, StandardCharsets.UTF_8);
@@ -387,7 +382,6 @@ final class EncodeService {
                     byte[] chunkData = plan.readChunk(start, end);
 
                     byte[] payload = QrPayloadSupport.buildPayload(
-                            projectName,
                             plan.relPath(),
                             chunkIdx,
                             plan.totalChunks(),

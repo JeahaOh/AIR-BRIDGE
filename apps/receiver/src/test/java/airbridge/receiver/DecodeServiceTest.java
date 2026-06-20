@@ -40,7 +40,7 @@ class DecodeServiceTest {
         Files.createDirectories(batchDir);
 
         byte[] sourceData = randomBytes(640, 17L);
-        List<Path> qrFiles = writeQrChunks(batchDir, "TESTPROJ", "docs/sample.bin", sourceData, 35, null, List.of());
+        List<Path> qrFiles = writeQrChunks(batchDir, "docs/sample.bin", sourceData, 35, null, List.of());
 
         DecodeSummary summary = new DecodeService(1)
                 .decode(inputDir, outputDir, QrDecodeSupport.collectQrImageFiles(inputDir), null);
@@ -78,8 +78,8 @@ class DecodeServiceTest {
         // Two independent copies of the same file's chunks: once the first copy completes the
         // file it is restored and evicted, so the second copy must be ignored, not re-restored
         // or reported as an error.
-        writeQrChunks(batch1, "TESTPROJ", "docs/dup.bin", sourceData, 30, null, List.of());
-        writeQrChunks(batch2, "TESTPROJ", "docs/dup.bin", sourceData, 30, null, List.of());
+        writeQrChunks(batch1, "docs/dup.bin", sourceData, 30, null, List.of());
+        writeQrChunks(batch2, "docs/dup.bin", sourceData, 30, null, List.of());
 
         DecodeSummary summary = new DecodeService(4)
                 .decode(inputDir, outputDir, QrDecodeSupport.collectQrImageFiles(inputDir), null);
@@ -98,8 +98,8 @@ class DecodeServiceTest {
         Path outputDir = tempDir.resolve("restored");
         Files.createDirectories(batchDir);
 
-        writeQrChunks(batchDir, "TESTPROJ", "docs/lost.bin", randomBytes(320, 19L), 40, null, List.of(1));
-        writeQrChunks(batchDir, "TESTPROJ", "docs/bad.bin", randomBytes(220, 23L), 1000, "deadbeefdeadbeef", List.of());
+        writeQrChunks(batchDir, "docs/lost.bin", randomBytes(320, 19L), 40, null, List.of(1));
+        writeQrChunks(batchDir, "docs/bad.bin", randomBytes(220, 23L), 1000, "deadbeefdeadbeef", List.of());
         ImageIO.write(new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB), "PNG", batchDir.resolve("invalid.png").toFile());
 
         DecodeSummary summary = new DecodeService(1)
@@ -125,7 +125,7 @@ class DecodeServiceTest {
         Path outputDir = tempDir.resolve("restored");
         Files.createDirectories(batchDir);
 
-        writeQrChunks(batchDir, "TESTPROJ", "../escape.bin", randomBytes(320, 29L), 1000, null, List.of());
+        writeQrChunks(batchDir, "../escape.bin", randomBytes(320, 29L), 1000, null, List.of());
 
         DecodeSummary summary = new DecodeService(1)
                 .decode(inputDir, outputDir, QrDecodeSupport.collectQrImageFiles(inputDir), null);
@@ -146,7 +146,6 @@ class DecodeServiceTest {
     }
 
     private static List<Path> writeQrChunks(Path dir,
-                                            String project,
                                             String relPath,
                                             byte[] data,
                                             int chunkDataSize,
@@ -165,7 +164,6 @@ class DecodeServiceTest {
             int start = index * chunkDataSize;
             int end = Math.min(encoded.length, start + chunkDataSize);
             byte[] payload = QrPayloadSupport.buildPayload(
-                    project,
                     relPath,
                     chunkIdx,
                     totalChunks,

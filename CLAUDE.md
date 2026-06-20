@@ -90,7 +90,7 @@ libs/packager  -> picocli  (identify/pack/unpack archive-rewrite helpers)
 - **Path safety:** decode/unpack must never write outside the selected output dir —
   preserve `RelativePathSupport`-style checks when touching restoration logic.
 - **Payload compatibility:** the QR carries gzip bytes directly in QR 8-bit byte mode (no
-  Base64), framed as a binary record in `QrPayloadSupport`: `magic 'A','B'` + u8-len `project`
+  Base64), framed as a binary record in `QrPayloadSupport`: `magic 'A','B'`
   + u16-len `relPath` + u32 `chunkIdx` + u32 `totalChunks` + 8-byte `hash` (first 16 hex chars
   of the SHA-256) + raw `data`. Encoder/decoder use the `ISO-8859-1` charset so bytes survive
   1:1 with no ECI. There is **no** version field, transfer id, or frame checksum — do not

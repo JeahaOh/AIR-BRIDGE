@@ -34,7 +34,6 @@ class ReceiverRoundTripTest {
                 "encode",
                 "--in", sourceDir.toString(),
                 "--out", qrDir.toString(),
-                "--project-name", "TESTPROJ",
                 "--target-extensions", "txt",
                 "--chunk-data-size", "40",
                 "--qr-image-size", "420",
@@ -74,7 +73,6 @@ class ReceiverRoundTripTest {
                 "--in", inputDir.toString(),
                 "--out", qrDir.toString(),
                 "--encode-root", encodeRoot.toString(),
-                "--project-name", "TESTPROJ",
                 "--target-extensions", "txt",
                 "--chunk-data-size", "60"
         );

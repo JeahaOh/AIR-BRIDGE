@@ -54,8 +54,7 @@ java -jar build/libs/sender-<version>.jar --help
 ```bash
 java -jar build/libs/sender-<version>.jar encode \
   --in /path/in \
-  --out /path/out \
-  --project-name PROJECT
+  --out /path/out
 ```
 
 GUI에서 파일을 QR 이미지로 만들기:

@@ -58,7 +58,6 @@ class EncodeServiceTest {
                 srcDir,
                 outDir,
                 srcDir,
-                "TESTPROJ",
                 List.of("txt"),
                 List.of("build"),
                 List.of(),
@@ -72,7 +71,6 @@ class EncodeServiceTest {
         assertTrue(Files.exists(summary.manifestPath()));
 
         String manifest = Files.readString(summary.manifestPath(), StandardCharsets.UTF_8);
-        assertTrue(manifest.contains("PROJECT: TESTPROJ"));
         assertTrue(manifest.contains("[docs/sample.txt]"));
 
         List<Path> qrFiles;
@@ -85,7 +83,6 @@ class EncodeServiceTest {
 
         assertEquals(summary.totalQrCount(), qrFiles.size());
         QrPayloadSupport.ParsedPayload parsed = decodeQrPayload(qrFiles.getFirst());
-        assertEquals("TESTPROJ", parsed.project());
         assertEquals("docs/sample.txt", parsed.relPath());
         assertEquals(1, parsed.chunkIdx());
     }
@@ -108,7 +105,7 @@ class EncodeServiceTest {
                 false,
                 false,
                 500
-        ).encode(srcDir, outDir, srcDir, "TESTPROJ", List.of("txt"), List.of(), List.of(), null);
+        ).encode(srcDir, outDir, srcDir, List.of("txt"), List.of(), List.of(), null);
 
         assertEquals(2, summary.totalFileCount());
 
@@ -143,7 +140,7 @@ class EncodeServiceTest {
                 40, false, false, false, 500);
 
         assertThrows(IllegalArgumentException.class, () -> service.encode(
-                srcDir, outDir, badRoot, "TESTPROJ",
+                srcDir, outDir, badRoot,
                 List.of("txt"), List.of(), List.of(), null));
         assertFalse(Files.exists(outDir));
     }
@@ -189,7 +186,7 @@ class EncodeServiceTest {
                 false,
                 true,
                 500
-        ).reencode(srcDir, outDir, srcDir, resultPath, "TESTPROJ", null);
+        ).reencode(srcDir, outDir, srcDir, resultPath, null);
 
         assertEquals(2, summary.fileCount());
         assertEquals(1, summary.errorCount());
@@ -240,7 +237,7 @@ class EncodeServiceTest {
                 false,
                 true,
                 500
-        ).reencode(srcDir, outDir, srcDir, resultPath, "TESTPROJ", null);
+        ).reencode(srcDir, outDir, srcDir, resultPath, null);
 
         assertEquals(1, summary.fileCount());
         assertEquals(1, summary.errorCount());
@@ -268,7 +265,6 @@ class EncodeServiceTest {
                 srcDir,
                 outDir,
                 srcDir,
-                "TESTPROJ",
                 List.of("txt"),
                 List.of(),
                 List.of(),

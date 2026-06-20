@@ -48,8 +48,7 @@ encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> dec
 ```bash
 java -jar build/libs/sender-<version>.jar encode \
   --in /path/in \
-  --out /path/out \
-  --project-name PROJECT
+  --out /path/out
 ```
 
 GUI로 인코딩할 수도 있습니다.
@@ -64,7 +63,7 @@ java -jar build/libs/sender-<version>.jar gui
 바로 슬라이드 입력으로 엽니다.
 
 encode 실행 중에는 결과가 중간에 다른 설정과 섞이지 않도록 Encode 탭의
-입력값이 잠깁니다. 잠기는 대상은 입력/출력/encode root, 프로젝트/오류 보정,
+입력값이 잠깁니다. 잠기는 대상은 입력/출력/encode root, 오류 보정,
 chunk size, QR size, label height, files per folder, targets, skip dirs,
 exclude, 변환 옵션, folder structure입니다. 실행 중단이 필요하면
 `Stop`을 누릅니다. Stop으로 중단되면 이번 encode 실행에서 생성한 QR PNG와
@@ -80,7 +79,6 @@ Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows
 
 - `--in`: 인코딩할 파일이 있는 디렉터리 (생략 시 jar 옆 `source`)
 - `--out`: QR PNG를 저장할 디렉터리 (생략 시 jar 옆 `encoded`)
-- `--project-name`: QR payload 안에 들어가는 프로젝트 이름
 
 주요 산출물:
 
@@ -95,7 +93,6 @@ Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows
 java -jar build/libs/sender-<version>.jar encode \
   --in /path/in \
   --out /path/out \
-  --project-name PROJECT \
   --no-folder-structure \
   --files-per-folder 500
 ```
@@ -106,7 +103,6 @@ XLSX는 CSV로, DOCX/PPTX는 텍스트로 변환 후 인코딩:
 java -jar build/libs/sender-<version>.jar encode \
   --in /path/in \
   --out /path/out \
-  --project-name PROJECT \
   --convert-xlsx-to-csv \
   --convert-office-to-text
 ```
@@ -117,7 +113,6 @@ java -jar build/libs/sender-<version>.jar encode \
 java -jar build/libs/sender-<version>.jar encode \
   --in /path/in \
   --out /path/out \
-  --project-name PROJECT \
   --target-extensions .java,.xml,.properties,.sql
 ```
 
@@ -212,8 +207,7 @@ X src/main/java/App.java - DECODE_ERROR
 ```bash
 java -jar build/libs/sender-<version>.jar encode \
   --in /work/source \
-  --out /work/qr \
-  --project-name DEMO
+  --out /work/qr
 ```
 
 수신 측:

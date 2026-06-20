@@ -6,7 +6,6 @@
 
 - source directory
 - output directory
-- project name
 - target extension list
 - skip-dir and exclude-path filters
 - chunk size / QR size / label height options

@@ -5,8 +5,6 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import java.util.List;
 
 final class SenderDefaults {
-    // QR payload 헤더에 들어가는 기본 프로젝트명이다.
-    static final String DEFAULT_PROJECT_NAME = "PROJECT";
     // 한 QR에 넣을 원본 데이터 청크 크기다.
     static final int DEFAULT_CHUNK_DATA_SIZE = 2000;
     // encode 병렬 처리에 사용할 기본 워커 수다(파일·청크 QR 생성 동시 실행).

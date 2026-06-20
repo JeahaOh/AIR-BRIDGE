@@ -72,7 +72,6 @@ public final class SenderGui {
         private final JTextField sourceDirField = new JTextField(AppPaths.sourceDir().toString(), 36);
         private final JTextField outputDirField = new JTextField(AppPaths.encodedDir().toString(), 36);
         private final JTextField encodeRootField = new JTextField(36);
-        private final JTextField projectNameField = new JTextField(EncodeWorkflow.DEFAULT_PROJECT_NAME, 18);
         private final JSpinner chunkDataSizeSpinner = intSpinner(EncodeWorkflow.DEFAULT_CHUNK_DATA_SIZE, 1, Integer.MAX_VALUE, 100);
         private final JSpinner qrImageSizeSpinner = intSpinner(EncodeWorkflow.DEFAULT_QR_IMAGE_SIZE, 1, 16_384, 10);
         private final JSpinner labelHeightSpinner = intSpinner(EncodeWorkflow.DEFAULT_LABEL_HEIGHT, 0, 2_000, 10);
@@ -140,10 +139,9 @@ public final class SenderGui {
             addField(form, row++, "Input", sourceDirField, sourceBrowseButton);
             addField(form, row++, "Output", outputDirField, outputBrowseButton);
             addField(form, row++, "Encode root", encodeRootField, rootBrowseButton);
-            addField(form, row++, "Project", projectNameField, errorLevelCombo, "Error");
             addField(form, row++, "Chunk size", chunkDataSizeSpinner, qrImageSizeSpinner, "QR size");
             addField(form, row++, "Label height", labelHeightSpinner, filesPerFolderSpinner, "Files/folder");
-            addField(form, row++, "Encode workers", encodeWorkersSpinner, new JLabel(), "");
+            addField(form, row++, "Encode workers", encodeWorkersSpinner, errorLevelCombo, "Error");
             addField(form, row++, "Targets", targetExtensionsField, new JLabel(), "");
             addField(form, row++, "Skip dirs", skipDirsField, new JLabel(), "");
             addField(form, row++, "Exclude", excludePathsField, new JLabel(), "");
@@ -297,7 +295,6 @@ public final class SenderGui {
             sourceDirField.setEnabled(!running);
             outputDirField.setEnabled(!running);
             encodeRootField.setEnabled(!running);
-            projectNameField.setEnabled(!running);
             chunkDataSizeSpinner.setEnabled(!running);
             qrImageSizeSpinner.setEnabled(!running);
             labelHeightSpinner.setEnabled(!running);
@@ -329,7 +326,6 @@ public final class SenderGui {
                     Path.of(sourceDir),
                     Path.of(outputDir),
                     encodeRoot.isEmpty() ? null : Path.of(encodeRoot),
-                    projectNameField.getText().trim(),
                     intValue(chunkDataSizeSpinner),
                     intValue(qrImageSizeSpinner),
                     (ErrorCorrectionLevel) errorLevelCombo.getSelectedItem(),

@@ -58,7 +58,6 @@ QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다. Base64 없�
 
 ```
 magic    : 2 bytes  'A','B'
-project  : u8 길이  + UTF-8 바이트
 relPath  : u16 길이 + UTF-8 바이트
 chunkIdx : u32
 total    : u32
@@ -109,7 +108,6 @@ data     : 나머지 바이트 (현재 청크의 GZIP 윈도우)
 
 `_manifest.txt`에는 아래 수준의 정보가 들어갑니다.
 
-- 프로젝트명
 - 소스 루트
 - 실행 시각
 - 파일별 상대경로, 원본 바이트 크기, QR 장수, 해시 앞 16자리
@@ -124,7 +122,7 @@ data     : 나머지 바이트 (현재 청크의 GZIP 윈도우)
 실행 중에는 아래 입력을 비활성화한다.
 
 - input, output, encode root
-- project, error correction level
+- error correction level
 - chunk size, QR size, label height, files per folder
 - targets, skip dirs, exclude
 - XLSX/Office 변환 옵션
@@ -169,7 +167,6 @@ QR 하나를 읽으면 `QrDecodedChunk`가 만들어지고, `relPath` 기준으�
 
 `FileChunks`가 동일 파일로 인정하는 조건:
 
-- `project` 동일
 - `totalChunks` 동일
 - `hash16` 동일
 

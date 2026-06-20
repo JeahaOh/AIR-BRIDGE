@@ -14,7 +14,6 @@ class QrPayloadSupportTest {
     void buildPayloadStartsWithMagicAndRoundTripsThroughParse() {
         byte[] chunkData = new byte[]{0, 1, 2, (byte) 0xFF, (byte) 0x80, 'g', 'z'};
         byte[] payload = QrPayloadSupport.buildPayload(
-                "TESTPROJ",
                 "docs/sample.txt",
                 2,
                 5,
@@ -26,7 +25,6 @@ class QrPayloadSupportTest {
         assertEquals(QrPayloadSupport.MAGIC_1, payload[1]);
 
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(payload);
-        assertEquals("TESTPROJ", parsed.project());
         assertEquals("docs/sample.txt", parsed.relPath());
         assertEquals(2, parsed.chunkIdx());
         assertEquals(5, parsed.totalChunks());
@@ -38,7 +36,7 @@ class QrPayloadSupportTest {
     @Test
     void parsePayloadPreservesUtf8RelativePaths() {
         byte[] payload = QrPayloadSupport.buildPayload(
-                "PRJ", "문서/샘플.txt", 1, 1, "00112233445566778899aabbccddeeff", new byte[]{42});
+                "문서/샘플.txt", 1, 1, "00112233445566778899aabbccddeeff", new byte[]{42});
 
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(payload);
         assertEquals("문서/샘플.txt", parsed.relPath());
@@ -54,7 +52,7 @@ class QrPayloadSupportTest {
     @Test
     void parsePayloadRejectsTruncatedFrame() {
         byte[] payload = QrPayloadSupport.buildPayload(
-                "PRJ", "a.txt", 1, 1, "00112233445566778899aabbccddeeff", new byte[]{1, 2, 3});
+                "a.txt", 1, 1, "00112233445566778899aabbccddeeff", new byte[]{1, 2, 3});
         byte[] truncated = new byte[payload.length - 5];
         System.arraycopy(payload, 0, truncated, 0, truncated.length);
         assertThrows(IllegalArgumentException.class, () -> QrPayloadSupport.parsePayload(truncated));

@@ -51,7 +51,9 @@ final class QrImageWriter {
         int qrW = qrImage.getWidth();
         int qrH = qrImage.getHeight();
 
-        BufferedImage finalImage = new BufferedImage(qrW, qrH + labelHeight, BufferedImage.TYPE_INT_RGB);
+        // QR is black/white and the label is gray text, so 8-bit grayscale is sufficient and
+        // produces much smaller PNGs (faster to write on encode and read on decode) than RGB.
+        BufferedImage finalImage = new BufferedImage(qrW, qrH + labelHeight, BufferedImage.TYPE_BYTE_GRAY);
         Graphics2D g = finalImage.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 

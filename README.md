@@ -71,6 +71,20 @@ The primary artifacts are `build/libs/sender-<version>.jar` and `build/libs/rece
 
 The default runtime entrypoint for both `sender` and `receiver` is the fat jar.
 
+### 네이티브 플랫폼 / Native platforms (receiver)
+
+`receiver` jar은 카메라 캡처용 OpenCV 네이티브를 번들합니다. 모든 OS/arch를 넣으면 ~380MB가 되므로,
+기본 빌드는 **`windows-x86_64` + `macosx-arm64`** 만 포함합니다(약 94MB).
+
+The `receiver` jar bundles OpenCV natives for capture. Bundling every OS/arch is ~380MB, so the
+default build includes only **`windows-x86_64` + `macosx-arm64`** (~94MB).
+
+```bash
+./gradlew clean build                                  # 기본: windows-x86_64, macosx-arm64
+./gradlew clean build -PjavacppPlatform=linux-x86_64   # 특정 플랫폼만
+./gradlew clean build -PallPlatforms                   # 모든 플랫폼(전체)
+```
+
 명령 없이 `java -jar ...`로 실행하면 GUI가 열리고, 명령이나 CLI 옵션을 지정하면 CLI로 동작합니다.
 
 Running the jar without a command opens the GUI. Supplying a command or CLI option keeps CLI behavior.

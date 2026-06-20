@@ -1,9 +1,14 @@
 apply plugin: 'java-library'
 
+// Java APIs only (platform-independent). The native libraries are bundled by the receiver app
+// fat jar for the selected platforms; capture itself never runs standalone and its tests do not
+// touch OpenCV natives.
 dependencies {
     implementation project(':common')
     implementation "com.google.zxing:core:${zxingVersion}"
     implementation "com.google.zxing:javase:${zxingVersion}"
     implementation "org.bytedeco:javacv:${javacvVersion}"
-    runtimeOnly "org.bytedeco:opencv-platform:${opencvPlatformVersion}"
+    implementation "org.bytedeco:javacpp:${javacvVersion}"
+    implementation "org.bytedeco:opencv:${opencvVersion}"
+    implementation "org.bytedeco:openblas:${openblasVersion}"
 }

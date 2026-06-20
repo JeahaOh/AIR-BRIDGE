@@ -1,5 +1,22 @@
 apply plugin: 'application'
 
+// Bytedeco native libs (javacpp + opencv + openblas) are bundled into this app's fat jar only
+// for the platforms we ship, instead of opencv-platform which pulls every OS/arch (~300MB).
+//   default                   -> windows-x86_64 + macosx-arm64
+//   -PjavacppPlatform=a,b,... -> explicit list
+//   -PallPlatforms            -> every supported platform
+// @jar forces artifact-only resolution so Gradle fetches exactly the requested classifier jar
+// instead of letting bytedeco module metadata reselect the build host's platform.
+List<String> nativePlatforms
+if (project.hasProperty('javacppPlatform')) {
+    nativePlatforms = project.property('javacppPlatform').toString().split(',').collect { it.trim() }.findAll { it }
+} else if (project.hasProperty('allPlatforms')) {
+    nativePlatforms = rootProject.ext.ALL_JAVACPP_PLATFORMS.split(',').collect { it.trim() }
+} else {
+    nativePlatforms = rootProject.ext.DEFAULT_JAVACPP_PLATFORMS.split(',').collect { it.trim() }
+}
+logger.lifecycle("[receiver] bundling native platforms: ${nativePlatforms.join(', ')}")
+
 dependencies {
     implementation project(':common')
     implementation project(':capture')
@@ -7,6 +24,11 @@ dependencies {
     implementation "info.picocli:picocli:${picocliVersion}"
     implementation "com.google.zxing:core:${zxingVersion}"
     implementation "com.google.zxing:javase:${zxingVersion}"
+    nativePlatforms.each { String p ->
+        runtimeOnly "org.bytedeco:javacpp:${javacvVersion}:${p}@jar"
+        runtimeOnly "org.bytedeco:opencv:${opencvVersion}:${p}@jar"
+        runtimeOnly "org.bytedeco:openblas:${openblasVersion}:${p}@jar"
+    }
     testImplementation project(':sender')
 }
 

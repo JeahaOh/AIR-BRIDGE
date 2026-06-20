@@ -4,13 +4,27 @@ import java.time.format.DateTimeFormatter
 
 apply plugin: 'base'
 
+// Native platforms bundled into the receiver fat jar (opencv/openblas via javacv).
+// Default: Windows + Apple-silicon macOS only. Build other/all platforms with
+//   -PjavacppPlatform=linux-x86_64,windows-x86_64,...   (explicit list)
+//   -PallPlatforms                                       (every supported platform)
+ext.ALL_JAVACPP_PLATFORMS = [
+        'android-arm', 'android-arm64', 'android-x86', 'android-x86_64',
+        'ios-arm64', 'ios-x86_64',
+        'linux-arm64', 'linux-armhf', 'linux-ppc64le', 'linux-x86', 'linux-x86_64',
+        'macosx-arm64', 'macosx-x86_64',
+        'windows-x86', 'windows-x86_64'
+].join(',')
+ext.DEFAULT_JAVACPP_PLATFORMS = 'windows-x86_64,macosx-arm64'
+
 ext {
     picocliVersion = '4.7.6'
     zxingVersion = '3.5.2'
     junitJupiterVersion = '5.10.2'
     junitPlatformLauncherVersion = '1.10.2'
     javacvVersion = '1.5.10'
-    opencvPlatformVersion = '4.9.0-1.5.10'
+    opencvVersion = '4.9.0-1.5.10'
+    openblasVersion = '0.3.26-1.5.10'
 }
 
 def buildVersion = "0.9.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"

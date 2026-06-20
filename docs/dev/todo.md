@@ -41,44 +41,23 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 
 ### 4. 구조 리팩터링 후속 검토
 
-현재는 `apps/*`, `libs/*`의 기존 모듈 경계를 유지하고, 우선 서비스 계약을
-정리합니다. `transfer-core`나 `carrier-qr` 같은 추가 모듈 분리는 계약이
-충분히 안정화된 뒤 별도 작업으로 검토합니다.
+`transfer-core`/`carrier-qr` 정식 모듈 분리는 payload 계약이 안정화된 뒤
+(§5.1 fountain code 방향 확정 후) 별도 작업으로 검토한다. 그 전까지는
+`apps/*`, `libs/*`의 기존 모듈 경계를 유지한다.
 
-검토할 때의 기준:
+검토 시 유지할 기준:
 
 - sender code가 capture 전용 런타임에 의존하지 않는다.
 - receiver code가 sender 전용 UI 동작에 의존하지 않는다.
 - QR payload 형식 변경은 sender, receiver, tests, docs를 함께 갱신한다.
 - `capture`는 카메라/프레임 수집 책임을 중심으로 유지한다.
 
-#### 검토 결과 (2026-06-20)
-
-- 의존성 방향 기준 3/4 충족: sender는 capture 미의존, receiver 메인은 sender/slide 미의존
-  (sender는 test 전용), payload 변경 동시 갱신은 §5.1에서 실증.
-- capture 책임 경계만 부분 충족이었음 — `apps/receiver/QrDecodeSupport`와
-  `libs/capture/CaptureQrDecodeSupport`가 같은 QR 디코드 머신을 각자 구현(드리프트).
-- **중간 조치 완료**: 디코드 머신을 `airbridge.common.qr.QrImageDecoder`로 통합하고
-  양측이 `Strategy`로 호출하도록 변경(동작 보존, charset 단일화). 의존성에 `capture -> common`,
-  `common -> zxing` 추가.
-- **`transfer-core`/`carrier-qr` 정식 모듈 분리는 계속 보류**: payload 계약이 아직 유동적
-  (§5.1로 변경됨, §5.2 보류). todo의 "계약 안정화 후" 게이트 미충족. §5.2 방향 확정 후 재검토.
-
 ### 5. 전송 포맷 · 처리율(throughput) 개선
 
-QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델"이 병목이라는
-판단에 따른 개선안. ROI(이득/비용) 순서로 1 → 2 → 3 으로 진행한다.
+"순차 인덱스 청크를 전부 수집해야 복원" 모델이 병목이라는 판단에 따른 개선안.
+ROI(이득/비용) 순서로 1 → 2 로 진행한다.
 
-- [x] **1. Base64 제거 → QR 8-bit 바이트 모드 직접 사용** (이득 ≈ 1.33×, 정확도 손실 0) — 완료
-  - `gzip → Base64 → QR 텍스트`에서 Base64(33% 부풀림)를 제거.
-  - QR 바이트 모드로 gzip 바이트를 직접 싣고(`ISO-8859-1` 1:1 charset, ECI 없음),
-    `QrPayloadSupport`의 구분자 텍스트 헤더를 바이너리 프레이밍(magic+길이접두 헤더+raw data)으로 교체.
-  - 반영: `CodecSupport`(gzip 전용 `compress/decompress`·`compressToFile/decompressToFile`),
-    `QrPayloadSupport`(바이너리 build/parse), `QrImageWriter`(byte 모드),
-    `QrDecodeSupport`/`QrDecodedChunk`/`FileChunks`/`DecodeService`(byte[] 청크·파싱),
-    `FileEncodingPlan`(gzip 임시파일·`readChunk` byte[]). tests·docs 동시 갱신, round-trip 검증 완료.
-
-- [ ] **2. Fountain code(RaptorQ, RFC 6330) 도입** (단방향 채널의 신뢰도·실효 처리율)
+- [ ] **1. Fountain code(RaptorQ, RFC 6330) 도입** (단방향 채널의 신뢰도·실효 처리율)
   - 현재 순차 인덱스 청크는 특정 프레임 드롭 시 그 청크가 다시 올 때까지 대기 →
     단방향 카메라 채널에서 비효율.
   - 파일을 동등 심볼 스트림으로 인코딩하고, 수신측이 임의의 K(1+ε)개만 모이면 복원.
@@ -87,42 +66,18 @@ QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델
     수신 측 수집·복원(`FileChunks`의 TreeMap 인덱스 모델 → fountain 디코더로 대체),
     payload 헤더에 심볼 메타(블록/심볼 id) 추가.
 
-- [ ] **3. 4색 컬러 심볼 (흰/녹/적/흑, 2 bit/셀)** (net ≈ 1.4~1.6×)
+- [ ] **2. 4색 컬러 심볼 (흰/녹/적/흑, 2 bit/셀)** (net ≈ 1.4~1.6×)
   - 휘도 255/150/76/0 으로 네 단계가 또렷 → 채도가 압축으로 무너져도 밝기만으로
     구분 가능(5색의 Blue↔Black 충돌 회피). 모노크롬에 가까운 견고함 유지.
   - 필수 동반 작업:
     - 프레임마다 고정 위치 **컬러 캘리브레이션 패치**(화이트밸런스/감마/조명 정규화).
     - RGB 유클리드 거리 대신 **휘도 우선 + 색상(hue) 보조 분류기**.
     - 크로마 서브샘플링(4:2:0) 대비 **셀 크기 하한** 확보.
-  - 가장 엔지니어링 비용이 큰 항목 → 1·2 적용 후에도 추가 처리율이 필요할 때 진행.
+  - 가장 엔지니어링 비용이 큰 항목 → 1(fountain) 적용 후에도 추가 처리율이 필요할 때 진행.
   - 영향 범위: `QrImageWriter`(컬러 렌더링) 또는 별도 carrier 모듈, `QrDecodeSupport`
     (컬러 분류·캘리브레이션), payload 비트 패킹.
 
-### 6. 배너 출력 (완료, 2026-06-20)
+### 6. 빌드·산출물·성능 개선
 
-- [x] build 완료 후 배너 출력 (`printRootLibs`, banner.txt 단일 소스).
-- [x] pack/unpack/identify에도 배너 출력 (`BannerExecutionStrategy`로 커맨드 1회 중앙 출력).
-- [x] capture는 시작 배너 없이 READY 배너만 (전략에서 opt-out).
-
-### 7. 빌드·산출물·성능 개선
-
-배포·속도·디스크 관점의 개선. ROI 순.
-
-- [x] **P1. receiver jar 슬림화 (네이티브 플랫폼 제한)** — 완료
-  - `receiver` jar이 383MB였고 대부분이 bytedeco opencv/openblas 네이티브를 8개 OS/arch 전부
-    번들한 것. `org.bytedeco.gradle-javacpp-platform` 플러그인으로 `-platform` 의존성을 필터.
-  - **기본 빌드 = `windows-x86_64,macosx-arm64`.** 다른/전체 플랫폼은 `-PjavacppPlatform=<csv>`
-    또는 `-PallPlatforms` 로 지정할 때만 번들.
-- [x] **P2. QR PNG를 grayscale(`TYPE_BYTE_GRAY`)로** — 완료
-  - QR(흑백)+라벨(회색)뿐이라 24bit RGB 불필요. PNG 크기·encode write·decode read·디스크 절감.
-- [x] **P4a. GUI에 `--encode-workers` 스피너 노출** — 완료 (CLI는 §아래 별도, GUI는 기본=코어수였음)
-- [x] **P4b. `BannerExecutionStrategy` 단위 테스트** — 완료
-- [x] **P4c. Gradle 10 deprecation 경고 정리** — 완료
-  - `printRootLibs`의 `doLast`가 실행 시점에 `Task.project`(`project.version`)·`rootProject.file`·
-    `layout`에 접근하던 것을 설정 시점 캡처(`projectVersion`/`bannerFile`/`libsDirProvider`)로 교체.
-    `--warning-mode all`에서 deprecation 0, 배너 footer 동작 보존.
 - [ ] **P4d. `chunkDataSize` 기본값 튜닝** — 바이트 모드 전환 후 QR 용량 한계까지 키워 QR 장수↓.
   버전/ECC 용량 검증 필요 → 별도 작업.
-
-(참고) encode 멀티스레드(`--encode-workers`, 파일·청크 병렬)는 별도로 이미 반영됨 — 벤치 8×256KB
-기준 67s→14s(~4.8×), round-trip byte-identical.

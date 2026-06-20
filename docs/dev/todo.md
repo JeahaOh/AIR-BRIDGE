@@ -103,3 +103,31 @@ QR 심볼 자체보다 "Base64 오버헤드 + 순차 청크 전부 수집 모델
   - 가장 엔지니어링 비용이 큰 항목 → 1·2 적용 후에도 추가 처리율이 필요할 때 진행.
   - 영향 범위: `QrImageWriter`(컬러 렌더링) 또는 별도 carrier 모듈, `QrDecodeSupport`
     (컬러 분류·캘리브레이션), payload 비트 패킹.
+
+### 7. 배너 출력 (완료, 2026-06-20)
+
+- [x] build 완료 후 배너 출력 (`printRootLibs`, banner.txt 단일 소스).
+- [x] pack/unpack/identify에도 배너 출력 (`BannerExecutionStrategy`로 커맨드 1회 중앙 출력).
+- [x] capture는 시작 배너 없이 READY 배너만 (전략에서 opt-out).
+
+### 8. 빌드·산출물·성능 개선
+
+배포·속도·디스크 관점의 개선. ROI 순.
+
+- [x] **P1. receiver jar 슬림화 (네이티브 플랫폼 제한)** — 완료
+  - `receiver` jar이 383MB였고 대부분이 bytedeco opencv/openblas 네이티브를 8개 OS/arch 전부
+    번들한 것. `org.bytedeco.gradle-javacpp-platform` 플러그인으로 `-platform` 의존성을 필터.
+  - **기본 빌드 = `windows-x86_64,macosx-arm64`.** 다른/전체 플랫폼은 `-PjavacppPlatform=<csv>`
+    또는 `-PallPlatforms` 로 지정할 때만 번들.
+- [x] **P2. QR PNG를 grayscale(`TYPE_BYTE_GRAY`)로** — 완료
+  - QR(흑백)+라벨(회색)뿐이라 24bit RGB 불필요. PNG 크기·encode write·decode read·디스크 절감.
+- [x] **P4a. GUI에 `--encode-workers` 스피너 노출** — 완료 (CLI는 §아래 별도, GUI는 기본=코어수였음)
+- [x] **P4b. `BannerExecutionStrategy` 단위 테스트** — 완료
+- [ ] **P3. 정적분석 도입 (SpotBugs/ErrorProne)** — encode가 동시성 코드가 된 만큼 적기.
+  도입 시 기존 경고 triage가 필요하므로 별도 작업으로 진행(보고 전용으로 먼저 붙이고 점진 정리).
+- [ ] **P4c. Gradle 10 deprecation 경고 정리** (`--warning-mode all`로 원인 파악 후).
+- [ ] **P4d. `chunkDataSize` 기본값 튜닝** — 바이트 모드 전환 후 QR 용량 한계까지 키워 QR 장수↓.
+  버전/ECC 용량 검증 필요 → 별도 작업.
+
+(참고) encode 멀티스레드(`--encode-workers`, 파일·청크 병렬)는 별도로 이미 반영됨 — 벤치 8×256KB
+기준 67s→14s(~4.8×), round-trip byte-identical.

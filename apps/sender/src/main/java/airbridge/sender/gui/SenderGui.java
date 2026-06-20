@@ -335,6 +335,7 @@ public final class SenderGui {
                     convertOfficeToTextCheck.isSelected(),
                     folderStructureCheck.isSelected(),
                     intValue(filesPerFolderSpinner),
+                    EncodeWorkflow.DEFAULT_ENCODE_WORKERS,
                     parseCsv(targetExtensionsField.getText(), true),
                     parseCsv(skipDirsField.getText(), true),
                     parseCsv(excludePathsField.getText(), false)

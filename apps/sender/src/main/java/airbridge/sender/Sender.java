@@ -229,6 +229,9 @@ public class Sender implements Runnable {
         @Option(names = "--files-per-folder", defaultValue = "500", descriptionKey = "option.files-per-folder")
         private int filesPerFolder = SenderDefaults.DEFAULT_FILES_PER_FOLDER;
 
+        @Option(names = "--encode-workers", descriptionKey = "option.encode-workers")
+        private int encodeWorkers = SenderDefaults.DEFAULT_ENCODE_WORKERS;
+
         @Option(names = "--target-extensions", split = ",", paramLabel = "EXT[,EXT...]", descriptionKey = "option.target-extensions")
         private List<String> targetExtensions = new ArrayList<>(SenderDefaults.DEFAULT_TARGET_EXTENSIONS);
 
@@ -256,7 +259,8 @@ public class Sender implements Runnable {
                     convertXlsxToCsv,
                     convertOfficeToText,
                     folderStructure,
-                    filesPerFolder
+                    filesPerFolder,
+                    encodeWorkers
             );
         }
 

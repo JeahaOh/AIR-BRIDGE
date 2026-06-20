@@ -59,6 +59,7 @@ public final class RoundTripBenchmark {
                     chunkSize, EncodeWorkflow.DEFAULT_QR_IMAGE_SIZE, EncodeWorkflow.DEFAULT_QR_ERROR_LEVEL,
                     EncodeWorkflow.DEFAULT_LABEL_HEIGHT, false, false,
                     EncodeWorkflow.DEFAULT_FOLDER_STRUCTURE, EncodeWorkflow.DEFAULT_FILES_PER_FOLDER,
+                    EncodeWorkflow.DEFAULT_ENCODE_WORKERS,
                     List.of("bin"), EncodeWorkflow.DEFAULT_SKIP_DIRS, List.of());
 
             long encodePeak;

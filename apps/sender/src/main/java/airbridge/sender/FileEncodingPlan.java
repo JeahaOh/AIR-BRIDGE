@@ -7,7 +7,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -32,7 +32,7 @@ final class FileEncodingPlan implements AutoCloseable {
     private final long fileSize;
     private final String safePrefix;
     private final String flatSafePrefix;
-    private SeekableByteChannel chunkChannel;
+    private volatile FileChannel chunkChannel;
 
     private FileEncodingPlan(String relPath,
                                 String fileName,
@@ -123,29 +123,48 @@ final class FileEncodingPlan implements AutoCloseable {
         }
     }
 
-    /** Reads the gzip payload window {@code [start, end)} from the staged temp file. */
+    /**
+     * Reads the gzip payload window {@code [start, end)} from the staged temp file. Uses
+     * positional reads on a shared {@link FileChannel}, which do not touch the channel's
+     * position, so this is safe to call concurrently for different chunks of the same file.
+     */
     byte[] readChunk(int start, int end) throws IOException {
         int length = end - start;
-        if (chunkChannel == null) {
-            chunkChannel = Files.newByteChannel(encodedTempFile, StandardOpenOption.READ);
-        }
-        chunkChannel.position(start);
+        FileChannel channel = channel();
         ByteBuffer buffer = ByteBuffer.allocate(length);
+        long position = start;
         while (buffer.hasRemaining()) {
-            if (chunkChannel.read(buffer) < 0) {
+            int read = channel.read(buffer, position);
+            if (read < 0) {
                 break;
             }
+            position += read;
         }
         byte[] out = new byte[buffer.position()];
         System.arraycopy(buffer.array(), 0, out, 0, buffer.position());
         return out;
     }
 
+    private FileChannel channel() throws IOException {
+        FileChannel channel = chunkChannel;
+        if (channel == null) {
+            synchronized (this) {
+                channel = chunkChannel;
+                if (channel == null) {
+                    channel = FileChannel.open(encodedTempFile, StandardOpenOption.READ);
+                    chunkChannel = channel;
+                }
+            }
+        }
+        return channel;
+    }
+
     @Override
     public void close() throws IOException {
         try {
-            if (chunkChannel != null) {
-                chunkChannel.close();
+            FileChannel channel = chunkChannel;
+            if (channel != null) {
+                channel.close();
                 chunkChannel = null;
             }
         } finally {

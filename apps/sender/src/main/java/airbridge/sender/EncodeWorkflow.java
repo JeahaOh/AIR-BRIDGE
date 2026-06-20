@@ -18,6 +18,7 @@ public final class EncodeWorkflow {
     public static final int DEFAULT_LABEL_HEIGHT = SenderDefaults.DEFAULT_LABEL_HEIGHT;
     public static final boolean DEFAULT_FOLDER_STRUCTURE = SenderDefaults.DEFAULT_FOLDER_STRUCTURE;
     public static final int DEFAULT_FILES_PER_FOLDER = SenderDefaults.DEFAULT_FILES_PER_FOLDER;
+    public static final int DEFAULT_ENCODE_WORKERS = SenderDefaults.DEFAULT_ENCODE_WORKERS;
     public static final List<String> DEFAULT_TARGET_EXTENSIONS = SenderDefaults.DEFAULT_TARGET_EXTENSIONS;
     public static final List<String> DEFAULT_SKIP_DIRS = SenderDefaults.DEFAULT_SKIP_DIRS;
 
@@ -58,7 +59,8 @@ public final class EncodeWorkflow {
                     normalized.convertXlsxToCsv(),
                     normalized.convertOfficeToText(),
                     normalized.folderStructure(),
-                    normalized.filesPerFolder()
+                    normalized.filesPerFolder(),
+                    normalized.encodeWorkers()
             ).encode(
                     normalized.sourceDir(),
                     normalized.outputDir(),
@@ -98,6 +100,7 @@ public final class EncodeWorkflow {
             boolean convertOfficeToText,
             boolean folderStructure,
             int filesPerFolder,
+            int encodeWorkers,
             List<String> targetExtensions,
             List<String> skipDirs,
             List<String> excludePaths
@@ -116,6 +119,7 @@ public final class EncodeWorkflow {
                     false,
                     DEFAULT_FOLDER_STRUCTURE,
                     DEFAULT_FILES_PER_FOLDER,
+                    DEFAULT_ENCODE_WORKERS,
                     DEFAULT_TARGET_EXTENSIONS,
                     DEFAULT_SKIP_DIRS,
                     List.of()
@@ -127,6 +131,7 @@ public final class EncodeWorkflow {
             requireMin("qrImageSize", qrImageSize, 1);
             requireMin("labelHeight", labelHeight, 0);
             requireMin("filesPerFolder", filesPerFolder, 1);
+            requireMin("encodeWorkers", encodeWorkers, 1);
             if (sourceDir == null) {
                 throw new IllegalArgumentException("sourceDir is required");
             }
@@ -146,6 +151,7 @@ public final class EncodeWorkflow {
                     convertOfficeToText,
                     folderStructure,
                     filesPerFolder,
+                    encodeWorkers,
                     copyList(targetExtensions),
                     copyList(skipDirs),
                     copyList(excludePaths)

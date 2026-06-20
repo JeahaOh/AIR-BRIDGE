@@ -9,6 +9,8 @@ final class SenderDefaults {
     static final String DEFAULT_PROJECT_NAME = "PROJECT";
     // 한 QR에 넣을 원본 데이터 청크 크기다.
     static final int DEFAULT_CHUNK_DATA_SIZE = 2000;
+    // encode 병렬 처리에 사용할 기본 워커 수다(파일·청크 QR 생성 동시 실행).
+    static final int DEFAULT_ENCODE_WORKERS = Math.max(1, Runtime.getRuntime().availableProcessors());
     // 생성할 QR PNG 한 변의 기본 픽셀 크기다.
     static final int DEFAULT_QR_IMAGE_SIZE = 1200;
     // QR 생성 시 사용할 기본 오류 정정 레벨이다.

@@ -77,6 +77,7 @@ public final class SenderGui {
         private final JSpinner qrImageSizeSpinner = intSpinner(EncodeWorkflow.DEFAULT_QR_IMAGE_SIZE, 1, 16_384, 10);
         private final JSpinner labelHeightSpinner = intSpinner(EncodeWorkflow.DEFAULT_LABEL_HEIGHT, 0, 2_000, 10);
         private final JSpinner filesPerFolderSpinner = intSpinner(EncodeWorkflow.DEFAULT_FILES_PER_FOLDER, 1, Integer.MAX_VALUE, 10);
+        private final JSpinner encodeWorkersSpinner = intSpinner(EncodeWorkflow.DEFAULT_ENCODE_WORKERS, 1, 256, 1);
         private final JComboBox<ErrorCorrectionLevel> errorLevelCombo = new JComboBox<>(ErrorCorrectionLevel.values());
         private final JTextField targetExtensionsField = new JTextField(String.join(",", EncodeWorkflow.DEFAULT_TARGET_EXTENSIONS), 36);
         private final JTextField skipDirsField = new JTextField(String.join(",", EncodeWorkflow.DEFAULT_SKIP_DIRS), 36);
@@ -142,6 +143,7 @@ public final class SenderGui {
             addField(form, row++, "Project", projectNameField, errorLevelCombo, "Error");
             addField(form, row++, "Chunk size", chunkDataSizeSpinner, qrImageSizeSpinner, "QR size");
             addField(form, row++, "Label height", labelHeightSpinner, filesPerFolderSpinner, "Files/folder");
+            addField(form, row++, "Encode workers", encodeWorkersSpinner, new JLabel(), "");
             addField(form, row++, "Targets", targetExtensionsField, new JLabel(), "");
             addField(form, row++, "Skip dirs", skipDirsField, new JLabel(), "");
             addField(form, row++, "Exclude", excludePathsField, new JLabel(), "");
@@ -300,6 +302,7 @@ public final class SenderGui {
             qrImageSizeSpinner.setEnabled(!running);
             labelHeightSpinner.setEnabled(!running);
             filesPerFolderSpinner.setEnabled(!running);
+            encodeWorkersSpinner.setEnabled(!running);
             errorLevelCombo.setEnabled(!running);
             targetExtensionsField.setEnabled(!running);
             skipDirsField.setEnabled(!running);
@@ -335,7 +338,7 @@ public final class SenderGui {
                     convertOfficeToTextCheck.isSelected(),
                     folderStructureCheck.isSelected(),
                     intValue(filesPerFolderSpinner),
-                    EncodeWorkflow.DEFAULT_ENCODE_WORKERS,
+                    intValue(encodeWorkersSpinner),
                     parseCsv(targetExtensionsField.getText(), true),
                     parseCsv(skipDirsField.getText(), true),
                     parseCsv(excludePathsField.getText(), false)

@@ -14,35 +14,21 @@
 - 앱 버전 표기는 `{major}.{minor}.{yymmdd}.{hh24mi}` 형식으로 관리한다.
 - QR 전송 파이프라인은 `encode -> slide -> capture -> decode`로 본다.
 - `identify -> pack -> unpack`는 `jar` 또는 `zip` 반입을 돕는 보조 흐름으로 본다.
+- GUI/CLI 병행 지원은 현 상태를 유지한다. 핵심 전송 흐름은 GUI·CLI 둘 다 제공하고,
+  보조 유틸(`identify`/`pack`/`unpack`/`reencode`)은 CLI 유지가 기본이다.
 
 ## 남은 작업
 
-### 1. GUI / CLI 병행 지원 후속
-
-핵심 전송 흐름의 GUI/CLI 병행 지원은 현재 구현에 들어가 있다. 남은 항목은
-보조 유틸리티를 GUI에 넣을지 판단하는 일이다.
-
-- `sender reencode`를 사용자 GUI에 노출할지 재검토한다.
-- `receiver identify`, `receiver pack`, `sender unpack`는 CLI 유지가 기본값이며,
-  GUI 편입은 실제 사용 빈도와 운영 복잡도를 보고 별도 결정한다.
-- `gui-cli-plan.md`에 남은 완료 전 계획 표현을 현재 구현 기준으로 정리하거나
-  계획 기록 문서로 분리한다.
-
-### 2. 사용자 문서 정리
-
-README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 작업은 GUI/CLI
-후속 판단으로 실제 동작이 바뀔 때 맞춰 갱신한다.
-
-### 3. Windows 실기 검증
+### 1. Windows 실기 검증
 
 - `receiver`의 카메라 인식/캡처 동작을 Windows 실기에서 최종 확인한다.
   (디바이스 이름 열거·probe 타임아웃·폴더 picker 코드는 반영됨. ffmpeg 미설치 시
   디바이스 이름은 안 뜨고 brute-force로 동작 → 필요하면 번들 ffmpeg 사용으로 후속 개선.)
 
-### 4. 구조 리팩터링 후속 검토
+### 2. 구조 리팩터링 후속 검토
 
 `transfer-core`/`carrier-qr` 정식 모듈 분리는 payload 계약이 안정화된 뒤
-(§5.1 fountain code 방향 확정 후) 별도 작업으로 검토한다. 그 전까지는
+(§3.1 fountain code 방향 확정 후) 별도 작업으로 검토한다. 그 전까지는
 `apps/*`, `libs/*`의 기존 모듈 경계를 유지한다.
 
 검토 시 유지할 기준:
@@ -52,7 +38,7 @@ README와 `docs/user/*`에는 GUI 실행 흐름이 반영되어 있다. 남은 �
 - QR payload 형식 변경은 sender, receiver, tests, docs를 함께 갱신한다.
 - `capture`는 카메라/프레임 수집 책임을 중심으로 유지한다.
 
-### 5. 전송 포맷 · 처리율(throughput) 개선
+### 3. 전송 포맷 · 처리율(throughput) 개선
 
 "순차 인덱스 청크를 전부 수집해야 복원" 모델이 병목이라는 판단에 따른 개선안.
 ROI(이득/비용) 순서로 1 → 2 로 진행한다.
@@ -77,7 +63,7 @@ ROI(이득/비용) 순서로 1 → 2 로 진행한다.
   - 영향 범위: `QrImageWriter`(컬러 렌더링) 또는 별도 carrier 모듈, `QrDecodeSupport`
     (컬러 분류·캘리브레이션), payload 비트 패킹.
 
-### 6. 빌드·산출물·성능 개선
+### 4. 빌드·산출물·성능 개선
 
 - [ ] **P4d. `chunkDataSize` 기본값 튜닝** — 바이트 모드 전환 후 QR 용량 한계까지 키워 QR 장수↓.
   버전/ECC 용량 검증 필요 → 별도 작업.

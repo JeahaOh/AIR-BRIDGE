@@ -137,10 +137,11 @@ final class QrDecodeSupport {
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(bytes);
         return new QrDecodedChunk(
                 parsed.relPath(),
-                parsed.chunkIdx(),
-                parsed.totalChunks(),
                 parsed.hash16(),
-                parsed.chunkData()
+                parsed.k(),
+                parsed.gzipLen(),
+                parsed.esi(),
+                parsed.symbolData()
         );
     }
 }

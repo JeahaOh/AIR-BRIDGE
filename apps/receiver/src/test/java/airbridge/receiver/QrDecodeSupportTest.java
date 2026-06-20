@@ -46,7 +46,8 @@ class QrDecodeSupportTest {
         byte[] encoded = CodecSupport.compress(sourceData);
         String hash16 = CodecSupport.sha256Hex(sourceData).substring(0, 16);
         Path qrFile = tempDir.resolve("valid.png");
-        writeQrFile(qrFile, QrPayloadSupport.buildPayload("docs/sample.txt", 1, 1, hash16, encoded));
+        // Single systematic symbol (k=1, esi=0) carrying the whole gzip stream.
+        writeQrFile(qrFile, QrPayloadSupport.buildPayload("docs/sample.txt", hash16, 1, encoded.length, 0, encoded));
 
         QrDecodeTaskResult result = QrDecodeSupport.decodeTask(0, qrFile, 1, 0);
 
@@ -56,10 +57,11 @@ class QrDecodeSupportTest {
         assertEquals(qrFile, result.qrFile);
         assertEquals(1, result.attempts);
         assertEquals("docs/sample.txt", result.chunk.relPath);
-        assertEquals(1, result.chunk.chunkIdx);
-        assertEquals(1, result.chunk.totalChunks);
+        assertEquals(1, result.chunk.k);
+        assertEquals(encoded.length, result.chunk.gzipLen);
+        assertEquals(0, result.chunk.esi);
         assertEquals(hash16, result.chunk.hash16);
-        assertArrayEquals(encoded, result.chunk.chunkData);
+        assertArrayEquals(encoded, result.chunk.symbolData);
     }
 
     @Test

@@ -1,47 +1,37 @@
 package airbridge.sender;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 
 final class ReencodeResultParser {
     private ReencodeResultParser() {
     }
 
-    static Map<String, List<Integer>> parseFailedFiles(List<String> lines) {
-        Map<String, List<Integer>> failedFiles = new LinkedHashMap<>();
+    /**
+     * Relative paths of files that did not restore in a {@code _restore_result.txt}. With the
+     * fountain transfer there is no per-chunk granularity: a failed file is simply re-emitted as
+     * a fresh symbol stream, so this returns just the set of failed paths (deduplicated, in
+     * first-seen order).
+     */
+    static List<String> parseFailedFiles(List<String> lines) {
+        Set<String> failed = new LinkedHashSet<>();
 
         for (String rawLine : lines) {
             String line = rawLine.trim();
-            if (line.startsWith("X ") && line.contains("INCOMPLETE")) {
-                int dashIdx = line.indexOf(" - INCOMPLETE");
-                if (dashIdx > 2) {
-                    String filePath = line.substring(2, dashIdx).trim();
-                    failedFiles.put(filePath, parseMissingChunks(line));
-                }
-            } else if (line.startsWith("X ") && (line.contains("DECODE_ERROR") || line.contains("HASH_MISMATCH"))) {
+            if (!line.startsWith("X ")) {
+                continue;
+            }
+            if (line.contains("INCOMPLETE") || line.contains("DECODE_ERROR")
+                    || line.contains("HASH_MISMATCH") || line.contains("INVALID_PATH")) {
                 int dashIdx = line.indexOf(" - ");
                 if (dashIdx > 2) {
-                    String filePath = line.substring(2, dashIdx).trim();
-                    failedFiles.put(filePath, new ArrayList<>());
+                    failed.add(line.substring(2, dashIdx).trim());
                 }
             }
         }
 
-        return failedFiles;
-    }
-
-    private static List<Integer> parseMissingChunks(String line) {
-        List<Integer> missingChunks = new ArrayList<>();
-        int bracketStart = line.indexOf('[');
-        int bracketEnd = line.indexOf(']');
-        if (bracketStart >= 0 && bracketEnd > bracketStart) {
-            String nums = line.substring(bracketStart + 1, bracketEnd);
-            for (String num : nums.split(",")) {
-                missingChunks.add(Integer.parseInt(num.trim()));
-            }
-        }
-        return missingChunks;
+        return new ArrayList<>(failed);
     }
 }

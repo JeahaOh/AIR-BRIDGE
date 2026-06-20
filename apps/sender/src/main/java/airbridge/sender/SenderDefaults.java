@@ -5,8 +5,11 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
 import java.util.List;
 
 final class SenderDefaults {
-    // 한 QR에 넣을 원본 데이터 청크 크기다.
+    // 한 QR에 넣을 원본 데이터 청크(= fountain 심볼) 크기다.
     static final int DEFAULT_CHUNK_DATA_SIZE = 2000;
+    // fountain 복구 심볼 여유분 비율이다. k개 소스 심볼에 더해 ceil(k*비율)개의 복구 심볼을
+    // 추가로 내보내, 단방향 채널에서 일부 프레임을 놓쳐도 복원되도록 한다.
+    static final double DEFAULT_REPAIR_OVERHEAD = 0.5;
     // encode 병렬 처리에 사용할 기본 워커 수다(파일·청크 QR 생성 동시 실행).
     static final int DEFAULT_ENCODE_WORKERS = Math.max(1, Runtime.getRuntime().availableProcessors());
     // 생성할 QR PNG 한 변의 기본 픽셀 크기다.

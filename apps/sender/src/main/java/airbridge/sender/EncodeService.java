@@ -3,6 +3,7 @@ package airbridge.sender;
 import airbridge.common.ConsoleSupport;
 import airbridge.common.QrPayloadSupport;
 import airbridge.common.RelativePathSupport;
+import airbridge.common.fountain.LtFountain;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -31,6 +32,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 final class EncodeService {
+    // reencode re-emits a failed file's whole stream with a larger repair margin than the
+    // first pass, since that pass already came up short.
+    private static final double REENCODE_REPAIR_OVERHEAD = 1.0;
+
     private final QrImageWriter qrImageWriter;
     private final int chunkDataSize;
     private final boolean convertXlsxToCsv;
@@ -146,17 +151,18 @@ final class EncodeService {
                 boolean submitted = false;
                 try {
                     totalOrigBytes += plan.fileSize();
+                    final int totalSymbols = symbolCount(plan.totalChunks());
 
                     effectiveListener.onLog("");
                     if (plan.convertedType() != null) {
                         effectiveListener.onLog(String.format("[FILE %d/%d] %s (%s 변환)",
                                 fi + 1, sourceFiles.size(), plan.relPath(), plan.convertedType()));
-                        effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장",
-                                plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
+                        effectiveListener.onLog(String.format("  변환후: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장(소스 %d + 복구 %d)",
+                                plan.fileSize(), plan.encodedSize(), totalSymbols, plan.totalChunks(), totalSymbols - plan.totalChunks()));
                     } else {
                         effectiveListener.onLog(String.format("[FILE %d/%d] %s", fi + 1, sourceFiles.size(), plan.relPath()));
-                        effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장",
-                                plan.fileSize(), plan.encodedSize(), plan.totalChunks()));
+                        effectiveListener.onLog(String.format("  원본: %,d bytes -> 압축(gzip): %,d bytes -> QR %d장(소스 %d + 복구 %d)",
+                                plan.fileSize(), plan.encodedSize(), totalSymbols, plan.totalChunks(), totalSymbols - plan.totalChunks()));
                     }
 
                     Path fileOutDir = null;
@@ -167,8 +173,8 @@ final class EncodeService {
                     }
                     final Path folderModeOutDir = fileOutDir;
 
-                    manifest.append(String.format("[%s] %,d bytes -> QR %d장 (hash: %s)\n",
-                            plan.relPath(), plan.fileSize(), plan.totalChunks(), plan.fileHash().substring(0, 16)));
+                    manifest.append(String.format("[%s] %,d bytes -> QR %d장 (소스 %d, hash: %s)\n",
+                            plan.relPath(), plan.fileSize(), totalSymbols, plan.totalChunks(), plan.fileHash().substring(0, 16)));
 
                     try {
                         filePermits.acquire();
@@ -181,9 +187,9 @@ final class EncodeService {
                     }
 
                     final FileEncodingPlan planRef = plan;
-                    AtomicInteger remaining = new AtomicInteger(plan.totalChunks());
-                    for (int i = 0; i < plan.totalChunks(); i++) {
-                        final int chunkIndex = i;
+                    AtomicInteger remaining = new AtomicInteger(totalSymbols);
+                    for (int i = 0; i < totalSymbols; i++) {
+                        final int esi = i;
                         pool.execute(() -> {
                             try {
                                 if (failure.get() != null) {
@@ -193,7 +199,7 @@ final class EncodeService {
                                     cancelledObserved.set(true);
                                     return;
                                 }
-                                writeChunk(planRef, chunkIndex, folderModeOutDir,
+                                writeSymbol(planRef, esi, totalSymbols, folderModeOutDir,
                                         outPath, pngCounter, createdDirs, createdFiles);
                                 totalQrCount.incrementAndGet();
                             } catch (Throwable t) {
@@ -256,26 +262,45 @@ final class EncodeService {
         return new EncodeSummary(totalQrCount.get(), totalFileCount, totalOrigBytes, manifestPath);
     }
 
-    // Generates one chunk's QR PNG. Safe to run concurrently: positional chunk reads, an atomic
-    // folder counter (flat mode), idempotent directory creation, and concurrent output tracking.
-    private void writeChunk(FileEncodingPlan plan,
-                            int chunkIndex,
-                            Path folderModeOutDir,
-                            Path outPath,
-                            AtomicInteger pngCounter,
-                            Set<Path> createdDirs,
-                            Queue<Path> createdFiles) throws Exception {
-        int start = chunkIndex * chunkDataSize;
-        // long math: (chunkIndex + 1) * chunkDataSize can exceed Integer.MAX_VALUE for payloads
-        // near the 2GB encodedSize cap before Math.min clamps it.
-        int end = (int) Math.min((long) (chunkIndex + 1) * chunkDataSize, plan.encodedSize());
-        byte[] chunkData = plan.readChunk(start, end);
-        int chunkIdx = chunkIndex + 1;
+    // Total fountain symbols to emit for a k-source block: the k systematic symbols plus a
+    // repair margin for the lossy one-way channel. The decoder needs slightly more than k
+    // distinct symbols to recover any lost source symbols.
+    private static int symbolCount(int k) {
+        return symbolCount(k, SenderDefaults.DEFAULT_REPAIR_OVERHEAD);
+    }
+
+    private static int symbolCount(int k, double repairOverhead) {
+        return k + (int) Math.ceil(k * repairOverhead);
+    }
+
+    // Builds fountain symbol `esi` for the file: XOR of its source-symbol neighbors. For
+    // esi < k this reads back source symbol esi verbatim (systematic).
+    private static byte[] buildSymbolBytes(FileEncodingPlan plan, int esi) throws IOException {
+        int[] neighbors = LtFountain.neighbors(esi, plan.totalChunks());
+        byte[] symbol = plan.readSymbol(neighbors[0]);
+        for (int n = 1; n < neighbors.length; n++) {
+            LtFountain.xorInto(symbol, plan.readSymbol(neighbors[n]));
+        }
+        return symbol;
+    }
+
+    // Generates one fountain symbol's QR PNG (esi in [0, totalSymbols)). Safe to run
+    // concurrently: positional source-symbol reads, an atomic folder counter (flat mode),
+    // idempotent directory creation, and concurrent output tracking.
+    private void writeSymbol(FileEncodingPlan plan,
+                             int esi,
+                             int totalSymbols,
+                             Path folderModeOutDir,
+                             Path outPath,
+                             AtomicInteger pngCounter,
+                             Set<Path> createdDirs,
+                             Queue<Path> createdFiles) throws Exception {
+        byte[] symbol = buildSymbolBytes(plan, esi);
 
         byte[] payload = QrPayloadSupport.buildPayload(
-                plan.relPath(), chunkIdx, plan.totalChunks(), plan.fileHash(), chunkData);
+                plan.relPath(), plan.fileHash(), plan.totalChunks(), plan.encodedSize(), esi, symbol);
 
-        String line1 = buildQrLabel(plan.fileName(), chunkIdx, plan.totalChunks());
+        String line1 = buildQrLabel(plan.fileName(), esi + 1, totalSymbols);
         String line2 = plan.relPath();
         BufferedImage qrImage = qrImageWriter.generateQrImage(payload, line1, line2);
 
@@ -290,7 +315,7 @@ final class EncodeService {
         }
 
         String prefix = folderStructure ? plan.safePrefix() : plan.flatSafePrefix();
-        String qrFileName = buildQrFileName(prefix, chunkIdx, plan.totalChunks());
+        String qrFileName = buildQrFileName(prefix, esi + 1, totalSymbols);
         Path qrFilePath = outDir.resolve(qrFileName);
         ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
         createdFiles.add(qrFilePath);
@@ -311,7 +336,7 @@ final class EncodeService {
                                 EncodeListener listener) throws Exception {
         EncodeListener effectiveListener = listener != null ? listener : line -> { };
         List<String> lines = Files.readAllLines(resultPath, StandardCharsets.UTF_8);
-        Map<String, List<Integer>> failedFiles = ReencodeResultParser.parseFailedFiles(lines);
+        List<String> failedFiles = ReencodeResultParser.parseFailedFiles(lines);
 
         if (failedFiles.isEmpty()) {
             return new ReencodeSummary(0, 0, 0);
@@ -323,11 +348,8 @@ final class EncodeService {
         int errorCount = 0;
         int pngCounter = 0;
 
-        for (Map.Entry<String, List<Integer>> entry : failedFiles.entrySet()) {
-            String relPath = entry.getKey();
-            List<Integer> missingChunks = entry.getValue();
+        for (String relPath : failedFiles) {
             String normalizedRelPath;
-
             try {
                 normalizedRelPath = RelativePathSupport.normalizeRelativePath(relPath);
             } catch (IllegalArgumentException e) {
@@ -355,41 +377,22 @@ final class EncodeService {
                     convertOfficeToText,
                     chunkDataSize
             )) {
-                List<Integer> chunksToGenerate;
-                if (missingChunks.isEmpty()) {
-                    chunksToGenerate = new ArrayList<>();
-                    for (int i = 1; i <= plan.totalChunks(); i++) {
-                        chunksToGenerate.add(i);
-                    }
-                } else {
-                    chunksToGenerate = missingChunks;
-                }
-
+                // The previous capture failed, so re-emit the whole fountain stream with a
+                // larger repair margin: a fresh decode run reads only these PNGs, and the extra
+                // distinct symbols raise the odds the retry pass clears the file.
+                int totalSymbols = symbolCount(plan.totalChunks(), REENCODE_REPAIR_OVERHEAD);
                 Path fileOutDir = outPath;
 
-                effectiveListener.onLog(String.format("%n[FILE %d/%d] %s (총 %d청크 중 %d개 재생성)",
+                effectiveListener.onLog(String.format("%n[FILE %d/%d] %s (소스 %d, QR %d장 재생성)",
                         fileCount + 1, failedFiles.size(), plan.relPath(),
-                        plan.totalChunks(), chunksToGenerate.size()));
+                        plan.totalChunks(), totalSymbols));
 
-                for (int chunkIdx : chunksToGenerate) {
-                    if (chunkIdx < 1 || chunkIdx > plan.totalChunks()) {
-                        effectiveListener.onLog(String.format("  [WARN] 청크 %d는 범위 밖 (총 %d) - 건너뜀", chunkIdx, plan.totalChunks()));
-                        continue;
-                    }
-
-                    int start = (chunkIdx - 1) * chunkDataSize;
-                    int end = (int) Math.min((long) chunkIdx * chunkDataSize, plan.encodedSize());
-                    byte[] chunkData = plan.readChunk(start, end);
-
+                for (int esi = 0; esi < totalSymbols; esi++) {
+                    byte[] symbol = buildSymbolBytes(plan, esi);
                     byte[] payload = QrPayloadSupport.buildPayload(
-                            plan.relPath(),
-                            chunkIdx,
-                            plan.totalChunks(),
-                            plan.fileHash(),
-                            chunkData
-                    );
+                            plan.relPath(), plan.fileHash(), plan.totalChunks(), plan.encodedSize(), esi, symbol);
 
-                    String line1 = buildQrLabel(plan.fileName(), chunkIdx, plan.totalChunks());
+                    String line1 = buildQrLabel(plan.fileName(), esi + 1, totalSymbols);
                     String line2 = plan.relPath();
                     BufferedImage qrImage = qrImageWriter.generateQrImage(payload, line1, line2);
 
@@ -401,7 +404,7 @@ final class EncodeService {
 
                     // reencode never rebuilds the relDir tree, so output is always flat;
                     // use the path-derived prefix to keep names unique across files.
-                    String qrFileName = buildQrFileName(plan.flatSafePrefix(), chunkIdx, plan.totalChunks());
+                    String qrFileName = buildQrFileName(plan.flatSafePrefix(), esi + 1, totalSymbols);
                     Path qrFilePath = fileOutDir.resolve(qrFileName);
                     ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
 

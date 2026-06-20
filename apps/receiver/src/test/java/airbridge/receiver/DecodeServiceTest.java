@@ -2,6 +2,7 @@ package airbridge.receiver;
 
 import airbridge.common.CodecSupport;
 import airbridge.common.QrPayloadSupport;
+import airbridge.common.fountain.LtFountain;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -15,7 +16,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -145,39 +145,50 @@ class DecodeServiceTest {
         return data;
     }
 
+    // Writes the systematic fountain symbols (one per source symbol, no repair) for `data`.
+    // `missingSymbols` lists 1-based symbol labels to omit; since no repair symbols are
+    // emitted, dropping any source symbol leaves the file undecodable (INCOMPLETE).
     private static List<Path> writeQrChunks(Path dir,
                                             String relPath,
                                             byte[] data,
                                             int chunkDataSize,
                                             String forcedHash16,
-                                            List<Integer> missingChunks) throws Exception {
+                                            List<Integer> missingSymbols) throws Exception {
         byte[] encoded = CodecSupport.compress(data);
         String hash16 = forcedHash16 != null ? forcedHash16 : CodecSupport.sha256Hex(data).substring(0, 16);
-        int totalChunks = Math.max(1, (int) Math.ceil((double) encoded.length / chunkDataSize));
+        int k = Math.max(1, (int) Math.ceil((double) encoded.length / chunkDataSize));
+        byte[][] source = splitIntoSymbols(encoded, k, chunkDataSize);
         List<Path> paths = new ArrayList<>();
 
-        for (int index = 0; index < totalChunks; index++) {
-            int chunkIdx = index + 1;
-            if (missingChunks.contains(chunkIdx)) {
+        for (int esi = 0; esi < k; esi++) {
+            int label = esi + 1;
+            if (missingSymbols.contains(label)) {
                 continue;
             }
-            int start = index * chunkDataSize;
-            int end = Math.min(encoded.length, start + chunkDataSize);
-            byte[] payload = QrPayloadSupport.buildPayload(
-                    relPath,
-                    chunkIdx,
-                    totalChunks,
-                    hash16,
-                    Arrays.copyOfRange(encoded, start, end)
-            );
+            byte[] symbol = LtFountain.encodeSymbol(esi, k, source); // systematic: source[esi]
+            byte[] payload = QrPayloadSupport.buildPayload(relPath, hash16, k, encoded.length, esi, symbol);
 
             String prefix = relPath.replace('/', '_').replace('.', '_');
-            Path qrFile = dir.resolve(String.format("%s-%03d.png", prefix, chunkIdx));
+            Path qrFile = dir.resolve(String.format("%s-%03d.png", prefix, label));
             writeQrFile(qrFile, payload);
             paths.add(qrFile);
         }
 
         return paths;
+    }
+
+    private static byte[][] splitIntoSymbols(byte[] data, int k, int symbolSize) {
+        byte[][] symbols = new byte[k][];
+        for (int i = 0; i < k; i++) {
+            byte[] sym = new byte[symbolSize];
+            int start = i * symbolSize;
+            int n = Math.min(symbolSize, data.length - start);
+            if (n > 0) {
+                System.arraycopy(data, start, sym, 0, n);
+            }
+            symbols[i] = sym;
+        }
+        return symbols;
     }
 
     private static void writeQrFile(Path path, byte[] payload) throws Exception {

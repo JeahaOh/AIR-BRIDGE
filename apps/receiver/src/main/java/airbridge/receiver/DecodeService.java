@@ -96,7 +96,8 @@ final class DecodeService {
 
                 FileChunks fileChunks = fileChunkMap.get(normalizedRelPath);
                 if (fileChunks == null) {
-                    fileChunks = new FileChunks(normalizedRelPath, chunk.totalChunks, chunk.hash16);
+                    fileChunks = new FileChunks(normalizedRelPath, chunk.k, chunk.gzipLen,
+                            chunk.symbolData.length, chunk.hash16);
                 }
 
                 try {
@@ -127,12 +128,13 @@ final class DecodeService {
             decodeExecutor.shutdownNow();
         }
 
-        // Anything still buffered never reached completeness.
+        // Anything still buffered never collected enough distinct symbols to decode.
         int incompleteCount = 0;
         for (FileChunks fileChunks : fileChunkMap.values()) {
-            List<Integer> missingChunks = fileChunks.findMissingChunks();
-            reportLines.add("X " + fileChunks.relPath + " - INCOMPLETE (누락: " + missingChunks + ")");
-            effectiveListener.onLog(String.format("  [INCOMPLETE] %s - 누락 %s", fileChunks.relPath, missingChunks));
+            reportLines.add("X " + fileChunks.relPath + " - INCOMPLETE (심볼 "
+                    + fileChunks.receivedCount() + "/" + fileChunks.k + " 소스, 복원 불가)");
+            effectiveListener.onLog(String.format("  [INCOMPLETE] %s - 심볼 %d/%d (소스), 복원 불가",
+                    fileChunks.relPath, fileChunks.receivedCount(), fileChunks.k));
             incompleteCount++;
         }
 
@@ -167,7 +169,7 @@ final class DecodeService {
         Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
         String actualHash16;
         try {
-            actualHash16 = CodecSupport.decompressToFile(fileChunks.orderedEncodedStream(), tempFile)
+            actualHash16 = CodecSupport.decompressToFile(fileChunks.encodedStream(), tempFile)
                     .substring(0, 16);
         } catch (Exception e) {
             Files.deleteIfExists(tempFile);

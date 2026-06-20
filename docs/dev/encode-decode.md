@@ -40,8 +40,8 @@
 - `fileName`: QR 라벨에 표시할 파일명
 - `convertedType`: 변환 여부 표시용 문자열
 - `fileHash`: 전처리 후 바이트 기준 SHA-256
-- `encodedSize`: GZIP 결과의 길이(바이트 수)
-- `totalChunks`: `encodedSize / chunkDataSize` 기준 청크 수
+- `encodedSize`: GZIP 결과의 길이(바이트 수). payload의 `gzipLen`.
+- `totalChunks`: `encodedSize / chunkDataSize` 기준 소스 심볼 수(`k`). fountain 소스 심볼 개수다.
 
 GZIP 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 임시파일에 스트리밍으로
 1회 기록한다. 따라서 큰 파일을 encode해도 heap 사용량이 파일 크기에 비례해 늘지 않는다.
@@ -54,16 +54,23 @@ GZIP 결과(`encoded`)는 메모리에 통째로 들고 있지 않고 임시파�
 
 QR payload는 `QrPayloadSupport.buildPayload(...)`에서 만든다. Base64 없이 GZIP 바이트를 QR
 8-bit 바이트 모드로 직접 싣기 때문에, payload는 텍스트 구분자가 아니라 **바이너리 프레이밍**이다.
-정수는 모두 big-endian.
+각 프레임은 GZIP 스트림의 **LT fountain 심볼 1개**다(`libs/common/.../fountain`). 정수는 모두
+big-endian.
 
 ```
 magic    : 2 bytes  'A','B'
 relPath  : u16 길이 + UTF-8 바이트
-chunkIdx : u32
-total    : u32
 hash     : 8 bytes  (파일 SHA-256의 앞 8바이트 = 16 hex chars)
-data     : 나머지 바이트 (현재 청크의 GZIP 윈도우)
+k        : u32  (GZIP 스트림을 나눈 소스 심볼 개수)
+gzipLen  : u32  (GZIP 스트림 길이. 패딩된 마지막 소스 심볼을 잘라낼 때 사용)
+esi      : u32  (encoding symbol id. 0..k-1 = 시스템틱 소스, >=k = 복구 심볼)
+data     : 나머지 바이트 (심볼 1개. symbolSize == data 길이, 파일 내 일정)
 ```
+
+`esi 0..k-1`은 소스 심볼 그대로(시스템틱), `esi >= k`는 소스 부분집합의 XOR(복구 심볼)이다.
+어떤 소스를 XOR하는지는 `esi`와 `k`만으로 결정적으로 정해지므로(이웃 집합) 전송하지 않는다.
+송·수신이 같은 이웃 집합을 계산해야 하므로 이웃 생성은 플랫폼 무관 결정적이어야 한다
+(`Math.log`/`sqrt` 회피, Ideal Soliton 사용).
 
 - 해시는 전체 SHA-256 중 앞 16자리(8바이트)만 payload에 실린다.
 - 바이트를 QR에 무손실로 싣기 위해 인코더/디코더 모두 `ISO-8859-1` charset을 쓴다(바이트↔문자
@@ -163,24 +170,30 @@ capture는 카메라 노이즈 대비 color 변형을 더 시도하도록 전략
 
 ## decode 파일 조립
 
-QR 하나를 읽으면 `QrDecodedChunk`가 만들어지고, `relPath` 기준으로 `FileChunks`에 묶는다.
+QR 하나를 읽으면 `QrDecodedChunk`(fountain 심볼 1개)가 만들어지고, `relPath` 기준으로
+`FileChunks`에 묶인다. `FileChunks`는 내부에 `LtDecoder`를 들고 들어오는 심볼을 `offer`한다.
 
 `FileChunks`가 동일 파일로 인정하는 조건:
 
-- `totalChunks` 동일
+- `k` 동일
+- `gzipLen` 동일
 - `hash16` 동일
+- symbol 크기 동일
 
-청크 번호 범위를 벗어나면 즉시 오류다. 같은 청크 번호가 여러 번 들어오면 마지막 값으로 덮어쓴다.
+같은 `esi`가 여러 번 들어오면(중복 프레임) 무시한다. 심볼은 순서와 무관하게 모이고, fountain
+디코더가 `k`개 소스 심볼을 모두 peeling 복원하면 완성이다 — 특정 프레임을 기다리지 않으므로
+일부 프레임을 놓쳐도 충분한 distinct 심볼만 모이면 복원된다(시스템틱 캡처는 정확히 `k`개,
+손실 시 조금 더 필요).
 
-파일은 모든 청크가 모이는(`FileChunks.isComplete()`) 즉시 복원되고 `fileChunkMap`에서 제거된다.
-따라서 메모리에는 "아직 진행 중인 파일"의 청크만 남고, 전송 전체의 청크가 한꺼번에 쌓이지 않는다.
-이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 청크는 `finalizedPaths`로 무시한다.
-QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 완성되지 못한(INCOMPLETE) 파일뿐이다.
+파일은 완성되는(`FileChunks.isComplete()`) 즉시 복원되고 `fileChunkMap`에서 제거된다.
+따라서 메모리에는 "아직 진행 중인 파일"의 심볼만 남고, 전송 전체가 한꺼번에 쌓이지 않는다.
+이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 심볼은 `finalizedPaths`로 무시한다.
+QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 심볼이 부족해 복원 못 한(INCOMPLETE) 파일뿐이다.
 
 복원 한 파일의 순서(`restoreCompletedFile`):
 
 1. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
-2. 청크를 순서대로 흘려(`FileChunks.orderedEncodedStream`, GZIP 바이트) GZIP 해제한 결과를
+2. 복원한 GZIP 스트림을(`FileChunks.encodedStream`) GZIP 해제한 결과를
    출력 디렉터리의 임시파일(`.airbridge-restore-*.part`)에 스트리밍 기록
    (`CodecSupport.decompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
    메모리에 통째로 들고 있지 않는다.
@@ -212,7 +225,7 @@ QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 완성되지 못한(I
 의미:
 
 - `QR_READ_ERROR`: 이미지에서 QR payload를 읽지 못했거나 payload 처리 중 예외
-- `INCOMPLETE`: 어떤 청크가 아예 없음
+- `INCOMPLETE`: 복원에 필요한 만큼의 distinct 심볼을 모으지 못함(받은 심볼 수/`k` 표기)
 - `DECODE_ERROR`: GZIP 복원 실패
 - `HASH_MISMATCH`: 복원 바이트는 나왔지만 hash16 불일치
 - `INVALID_REL_PATH` / `INVALID_PATH`: 경로 traversal 등 안전하지 않은 상대경로
@@ -228,11 +241,14 @@ encode와 decode 모두 상대경로 안전성은 `RelativePathSupport`에 의�
 
 ## reencode와의 연결
 
-`reencode`는 `_restore_result.txt`를 읽어 실패 파일이나 누락 청크만 다시 만든다.
+`reencode`는 `_restore_result.txt`를 읽어 **실패한 파일을 통째로 다시 만든다**. fountain에는
+"누락 청크 인덱스" 개념이 없으므로, 실패 파일은 시스템틱+복구 심볼 스트림을 처음부터 재생성한다
+(첫 패스가 모자랐으니 복구 여유분을 더 크게 잡는다 — `REENCODE_REPAIR_OVERHEAD`). 수신측은
+재생성된 PNG만으로 새로 decode 한다.
 
 연결 포인트:
 
-- `INCOMPLETE`, `DECODE_ERROR`, `HASH_MISMATCH` 항목을 입력으로 사용
+- `INCOMPLETE`, `DECODE_ERROR`, `HASH_MISMATCH`, `INVALID_PATH` 항목의 실패 파일 경로를 입력으로 사용
 - 변환 옵션이 켜져 있으면 `.csv` / `.txt` 상대경로를 원래 `.xlsx` / `.docx` / `.pptx` 소스로 역추적
 
 즉 encode 쪽 상대경로 변환 규칙을 decode/reencode가 같이 이해하고 있어야 round-trip이 맞습니다.

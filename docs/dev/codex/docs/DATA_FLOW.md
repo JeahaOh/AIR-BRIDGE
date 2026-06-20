@@ -26,9 +26,10 @@ source file
   -> optional office conversion
   -> SHA-256 over converted bytes
   -> GZIP bytes
-  -> split by chunkDataSize bytes
-  -> binary payload frame:
-       magic 'A','B' + relPath + chunkIdx + total + hash + data
+  -> split into k source symbols of chunkDataSize bytes (last zero-padded)
+  -> emit k systematic + ceil(k * repairOverhead) repair LT fountain symbols
+  -> binary payload frame per symbol:
+       magic 'A','B' + relPath + hash + k + gzipLen + esi + data
   -> ZXing QR render (8-bit byte mode, ISO-8859-1)
   -> PNG written to output directory
 ```
@@ -37,9 +38,10 @@ Additional encode outputs:
 
 - `_manifest.txt`
 
-Important current rule:
+Important current rules:
 
-- chunking is based on gzip byte length (no Base64)
+- symbol size is the gzip byte length per symbol (no Base64)
+- repair symbols give the one-way channel loss tolerance (default repairOverhead 0.5)
 
 ## Decode Flow Details
 
@@ -49,10 +51,10 @@ Current `receiver decode` behavior:
 PNG files
   -> recursive PNG collection
   -> QR decode retries with rotations / binarizers / scales / crops
-  -> parsed payload fields
-  -> grouped by relPath + totalChunks + hash16
-  -> missing chunk check
-  -> concatenate chunk data bytes
+  -> parsed payload fields (one fountain symbol)
+  -> grouped by relPath (k + gzipLen + hash16 + symbol size must agree)
+  -> fountain decode: peel symbols until all k source symbols recovered
+  -> reassemble gzip stream, trim to gzipLen
   -> GZIP inflate
   -> SHA-256 prefix compare
   -> RelativePathSupport safety check
@@ -107,12 +109,14 @@ QR reconstruction must use payload metadata, not PNG filenames.
 Current grouping fields:
 
 - `relPath`
-- `totalChunks`
+- `k`
+- `gzipLen`
 - `hash16`
+- symbol size
 
-Current chunk index rule:
+Current symbol rule:
 
-- one-based chunk indexes
+- `esi 0..k-1` systematic, `esi >= k` repair; symbols apply in any order, duplicates ignored
 
 PNG filenames and label text are convenience only.
 
@@ -123,8 +127,8 @@ Validate in roughly this order:
 1. the PNG can be read as an image
 2. QR payload bytes can be extracted (ISO-8859-1, 1:1)
 3. the binary frame parses correctly
-4. chunk indexes are in range
-5. all required chunks are present
+4. offer the symbol to the file's fountain decoder
+5. all k source symbols are peeled (enough distinct symbols collected)
 6. concatenated chunk data can be GZIP-inflated
 7. restored bytes match the payload `hash16`
 8. restored output path is safe under the output root

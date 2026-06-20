@@ -82,9 +82,10 @@ class EncodeServiceTest {
         }
 
         assertEquals(summary.totalQrCount(), qrFiles.size());
+        // The first PNG (sorted) is esi 0: the first systematic source symbol.
         QrPayloadSupport.ParsedPayload parsed = decodeQrPayload(qrFiles.getFirst());
         assertEquals("docs/sample.txt", parsed.relPath());
-        assertEquals(1, parsed.chunkIdx());
+        assertEquals(0, parsed.esi());
     }
 
     @Test
@@ -146,7 +147,7 @@ class EncodeServiceTest {
     }
 
     @Test
-    void reencodeRegeneratesOnlyRequestedChunksAndCountsMissingSources() throws Exception {
+    void reencodeRegeneratesFullSymbolStreamForFailedFiles() throws Exception {
         Path srcDir = tempDir.resolve("src");
         Files.createDirectories(srcDir.resolve("docs"));
 
@@ -173,7 +174,7 @@ class EncodeServiceTest {
         Path resultPath = tempDir.resolve("restore/_restore_result.txt");
         Files.createDirectories(resultPath.getParent());
         Files.writeString(resultPath, String.join(System.lineSeparator(),
-                "X docs/first.txt - INCOMPLETE (누락: [2, 4])",
+                "X docs/first.txt - INCOMPLETE (심볼 5/" + firstTotalChunks + " 소스, 복원 불가)",
                 "X docs/second.txt - HASH_MISMATCH",
                 "X docs/missing.txt - DECODE_ERROR"
         ), StandardCharsets.UTF_8);
@@ -188,9 +189,8 @@ class EncodeServiceTest {
                 500
         ).reencode(srcDir, outDir, srcDir, resultPath, null);
 
-        assertEquals(2, summary.fileCount());
-        assertEquals(1, summary.errorCount());
-        assertEquals(2 + secondTotalChunks, summary.totalQrCount());
+        assertEquals(2, summary.fileCount());   // first + second regenerated
+        assertEquals(1, summary.errorCount());  // missing.txt absent
 
         List<String> outputNames;
         try (Stream<Path> stream = Files.list(outDir)) {
@@ -202,10 +202,13 @@ class EncodeServiceTest {
         }
 
         assertEquals(summary.totalQrCount(), outputNames.size());
-        assertTrue(outputNames.contains(qrFileName(firstFlatPrefix, 2, firstTotalChunks)));
-        assertTrue(outputNames.contains(qrFileName(firstFlatPrefix, 4, firstTotalChunks)));
-        assertTrue(outputNames.contains(qrFileName(secondFlatPrefix, 1, secondTotalChunks)));
-        assertFalse(outputNames.contains(qrFileName(firstFlatPrefix, 1, firstTotalChunks)));
+        // Each failed file is re-emitted as its full systematic stream plus a repair margin,
+        // so at least one symbol per source symbol is present for each.
+        long firstCount = outputNames.stream().filter(n -> n.startsWith(firstFlatPrefix)).count();
+        long secondCount = outputNames.stream().filter(n -> n.startsWith(secondFlatPrefix)).count();
+        assertTrue(firstCount >= firstTotalChunks);
+        assertTrue(secondCount >= secondTotalChunks);
+        assertEquals(firstCount + secondCount, summary.totalQrCount());
     }
 
     @Test
@@ -241,7 +244,8 @@ class EncodeServiceTest {
 
         assertEquals(1, summary.fileCount());
         assertEquals(1, summary.errorCount());
-        assertEquals(insideTotalChunks, summary.totalQrCount());
+        // inside.txt is re-emitted as its full systematic stream plus repair margin.
+        assertTrue(summary.totalQrCount() >= insideTotalChunks);
         assertFalse(Files.exists(outDir.resolve("escape.txt")));
     }
 

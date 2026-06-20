@@ -4,16 +4,19 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Binary framing for one QR chunk. The payload carries gzip bytes directly in QR 8-bit byte
- * mode (no Base64), so there is no text separator scheme. Layout (all integers big-endian):
+ * Binary framing for one QR fountain symbol. The payload carries gzip bytes directly in QR
+ * 8-bit byte mode (no Base64), so there is no text separator scheme. Each frame is one LT
+ * fountain symbol of the file's gzip stream (see {@code airbridge.common.fountain}). Layout
+ * (all integers big-endian):
  *
  * <pre>
  *   magic    : 2 bytes  {@code 'A','B'}
  *   relPath  : u16 length + UTF-8 bytes
- *   chunkIdx : u32
- *   total    : u32
  *   hash     : 8 bytes  (first 8 bytes / 16 hex chars of the file SHA-256)
- *   data     : remaining bytes (gzip payload window)
+ *   k        : u32  (number of source symbols the gzip stream was split into)
+ *   gzipLen  : u32  (gzip stream length, for trimming the padded last source symbol)
+ *   esi      : u32  (encoding symbol id; 0..k-1 = systematic source, >=k = repair)
+ *   data     : remaining bytes (one symbol; symbolSize == data.length, constant per file)
  * </pre>
  */
 public final class QrPayloadSupport {
@@ -26,12 +29,12 @@ public final class QrPayloadSupport {
     }
 
     /**
-     * Builds the binary frame for one chunk. {@code fileHash} may be the full SHA-256 hex or the
-     * 16-char short hash; only its first 16 hex chars (8 bytes) are carried.
+     * Builds the binary frame for one fountain symbol. {@code fileHash} may be the full SHA-256
+     * hex or the 16-char short hash; only its first 16 hex chars (8 bytes) are carried.
      */
-    public static byte[] buildPayload(String relPath,
-                                      int chunkIdx, int totalChunks,
-                                      String fileHash, byte[] chunkData) {
+    public static byte[] buildPayload(String relPath, String fileHash,
+                                      int k, int gzipLen, int esi,
+                                      byte[] symbolData) {
         byte[] relPathBytes = relPath.getBytes(StandardCharsets.UTF_8);
         if (relPathBytes.length > 0xFFFF) {
             throw new IllegalArgumentException("relative path too long: " + relPathBytes.length + " bytes");
@@ -39,15 +42,16 @@ public final class QrPayloadSupport {
         byte[] hashBytes = hash16ToBytes(fileHash);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream(
-                2 + 2 + relPathBytes.length + 4 + 4 + HASH_BYTES + chunkData.length);
+                2 + 2 + relPathBytes.length + HASH_BYTES + 4 + 4 + 4 + symbolData.length);
         out.write(MAGIC_0);
         out.write(MAGIC_1);
         writeU16(out, relPathBytes.length);
         out.writeBytes(relPathBytes);
-        writeU32(out, chunkIdx);
-        writeU32(out, totalChunks);
         out.writeBytes(hashBytes);
-        out.writeBytes(chunkData);
+        writeU32(out, k);
+        writeU32(out, gzipLen);
+        writeU32(out, esi);
+        out.writeBytes(symbolData);
         return out.toByteArray();
     }
 
@@ -60,19 +64,20 @@ public final class QrPayloadSupport {
         try {
             int relPathLen = r.readU16();
             String relPath = r.readUtf8(relPathLen);
-            int chunkIdx = r.readU32();
-            int totalChunks = r.readU32();
             String hash16 = bytesToHex(r.readBytes(HASH_BYTES));
+            int k = r.readU32();
+            int gzipLen = r.readU32();
+            int esi = r.readU32();
             byte[] data = r.readRemaining();
-            return new ParsedPayload(relPath, chunkIdx, totalChunks, hash16, data);
+            return new ParsedPayload(relPath, hash16, k, gzipLen, esi, data);
         } catch (IndexOutOfBoundsException e) {
             throw new IllegalArgumentException("페이로드가 잘렸거나 손상되었습니다", e);
         }
     }
 
-    /** Decoded view of one chunk frame. {@code hash16} is the 16-char lowercase hex short hash. */
-    public record ParsedPayload(String relPath, int chunkIdx, int totalChunks,
-                                String hash16, byte[] chunkData) {
+    /** Decoded view of one fountain symbol frame. {@code hash16} is the 16-char lowercase hex short hash. */
+    public record ParsedPayload(String relPath, String hash16, int k, int gzipLen, int esi,
+                                byte[] symbolData) {
     }
 
     private static void writeU16(ByteArrayOutputStream out, int value) {

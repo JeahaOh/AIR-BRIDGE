@@ -1,17 +1,20 @@
 package airbridge.receiver;
 
+/** One decoded fountain symbol frame (see {@code airbridge.common.QrPayloadSupport}). */
 final class QrDecodedChunk {
     final String relPath;
-    final int chunkIdx;
-    final int totalChunks;
     final String hash16;
-    final byte[] chunkData;
+    final int k;
+    final int gzipLen;
+    final int esi;
+    final byte[] symbolData;
 
-    QrDecodedChunk(String relPath, int chunkIdx, int totalChunks, String hash16, byte[] chunkData) {
+    QrDecodedChunk(String relPath, String hash16, int k, int gzipLen, int esi, byte[] symbolData) {
         this.relPath = relPath;
-        this.chunkIdx = chunkIdx;
-        this.totalChunks = totalChunks;
         this.hash16 = hash16;
-        this.chunkData = chunkData;
+        this.k = k;
+        this.gzipLen = gzipLen;
+        this.esi = esi;
+        this.symbolData = symbolData;
     }
 }

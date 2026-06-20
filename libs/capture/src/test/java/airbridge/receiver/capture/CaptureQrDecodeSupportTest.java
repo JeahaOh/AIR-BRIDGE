@@ -49,7 +49,7 @@ class CaptureQrDecodeSupportTest {
         // A real §6.1 payload: gzip bytes wrapped in the binary frame, rendered in QR byte mode.
         byte[] gzip = CodecSupport.compress("capture binary payload".getBytes(StandardCharsets.UTF_8));
         String hash16 = CodecSupport.sha256Hex(gzip).substring(0, 16);
-        byte[] frame = QrPayloadSupport.buildPayload("docs/a.bin", 1, 1, hash16, gzip);
+        byte[] frame = QrPayloadSupport.buildPayload("docs/a.bin", hash16, 1, gzip.length, 0, gzip);
 
         BufferedImage image = createByteModeQrImage(frame, 360);
         String decodedText = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
@@ -59,7 +59,7 @@ class CaptureQrDecodeSupportTest {
         byte[] recovered = decodedText.getBytes(StandardCharsets.ISO_8859_1);
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(recovered);
         assertEquals("docs/a.bin", parsed.relPath());
-        assertArrayEquals(gzip, parsed.chunkData());
+        assertArrayEquals(gzip, parsed.symbolData());
     }
 
     @Test

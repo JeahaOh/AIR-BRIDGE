@@ -26,17 +26,22 @@
 ① fountain code  →  ② slide↔capture 페이싱  →  ③ 4색 컬러 심볼  →  ④ 구조 리팩터링(모듈 분리)
 ```
 
-### 1. Fountain code(RaptorQ, RFC 6330) 도입  ← 최우선
+### 1. Fountain code 도입 (완료, 2026-06-20)
 
-단방향 채널의 신뢰도·실효 처리율 개선이자, 이후 작업이 기다리는 **payload 계약 확정** 단계.
+단방향 채널의 신뢰도·실효 처리율 개선이자, 이후 작업이 기다리던 **payload 계약 확정** 단계.
 
-- [ ] 현재 순차 인덱스 청크는 특정 프레임 드롭 시 그 청크가 다시 올 때까지 대기 →
-  단방향 카메라 채널에서 비효율. 이를 fountain 부호로 대체한다.
-  - 파일을 동등 심볼 스트림으로 인코딩하고, 수신측이 임의의 K(1+ε)개만 모이면 복원.
-    "빠진 청크 재전송" 협상 자체를 제거.
-  - 영향 범위: 인코딩 측 청크 생성(`FileEncodingPlan`/`EncodeService`),
-    수신 측 수집·복원(`FileChunks`의 TreeMap 인덱스 모델 → fountain 디코더로 대체),
-    payload 헤더에 심볼 메타(블록/심볼 id) 추가.
+- [x] **자체 구현 systematic LT(Luby Transform) fountain 부호로 순차 인덱스 청크 모델을 대체** — 완료
+  - RaptorQ 라이브러리(OpenRQ)는 Maven Central 미배포라 의존성 0인 자체 LT 구현 채택.
+    `libs/common/.../fountain`(`LtFountain`/`LtDecoder`). 이웃 생성은 플랫폼 무관 결정적
+    (Ideal Soliton, `Math.log`/`sqrt` 회피)이라 송·수신이 같은 이웃 집합을 계산한다.
+  - 시스템틱(esi 0..k-1 = 소스 그대로) + 복구 심볼(esi>=k = 소스 XOR). 수신측은 임의 순서로
+    distinct 심볼을 ~k개 모으면 복원 → "빠진 청크 재전송" 협상 제거. 기본 복구 여유분 0.5
+    (`SenderDefaults.DEFAULT_REPAIR_OVERHEAD`).
+  - 반영: 프레임 교체(`QrPayloadSupport` → relPath+hash+k+gzipLen+esi+symbol),
+    `FileEncodingPlan.readSymbol`(패딩), `EncodeService`(심볼 스트림·`reencode` 전체 재생성),
+    `FileChunks`(TreeMap → `LtDecoder` 누산기), `DecodeService`/`QrDecodeSupport`.
+    tests(코덱 손실 시뮬 + 손실 라운드트립)·docs 동시 갱신, round-trip·손실 복원 검증 완료.
+  - 후속(미착수): 복구 여유분(`--repair-overhead`) CLI/GUI 노출, Robust Soliton 등 효율 튜닝.
 
 ### 2. slide ↔ capture 페이싱·동기화
 

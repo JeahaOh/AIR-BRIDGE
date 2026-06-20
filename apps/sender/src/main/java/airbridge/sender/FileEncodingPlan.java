@@ -29,6 +29,7 @@ final class FileEncodingPlan implements AutoCloseable {
     private final Path encodedTempFile;
     private final int encodedSize;
     private final int totalChunks;
+    private final int symbolSize;
     private final long fileSize;
     private final String safePrefix;
     private final String flatSafePrefix;
@@ -41,6 +42,7 @@ final class FileEncodingPlan implements AutoCloseable {
                                 Path encodedTempFile,
                                 int encodedSize,
                                 int totalChunks,
+                                int symbolSize,
                                 long fileSize,
                                 String safePrefix,
                                 String flatSafePrefix) {
@@ -51,6 +53,7 @@ final class FileEncodingPlan implements AutoCloseable {
         this.encodedTempFile = encodedTempFile;
         this.encodedSize = encodedSize;
         this.totalChunks = totalChunks;
+        this.symbolSize = symbolSize;
         this.fileSize = fileSize;
         this.safePrefix = safePrefix;
         this.flatSafePrefix = flatSafePrefix;
@@ -113,6 +116,7 @@ final class FileEncodingPlan implements AutoCloseable {
                     tempFile,
                     encodedSize,
                     totalChunks,
+                    chunkDataSize,
                     info.rawByteCount(),
                     buildSafePrefix(effectiveFileName),
                     buildFlatSafePrefix(effectiveRelPath)
@@ -142,6 +146,32 @@ final class FileEncodingPlan implements AutoCloseable {
         }
         byte[] out = new byte[buffer.position()];
         System.arraycopy(buffer.array(), 0, out, 0, buffer.position());
+        return out;
+    }
+
+    /**
+     * Reads source symbol {@code index} (one of the {@code totalChunks()} symbols the gzip
+     * stream is split into) as a fixed {@code symbolSize}-byte block, zero-padding the final
+     * symbol. Positional reads, so safe to call concurrently for different symbols of one file.
+     */
+    byte[] readSymbol(int index) throws IOException {
+        int start = index * symbolSize;
+        int end = (int) Math.min((long) (index + 1) * symbolSize, encodedSize);
+        byte[] out = new byte[symbolSize]; // zero-padded tail for the last symbol
+        int length = end - start;
+        if (length <= 0) {
+            return out;
+        }
+        FileChannel channel = channel();
+        ByteBuffer buffer = ByteBuffer.wrap(out, 0, length);
+        long position = start;
+        while (buffer.hasRemaining()) {
+            int read = channel.read(buffer, position);
+            if (read < 0) {
+                break;
+            }
+            position += read;
+        }
         return out;
     }
 
@@ -219,6 +249,10 @@ final class FileEncodingPlan implements AutoCloseable {
 
     int totalChunks() {
         return totalChunks;
+    }
+
+    int symbolSize() {
+        return symbolSize;
     }
 
     long fileSize() {

@@ -90,14 +90,21 @@ libs/packager  -> picocli  (identify/pack/unpack archive-rewrite helpers)
 - **Path safety:** decode/unpack must never write outside the selected output dir —
   preserve `RelativePathSupport`-style checks when touching restoration logic.
 - **Payload compatibility:** the QR carries gzip bytes directly in QR 8-bit byte mode (no
-  Base64), framed as a binary record in `QrPayloadSupport`: `magic 'A','B'`
-  + u16-len `relPath` + u32 `chunkIdx` + u32 `totalChunks` + 8-byte `hash` (first 16 hex chars
-  of the SHA-256) + raw `data`. Encoder/decoder use the `ISO-8859-1` charset so bytes survive
-  1:1 with no ECI. There is **no** version field, transfer id, or frame checksum — do not
-  invent one. Any frame change touches sender, receiver, tests, and docs together.
-- **Decode semantics:** chunks group by payload metadata, not PNG filename; successful
-  decode moves source PNGs into sibling `*-success` dirs; missing chunks / QR-read failures
-  / hash mismatches / invalid paths are explicit first-class outcomes.
+  Base64). Each frame is one **LT fountain symbol** (see `libs/common/.../fountain`), framed as
+  a binary record in `QrPayloadSupport`: `magic 'A','B'` + u16-len `relPath` + 8-byte `hash`
+  (first 16 hex chars of the SHA-256) + u32 `k` (source-symbol count) + u32 `gzipLen` + u32
+  `esi` (encoding symbol id) + raw `symbol`. `esi 0..k-1` are systematic (the source symbols
+  verbatim), `esi >= k` are repair symbols (XOR of a deterministic source subset). Encoder/
+  decoder use the `ISO-8859-1` charset so bytes survive 1:1 with no ECI. There is **no** version
+  field, transfer id, or frame checksum — do not invent one. Fountain neighbor generation must
+  stay cross-platform deterministic (Ideal Soliton; no `Math.log`/`sqrt`). Any frame change
+  touches sender, receiver, tests, and docs together.
+- **Decode semantics:** symbols group by `relPath` (with `k`/`gzipLen`/`hash16` agreeing), not
+  PNG filename; a file rebuilds once the fountain decoder peels enough distinct symbols (~`k`,
+  a bit more under loss — any frames work, no specific one is required). Successful decode moves
+  source PNGs into sibling `*-success` dirs; not-enough-symbols (INCOMPLETE) / QR-read failures
+  / hash mismatches / invalid paths are explicit first-class outcomes. `reencode` re-emits a
+  failed file's whole symbol stream (no per-chunk granularity).
 
 ## When changing behavior
 

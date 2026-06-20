@@ -69,18 +69,27 @@ Current responsibilities:
    - Shared helpers belong in `libs/common` or another clearly shared module.
 
 4. Payload compatibility
-   - The current QR payload is a simple `HDR` header plus chunk data.
+   - Each QR frame is one LT fountain symbol of the file's gzip stream:
+     `magic 'A','B' + relPath + hash + k + gzipLen + esi + symbol` (binary,
+     big-endian). See `libs/common/.../fountain` and `docs/dev/encode-decode.md`.
    - There is no explicit payload version field today.
    - Do not invent or imply a transfer id, frame checksum, package manifest, or
      version field as if it already exists.
-   - Any payload field or separator change is a compatibility change and must
-     update sender, receiver, tests, and docs together.
+   - Fountain neighbor generation must stay cross-platform deterministic (Ideal
+     Soliton; java.util.Random + IEEE division/ceil only, no Math.log/sqrt), or
+     sender and receiver compute different neighbor sets and decoding breaks.
+   - Any payload field or fountain-scheme change is a compatibility change and
+     must update sender, receiver, tests, and docs together.
 
 5. Existing decode behavior matters
-   - Decode groups chunks by payload metadata, not by PNG filename.
+   - Decode groups symbols by payload metadata (relPath), not by PNG filename.
+   - A file rebuilds once the fountain decoder peels enough distinct symbols to
+     recover all k source symbols; no specific frame is required, so dropped
+     frames are tolerated. Order does not matter; duplicate esi is ignored.
    - Successful decode moves source PNGs into sibling `*-success` directories.
-   - Missing chunks, QR read failures, hash mismatches, and invalid paths are
-     first-class outcomes and must stay explicit.
+   - Not-enough-symbols (INCOMPLETE), QR read failures, hash mismatches, and
+     invalid paths are first-class outcomes and must stay explicit.
+   - `reencode` re-emits a failed file's whole symbol stream (no per-chunk index).
 
 6. Package helper semantics matter
    - `identify` writes `target-ext.txt` in the input archive directory.

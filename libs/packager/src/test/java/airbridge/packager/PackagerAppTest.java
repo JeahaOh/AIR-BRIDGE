@@ -352,6 +352,19 @@ class PackagerAppTest {
         throw new AssertionError("nested entry not found: " + entryName);
     }
 
+    @Test
+    void identifyFindsExtensionsInsideJarInJarInJar() throws Exception {
+        Path inner = tempDir.resolve("inner.jar");
+        createZip(inner, Map.of("deep/only.xyz", text("x")));
+        Path mid = tempDir.resolve("mid.jar");
+        createZip(mid, Map.of("lib/inner.jar", Files.readAllBytes(inner)));
+        Path outer = tempDir.resolve("outer.jar");
+        createZip(outer, Map.of("lib/mid.jar", Files.readAllBytes(mid)));
+
+        List<String> exts = PackagerInspector.collectUniqueExtensions(outer);
+        assertTrue(exts.contains("xyz"), "deep-only extension not found by identify: " + exts);
+    }
+
     private static byte[] text(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
     }

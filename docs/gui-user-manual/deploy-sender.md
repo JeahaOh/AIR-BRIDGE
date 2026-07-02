@@ -53,8 +53,7 @@ java -jar sender-<version>.jar
 `Browse`를 누르면 운영체제에 맞는 폴더 선택창이 열립니다.
 
 - macOS: Finder 스타일 창
-- Windows: Explorer 스타일 창을 우선 사용
-- 기본 창을 열 수 없는 경우: Java 기본 폴더 선택창 사용
+- Windows/기타: Java 기본(Swing) 폴더 선택창
 
 입력칸에 이미 유효한 경로가 있으면 그 위치에서 시작합니다. 비어 있거나
 잘못된 경로면 앱을 시작한 위치에서 시작합니다.

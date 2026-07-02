@@ -21,7 +21,9 @@
 
 ## slide 진입점
 
-`sender`는 `slide`를 별도 Picocli 서브커맨드로 처리하지 않고, `main(...)` 초반에 `"slide"` 토큰을 감지하면 `SlideApp.launch(...)`로 바로 넘긴다.
+`sender`는 `main(...)` 초반에 `"slide"` 토큰을 감지하면 `SlideApp.launch(...)`로 바로 넘긴다
+(주 경로). `slide`는 `--help` 목록 노출을 위해 Picocli 서브커맨드(`Sender.SlideCommand`)로도
+등록돼 있으며, 이 경로 역시 `SlideApp.launch(...)`를 호출한다.
 
 특징:
 
@@ -37,9 +39,9 @@
 구현은 `airbridge.common.gui.DirectoryChooser`를 사용하므로 sender/receiver
 GUI의 Browse 버튼과 같은 정책을 공유합니다.
 
-- macOS: `FileDialog` 디렉터리 선택
-- Windows: native `FileDialog`를 우선 시도하고, 디렉터리 선택으로 확정되지 않으면 `JFileChooser(DIRECTORIES_ONLY)`로 fallback
-- 그 외: `JFileChooser(DIRECTORIES_ONLY)`
+- macOS: `FileDialog` 디렉터리 선택(`apple.awt.fileDialogForDirectories`)
+- Windows/기타: `JFileChooser(DIRECTORIES_ONLY)` 직접 사용
+  (Windows의 AWT `FileDialog`는 디렉터리 선택이 불가능해 native 시도를 하지 않는다)
 - 입력칸 경로가 유효하면 그 위치에서 시작
 - 입력칸이 비어 있거나 유효하지 않으면 앱 실행 위치(`user.dir`)에서 시작
 
@@ -108,7 +110,7 @@ GUI의 Browse 버튼과 같은 정책을 공유합니다.
 
 1. `Play`
 2. 현재 이미지 표시
-3. `pageDisplayTimer`
+3. `displayTimer` (Page(ms) 대기)
 4. 필요 시 black frame 표시
 5. `blackTimer`
 6. 다음 이미지로 이동
@@ -197,9 +199,10 @@ decode 시작을 막습니다. 단, `Preview` 토글과 `Preview FPS`는 실행 
 
 동작:
 
-1. macOS면 `ffmpeg -f avfoundation -list_devices true -i ""` 출력 파싱 시도
+1. macOS면 `ffmpeg -f avfoundation -list_devices true -i ""`, Windows면
+   `ffmpeg -f dshow -list_devices true -i dummy` 출력에서 장치 이름 파싱 시도
 2. 인덱스와 이름을 얻으면 각 장치를 실제로 열어본다
-3. 이름 파싱 실패 시 `0..9`를 순회하며 오픈 가능한 장치만 노출
+3. 이름 파싱 실패 시(ffmpeg 미설치 포함) `0..9`를 순회하며 오픈 가능한 장치만 노출
 
 실제 사용 가능 여부는 `OpenCVFrameGrabber.start()` + `grab()` 성공 여부로 확인합니다.
 

@@ -17,7 +17,8 @@
 
 - 입력: `.jar` 또는 `.zip`
 - `identify` 출력: 입력 파일과 같은 폴더의 `target-ext.txt`
-- `pack` 출력: 같은 이름의 새 `.zip`
+- `pack` 출력: 같은 이름의 새 `.zip` (입력이 이미 `.zip`이면 원본 보존을 위해
+  `<이름>-packed.zip`)
 - `unpack` 출력: 입력 파일을 제자리에서 복원하고, jar 구조면 최종적으로 `.jar`로 바꾼다
 
 예:

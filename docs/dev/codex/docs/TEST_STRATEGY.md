@@ -49,9 +49,10 @@ Add or update tests for:
 - nested directory round-trip
 - text file and binary file round-trip
 - empty payload edge cases when relevant
-- QR payload parsing
-- chunk index bounds
-- missing chunks
+- QR payload parsing (including implausible frame-field rejection)
+- fountain peel behavior: duplicate esi ignored, repair symbols compensating
+  for lost source symbols (`LtFountainTest`, `LtPeelTrackerTest`)
+- insufficient distinct symbols -> INCOMPLETE
 - hash mismatch
 - QR read error handling
 - invalid or unsafe relative paths

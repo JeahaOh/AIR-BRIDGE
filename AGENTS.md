@@ -8,8 +8,11 @@ restoring them on the receiving side.
 
 The real command surface today is:
 
-- `sender`: `encode`, `slide`, `unpack`, hidden `reencode`
-- `receiver`: `decode`, `capture`, `identify`, `pack`
+- `sender`: `encode`, `gui`, `slide`, `unpack`, hidden `reencode`
+- `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
+
+Running either jar with no command opens the GUI; any command or CLI option
+keeps CLI behavior.
 
 Important distinction:
 
@@ -35,11 +38,12 @@ libs/
 Current responsibilities:
 
 - `apps/sender`
-  - Picocli entrypoint for `encode`
-  - direct `slide` launcher
-  - hidden `reencode`
+  - Picocli entrypoint for `encode`, `unpack`, `gui`, hidden `reencode`
+  - direct `slide` launcher (early token dispatch; also registered as a subcommand)
+  - Swing GUI (`SenderGui`: Encode/Slide tabs)
 - `apps/receiver`
-  - Picocli entrypoint for `decode` and `capture`
+  - Picocli entrypoint for `decode`, `capture`, `identify`, `pack`, `gui`
+  - Swing GUI (`ReceiverGui`: Capture/Decode tabs)
 - `libs/common`
   - QR payload helpers
   - shared CLI, banner, version, codec, and path helpers

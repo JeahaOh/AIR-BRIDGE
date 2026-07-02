@@ -78,28 +78,32 @@ data     : 나머지 바이트 (심볼 1개. symbolSize == data 길이, 파일 �
   ISO_8859_1)`로 인코딩하고, `QrDecodeSupport`는 `getText().getBytes(ISO_8859_1)`로 바이트를
   복원한 뒤 `QrPayloadSupport.parsePayload(byte[])`로 프레임을 해석한다.
 
-## encode 청크 생성
+## encode 심볼 생성
 
 파일 하나당 처리 순서는 아래와 같다.
 
 1. 전처리 후 바이트를 `CodecSupport.compressToFile(...)`로 GZIP 압축해서
    임시파일에 스트리밍 기록한다(같은 패스에서 SHA-256도 계산). 메모리는 O(buffer)로 제한된다.
-2. 임시파일을 `chunkDataSize`(바이트) 단위 윈도우로 읽는다(`FileEncodingPlan.readChunk`, byte[] 반환).
-3. 각 청크마다 payload 바이트 프레임을 만든다.
-4. `QrImageWriter.generateQrImage(...)`로 QR PNG를 만든다.
+2. gzip 스트림을 `symbolSize`(=`chunkDataSize`) 바이트 고정 블록 `k`개로 본다. 소스 심볼은
+   `FileEncodingPlan.readSymbol(index)`로 positional read 한다(마지막 심볼은 zero-padding).
+3. `esi 0..totalSymbols-1`마다 프레임을 하나씩 만든다. `totalSymbols = k +
+   ceil(k * repairOverhead)`(기본 overhead 0.5). `esi < k`는 소스 심볼 그대로, `esi >= k`는
+   `LtFountain.neighbors(esi, k)` 집합의 XOR이다(`EncodeService.buildSymbolBytes`).
+4. `QrImageWriter.generateQrImage(...)`로 QR PNG를 만든다(비트매트릭스를 그레이 래스터에
+   직접 렌더링). 심볼 단위 작업은 워커 풀에서 병렬 실행된다.
 5. 파일별 진행 로그를 남긴다.
 
 파일명 규칙:
 
 - 라벨 1행: `<fileName> [001/123]`
 - 라벨 2행: `relPath`
-- PNG 파일명: `<safePrefix>_001of123.png`
+- PNG 파일명: `<safePrefix>_001of123.png` (번호는 `esi + 1`, 총수는 복구 심볼 포함)
 
 `safePrefix`는 파일명에서 basename과 extension을 `_`로 이어 붙인 값입니다.
 
-예:
+예 (k=10, 기본 overhead 0.5 → 총 15장):
 
-- `sample.txt` -> `sample_txt_001of010.png`
+- `sample.txt` -> `sample_txt_001of015.png` ... `sample_txt_015of015.png`
 
 flat 모드(`folderStructure=false`)와 `reencode`는 전체 relPath에서 프리픽스를 만들되,
 경로 문자 치환(비ASCII → `_`)만으로는 서로 다른 파일이 같은 이름으로 붕괴할 수 있어

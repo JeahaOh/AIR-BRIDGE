@@ -64,8 +64,9 @@ java -jar build/libs/sender-<version>.jar gui
 
 encode 실행 중에는 결과가 중간에 다른 설정과 섞이지 않도록 Encode 탭의
 입력값이 잠깁니다. 잠기는 대상은 입력/출력/encode root, 오류 보정,
-chunk size, QR size, label height, files per folder, targets, skip dirs,
-exclude, 변환 옵션, folder structure입니다. 실행 중단이 필요하면
+chunk size, QR size, label height, files per folder, encode workers,
+repair overhead, targets, skip dirs, exclude, 변환 옵션,
+folder structure입니다. 실행 중단이 필요하면
 `Stop`을 누릅니다. Stop으로 중단되면 이번 encode 실행에서 생성한 QR PNG와
 manifest 파일은 정리하고, 기존에 있던 파일이나 비어 있지 않은
 디렉터리는 유지합니다.

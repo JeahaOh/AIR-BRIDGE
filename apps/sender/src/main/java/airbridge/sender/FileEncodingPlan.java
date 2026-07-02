@@ -128,28 +128,6 @@ final class FileEncodingPlan implements AutoCloseable {
     }
 
     /**
-     * Reads the gzip payload window {@code [start, end)} from the staged temp file. Uses
-     * positional reads on a shared {@link FileChannel}, which do not touch the channel's
-     * position, so this is safe to call concurrently for different chunks of the same file.
-     */
-    byte[] readChunk(int start, int end) throws IOException {
-        int length = end - start;
-        FileChannel channel = channel();
-        ByteBuffer buffer = ByteBuffer.allocate(length);
-        long position = start;
-        while (buffer.hasRemaining()) {
-            int read = channel.read(buffer, position);
-            if (read < 0) {
-                break;
-            }
-            position += read;
-        }
-        byte[] out = new byte[buffer.position()];
-        System.arraycopy(buffer.array(), 0, out, 0, buffer.position());
-        return out;
-    }
-
-    /**
      * Reads source symbol {@code index} (one of the {@code totalChunks()} symbols the gzip
      * stream is split into) as a fixed {@code symbolSize}-byte block, zero-padding the final
      * symbol. Positional reads, so safe to call concurrently for different symbols of one file.

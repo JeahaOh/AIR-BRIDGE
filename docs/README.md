@@ -6,6 +6,16 @@
 - `gui-user-manual/` : **GUI(화면이 있는 앱)** 로 쓰는 사람을 위한 문서
 - `dev/` : 내부 동작·성능·TODO 등 개발/유지보수용 문서
 
+## 새 담당자 읽는 순서
+
+1. 루트 `README.md` — 무엇을 하는 도구인지, 빌드/실행
+2. `AGENTS.md` — 지켜야 하는 제약(payload 호환성, 경로 안전, air-gap)과 모듈 경계
+3. `dev/encode-decode.md` — QR payload 프레임 규칙과 encode/decode 내부 동작
+4. `dev/slide-capture.md` — slide/capture 내부 동작과 페이싱
+5. `dev/todo.md` — 남은 작업과 보류 항목
+
+payload 프레임 형식을 바꾸는 변경은 sender·receiver·테스트·문서를 반드시 함께 고친다.
+
 ## CLI 사용자용 문서 (`user/`)
 
 - `user/deploy-receiver.md`: `receiver`를 실제로 실행하는 방법
@@ -33,7 +43,8 @@
 - `dev/faster.md`: `slide` / `capture` 성능 튜닝 메모
 - `dev/packager.md`: `identify` / `pack` / `unpack` 내부 동작 정리
 - `dev/slide-capture.md`: `slide` / `capture` 내부 동작과 상태 전이 정리
-- `dev/codex/README.md`: Codex 작업용 보조 문서, 프롬프트, 검증 스크립트 안내
+- `dev/sketch.md`: slide↔capture 속도 협상 설계 메모(방법 A 착수 여부 미결정 기록)
+- `dev/codex/README.md`: AI 어시스턴트 작업용 보조 문서, 프롬프트, 검증 스크립트 안내
 - `dev/todo.md`: 현재 남아 있는 작업만 정리한 TODO
 
 ## 정리 원칙

@@ -32,11 +32,12 @@ Current responsibilities:
 - collect source files from a directory
 - optionally convert selected office formats before encoding
 - GZIP-compress file content
-- split compressed bytes into QR payload chunks (binary frames, 8-bit byte mode)
+- emit LT fountain symbols over the gzip stream as QR payload frames
+  (binary frames, 8-bit byte mode; k systematic + repair symbols)
 - render QR PNG files plus `_manifest.txt`
 - launch the Swing slideshow app for playback
 - unpack a previously packed `zip` back into its original archive shape
-- regenerate failed QR chunks with hidden `reencode`
+- re-emit a failed file's whole symbol stream with hidden `reencode`
 
 ### Receiver
 
@@ -106,8 +107,8 @@ embedded metadata, and converts back to `.jar` when appropriate.
 
 ## Critical Behaviors
 
-- QR payload metadata is currently very small: relative path, chunk index,
-  total chunks, and a 16-hex SHA-256 prefix.
+- QR payload metadata is currently very small: relative path, a 16-hex SHA-256
+  prefix, `k` (source-symbol count), `gzipLen`, and `esi` (encoding symbol id).
 - The current payload has no explicit format version field.
 - Decode ordering and grouping come from payload metadata, not PNG filenames.
 - Path traversal and unsafe restore paths must be rejected.

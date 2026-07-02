@@ -27,8 +27,8 @@ flowchart TD
   B --> C["Capture 탭에서 출력 폴더 선택"]
   C --> D["기본 옵션 그대로 Start 클릭"]
   D --> E["송신 PC<br/>java -jar sender-&lt;version&gt;.jar 실행"]
-  E --> F["Slide 탭에서 QR PNG 폴더 선택"]
-  F --> G["기본 옵션 그대로 Play 클릭"]
+  E --> F["Slide 탭에서 QR PNG 폴더 선택 후 Launch slide"]
+  F --> G["플레이어 창에서 기본 옵션 그대로 Play 클릭"]
   G --> H["수신 PC가 QR 화면을 captured-images에 저장"]
   H --> I["Slide 재생 종료 확인"]
   I --> J["Capture 탭에서 Stop 클릭"]
@@ -77,13 +77,16 @@ sender GUI를 엽니다.
 java -jar sender-<version>.jar
 ```
 
-`Slide` 탭에서 아래 순서로 진행합니다.
+`Slide` 탭은 입력 폴더 선택까지만 담당하고, 재생 조작은 별도로 뜨는 슬라이드
+플레이어 창에서 합니다.
 
-1. `Browse`로 QR PNG가 들어 있는 폴더를 선택합니다.
-2. `Page(ms)`, `Black(ms)`, `Loop`는 기본값 그대로 둡니다.
-3. 수신 PC에서 `Capture`가 시작된 것을 확인합니다.
-4. `Play`로 재생을 시작합니다.
-5. 재생이 끝나면 수신 PC에서 `Stop`을 누릅니다.
+1. `Slide` 탭에서 `Browse`로 QR PNG가 들어 있는 폴더를 선택합니다
+   (`Use encode output`을 누르면 Encode 탭의 출력 폴더를 그대로 씁니다).
+2. `Launch slide`를 눌러 슬라이드 플레이어 창을 엽니다.
+3. 플레이어 창에서 `Page(ms)`, `Black(ms)`, `Loop`는 기본값 그대로 둡니다.
+4. 수신 PC에서 `Capture`가 시작된 것을 확인합니다.
+5. 플레이어 창의 `Play`로 재생을 시작합니다.
+6. 재생이 끝나면 수신 PC에서 `Stop`을 누릅니다.
 
 입력 규칙:
 
@@ -91,12 +94,12 @@ java -jar sender-<version>.jar
 - `session-start`가 포함된 파일은 먼저, `session-end`가 포함된 파일은 마지막에 배치됩니다.
 - 나머지는 상대 경로 기준으로 정렬됩니다.
 
-Browse 선택창은 macOS에서는 Finder 스타일 창을 사용하고, Windows에서는
-native Explorer 스타일 창을 우선 시도한 뒤 필요하면 Swing 디렉터리 선택창으로
-내려갑니다. 입력칸 경로가 유효하면 그 위치에서 시작하고, 비어 있거나
-유효하지 않으면 앱을 시작한 위치에서 시작합니다.
+Browse 선택창은 macOS에서는 Finder 스타일 창을, Windows를 포함한 그 외
+운영체제에서는 Java 기본(Swing) 디렉터리 선택창을 사용합니다. 입력칸 경로가
+유효하면 그 위치에서 시작하고, 비어 있거나 유효하지 않으면 앱을 시작한
+위치에서 시작합니다.
 
-주요 UI:
+플레이어 창 주요 UI:
 
 - `Browse`: 입력 디렉터리 선택
 - `Reload`: 이미지 다시 읽기

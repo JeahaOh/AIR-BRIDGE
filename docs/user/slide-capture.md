@@ -200,7 +200,7 @@ java -jar build/libs/receiver-<version>.jar decode \
 보수적 설정:
 
 - `Page(ms)`: `250`
-- `Black(ms)`: `0`
+- `Black(ms)`: `1` (입력 하한)
 
 고속 테스트:
 

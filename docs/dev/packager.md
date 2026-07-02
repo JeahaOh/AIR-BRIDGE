@@ -31,7 +31,8 @@
 
 1. 최상위 패키지와 중첩 `jar`/`zip` 내부까지 재귀적으로 스캔한다.
 2. 디렉터리는 제외한다.
-3. OS/IDE 잡파일 등 제외 패턴은 `PackEntryFilters` 기준으로 무시한다.
+3. `PackEntryFilters` 제외 패턴은 적용하지 않는다(`pack`만 적용). 잡파일 토큰은
+   6번의 `ExtensionTokens` 필터에서만 걸러진다.
 4. 파일명이 확장자를 가지면 마지막 확장자만 토큰으로 기록한다.
 5. 확장자가 없으면 파일명 자체를 토큰으로 기록한다.
 6. 수집 결과에 `ExtensionTokens.filterIncluded(...)`를 적용해 제외 토큰을 걷어낸다.
@@ -95,8 +96,10 @@
 1. 입력 파일을 제자리 rewrite 한다.
 2. `target-ext.txt`, `target.txt` 메타데이터 엔트리는 제거한다.
 3. `target.txt`의 이름 목록에 있는 엔트리만 `.txt` suffix를 제거한다 — pack이 rename하지
-   않은, 원래부터 `.txt`였던 파일(예: `readme.txt`)은 이름을 유지한다. 목록이 없는
-   구버전 패키지는 확장자 휴리스틱(대상 확장자·확장자 없음)으로 복원한다.
+   않은, 원래부터 `.txt`였던 파일(예: `readme.txt`)은 이름을 유지한다. 예외: 목록이 있어도
+   `*.jar.txt`/`*.zip.txt`(대상 확장자인 아카이브)는 모양 기준으로 복원한다(중첩 아카이브
+   rename을 기록하지 않던 구버전 목록 호환). 목록 자체가 없는 구버전 패키지는 확장자
+   휴리스틱(대상 확장자·확장자 없음)으로 복원한다.
 4. 중첩 `jar`/`zip`도 내부까지 재귀적으로 복원한다.
 5. 결과 zip에 `META-INF/MANIFEST.MF`가 있으면 `.jar`로 다시 써서 파일 확장자도 `.jar`로 되돌린다.
 
@@ -116,7 +119,8 @@
 - `node_modules/**`
 - `__pycache__/**`
 
-이 패턴은 `identify`의 확장자 수집, `pack`의 대상 계산, 실제 rewrite 모두에 영향을 줍니다.
+이 패턴은 `pack`에만 적용됩니다(대상 계산, 추론 fallback, 실제 rewrite).
+`identify`는 이 패턴을 적용하지 않고 `ExtensionTokens` 토큰 필터만 사용합니다.
 
 ## 구현 포인트
 

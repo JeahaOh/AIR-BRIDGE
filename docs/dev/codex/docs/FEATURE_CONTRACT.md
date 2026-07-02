@@ -45,9 +45,10 @@
 
 - input directory exists
 - at least one PNG is found
-- QR payload parses correctly
-- chunk indexes are valid
-- chunk set completeness
+- QR payload parses correctly (frame fields must be plausible: k >= 1,
+  esi >= 0, gzipLen consistent with k and symbol size)
+- symbols group by relPath with agreeing k/gzipLen/hash16/symbol size
+- fountain peel completeness (enough distinct symbols; otherwise INCOMPLETE)
 - restored byte hash matches payload `hash16`
 - output paths stay under the restore root
 
@@ -185,7 +186,8 @@
 
 ### Output
 
-- regenerated QR PNG files for failed files or missing chunks
+- regenerated QR PNG files: the whole symbol stream of each failed file
+  (fountain model has no per-chunk regeneration)
 - console summary
 
 ### Must Validate

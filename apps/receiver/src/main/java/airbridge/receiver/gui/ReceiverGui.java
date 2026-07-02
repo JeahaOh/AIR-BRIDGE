@@ -304,8 +304,10 @@ public final class ReceiverGui {
             lastPreviewQueuedNanos.set(0L);
             previewPanel.setImage(null);
             setStatus("Starting capture");
-            updateRunningState(true);
+            // Assign before updateRunningState: it checks isCaptureRunning() to decide
+            // whether the Decode start button must be disabled too.
             captureWorker = new CaptureWorker(options);
+            updateRunningState(true);
             captureWorker.execute();
         }
 

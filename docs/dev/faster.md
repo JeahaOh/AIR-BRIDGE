@@ -94,15 +94,15 @@
 
 안정형:
 - `page=250ms`
-- `black=0~30ms`
+- `black=1~30ms`
 
 균형형:
 - `page=200ms`
-- `black=0ms`
+- `black=1ms`
 
 고속형:
 - `page=150~180ms`
-- `black=0ms`
+- `black=1ms` (스피너 하한이 1ms)
 - 이 구간은 실제 환경에서 검증 후 사용
 
 ## 2. Capture
@@ -114,8 +114,8 @@
 - `SAVE_QUEUE_CAPACITY = 128`
 - `MAX_PENDING_DECODE = 32`
 
-위치:
-- [`CaptureService.java`](../../libs/capture/src/main/java/airbridge/receiver/capture/CaptureService.java)
+위치(정의):
+- [`CaptureDefaults.java`](../../libs/capture/src/main/java/airbridge/receiver/capture/CaptureDefaults.java)
 
 기본값:
 - CLI `fps = 15`

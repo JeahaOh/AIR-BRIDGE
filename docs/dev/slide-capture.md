@@ -285,6 +285,7 @@ decode 구현 자체는 `CaptureQrDecodeSupport.decodeQrPayloadWithRetries(...)`
 규칙:
 
 - `seenPayloads.add(payload)`가 실패하면 이미 본 payload이므로 저장 안 함
+- 새 payload마다 `trackCompletion(payload)`로 파일별 복원 가능 여부를 갱신(아래 페이싱 절 참고)
 - 저장할 때만 `savedImageCounter` 증가
 - 파일명은 `frame_000001.png` 형태
 - `maxPayloads > 0`이고 저장 건수가 상한에 도달하면 종료 요청
@@ -345,6 +346,8 @@ manifest에는 아래 정보가 들어간다.
 - 시작/종료 시각
 - stop reason
 - 총 frames / analyzed / decoded / unique payloads / saved images
+- `observedFiles` / `decodableFiles`: 관측된 파일 수와 그중 심볼이 충분히 모여 복원 가능한 파일 수
+- `unparsedPayloads`: fountain 프레임으로 파싱되지 않은 payload 수(외부 QR 등)
 - black frame skip 수
 - decode failure 수
 - queue high-water mark
@@ -361,17 +364,26 @@ manifest에는 아래 정보가 들어간다.
 1. **수신측 측정 → 권장 속도 출력(사람이 적용).** `capture`는 이번 실행에서 잡은 고유 심볼
    수와 경과 시간으로 "고유 N QR/s"를 구하고, 다음 패스 권장 `page-display-ms`를
    상태 로그와 종료 로그에 출력한다(`CaptureService.recommendedDwellMs`,
-   `= 고유 1개당 평균 간격 × 안전계수 1.3`). 운영자가 그 값을 보고 `slide`의 `Page` 시간을
-   맞춘다. 송신측을 자동 제어하는 채널은 없으므로 어디까지나 **가이드값**이다.
+   `= 고유 1개당 평균 간격 × 안전계수 1.3`). 로그에는 방향 힌트("지금 slide Page(ms)가
+   N보다 작으면 올리고, 크면 N까지 내려도 됩니다")가 함께 붙어 운영자가 `slide`의 `Page`
+   시간을 맞춘다. 송신측을 자동 제어하는 채널은 없으므로 어디까지나 **가이드값**이다.
 2. **fountain 복구 + slide 루프가 미스매치를 흡수.** §1 fountain(`docs/dev/encode-decode.md`)
    덕분에 특정 프레임을 놓쳐도 distinct 심볼만 충분히 모이면 복원된다. `slide`는 이미 루프하므로
    (`Loop=0`이면 무한, `advanceToNext`가 끝에서 첫 장으로 복귀) 매 패스마다 받을 수 있는
    심볼을 누적한다 → 정밀한 속도 매칭이 필요 없다. 권장값보다 조금 빨라도 루프가 메운다.
-3. **완료 신호는 수신측에서 사람이 판단.** `decode`/복원 진행은 수신측에서 보이므로, 운영자가
-   복원 완료를 확인하면 `slide`를 멈춘다(루프를 사람이 닫는다).
+3. **완료 자동 감지 → 정지 안내(사람이 정지).** `capture`가 고유 payload마다 fountain 프레임을
+   파싱해(`CaptureCompletionTracker`) decode와 같은 기준(relPath+hash16+k+gzipLen+symbolSize)으로
+   파일별 심볼을 묶고, `LtPeelTracker`(심볼 바이트 없이 이웃 집합만으로 `LtDecoder`와 동일한
+   peel을 수행하는 구조적 트래커)로 "지금 저장된 PNG만으로 decode가 이 파일을 복원할 수 있는가"를
+   실시간 판정한다. 파일이 복원 가능해지는 순간 `[CAPTURE][DONE]` 로그를, 관측된 파일 전부가
+   복원 가능해지면 "slide를 정지해도 됩니다" 배너를 출력하고 상태(`decodableFiles/observedFiles`)를
+   즉시 갱신한다. 단, **한 번도 카메라에 잡히지 않은 파일은 관측 자체가 안 되므로** 전체 세션
+   완료의 증명은 아니다 — 보낸 파일 개수는 운영자가 알고 있어야 하고, 정지도 운영자가 한다
+   (자동 정지 없음).
 
-요약: "자동 페이싱"은 *수신측이 권장 속도를 측정해 보여주고, fountain 루프가 나머지를 흡수* 하는
-사람 개입(human-in-the-loop) 방식이다. 송신측 자동 속도 제어는 원리적으로 없다.
+요약: "자동 페이싱"은 *수신측이 권장 속도를 측정해 보여주고, fountain 루프가 나머지를 흡수하며,
+복원 가능 시점은 수신측이 자동 감지해 알려주는* 사람 개입(human-in-the-loop) 방식이다.
+송신측 자동 속도 제어는 원리적으로 없다.
 
 ## 테스트로 보는 보장 범위
 

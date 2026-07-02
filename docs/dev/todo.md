@@ -57,7 +57,13 @@
   - 이미 루프함(`Loop=0` 무한, `SlidePlaybackController.advanceToNext`가 끝에서 첫 장 복귀).
     fountain 복구+루프가 속도 미스매치를 흡수 → 정밀 매칭 불필요. `docs/dev/slide-capture.md`
     "slide ↔ capture 페이싱" 절에 워크플로(권장값 적용 + 루프 + 수신측에서 완료 확인 후 정지) 명시.
+- [x] **완료 자동 감지 + 정지 안내 (sketch 방법 B)** — 완료(2026-07-02)
+  - `capture`가 고유 payload마다 fountain 프레임을 파싱해(`CaptureCompletionTracker` +
+    `LtPeelTracker`, 심볼 바이트 없이 ESI 구조만으로 peel 판정) 파일별 복원 가능 시점을
+    감지하고 `[CAPTURE][DONE]` 로그·"slide 정지해도 됩니다" 배너·GUI 상태(`복원 가능 N/M`)로
+    안내. 권장값 로그에 방향 힌트 추가. 자세한 배경은 `docs/dev/sketch.md`(방법 B).
   - 후속(미착수): 전송 전 속도 램프 캘리브레이션 모드(더 정확한 권장값) — ROI 보고 별도 결정.
+    방법 A(광학 양방향 back-channel)는 에어갭 정책 결정 게이트에 답한 뒤에만 검토.
 
 ### 3. 4색 컬러 심볼 (흰/녹/적/흑, 2 bit/셀)
 

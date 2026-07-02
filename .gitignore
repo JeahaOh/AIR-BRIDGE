@@ -68,3 +68,5 @@ work/
 
 fixtures/
 .gradle-home
+.gradlew-home
+.gradlew-home-x

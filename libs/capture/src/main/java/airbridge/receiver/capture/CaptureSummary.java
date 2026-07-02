@@ -15,6 +15,8 @@ public record CaptureSummary(
         long uniquePayloads,
         long savedImages,
         long blackFramesSkipped,
-        long decodeFailures
+        long decodeFailures,
+        long observedFiles,
+        long decodableFiles
 ) {
 }

@@ -1,5 +1,6 @@
 package airbridge.receiver.capture;
 
+import airbridge.common.QrPayloadSupport;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
@@ -14,6 +15,7 @@ import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -74,6 +76,9 @@ class CaptureServiceInternalTest {
                 new CaptureOptions(outDir, 7, 1920, 1080, 15.5d, 0L, 0, 4, 1000L, 30L, false),
                 null
         );
+        // One decodable single-symbol file plus one foreign payload, to pin the new fields.
+        invoke(service, "trackCompletion", new Class<?>[]{String.class}, fountainPayload("m.txt", 1, 0));
+        invoke(service, "trackCompletion", new Class<?>[]{String.class}, "not-a-fountain-frame");
 
         getField(service, "totalFrames", AtomicLong.class).set(101);
         getField(service, "analyzedFrames", AtomicLong.class).set(88);
@@ -108,11 +113,53 @@ class CaptureServiceInternalTest {
         assertTrue(manifest.contains("\"fps\": 15.5"));
         assertTrue(manifest.contains("\"uniquePayloads\": 2"));
         assertTrue(manifest.contains("\"savedImages\": 6"));
+        assertTrue(manifest.contains("\"observedFiles\": 1"));
+        assertTrue(manifest.contains("\"decodableFiles\": 1"));
+        assertTrue(manifest.contains("\"unparsedPayloads\": 1"));
         assertTrue(manifest.contains("\"decodeFailures\": 3"));
         assertTrue(manifest.contains("\"fingerprintMillis\": 1.250"));
         assertTrue(manifest.contains("\"decodeMillis\": 2.500"));
         assertTrue(manifest.contains("\"saveMillis\": 3.750"));
         assertTrue(manifest.contains("\"stopReason\": \"stop \\\"quoted\\\"\\nnext\""));
+    }
+
+    @Test
+    void trackCompletionAnnouncesDecodableFilesAndPushesStatus() throws Exception {
+        List<String> logs = new ArrayList<>();
+        List<CaptureStatus> statuses = new ArrayList<>();
+        CaptureService service = new CaptureService(
+                new CaptureOptions(tempDir.resolve("done-out"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false),
+                new CaptureListener() {
+                    @Override
+                    public void onLog(String line) {
+                        logs.add(line);
+                    }
+
+                    @Override
+                    public void onStatus(CaptureStatus status) {
+                        statuses.add(status);
+                    }
+                }
+        );
+        Class<?>[] sig = {String.class};
+
+        invoke(service, "trackCompletion", sig, fountainPayload("dir/file.txt", 2, 0));
+        assertTrue(logs.isEmpty(), "no announcement before the file is decodable");
+        assertTrue(statuses.isEmpty());
+
+        invoke(service, "trackCompletion", sig, fountainPayload("dir/file.txt", 2, 1));
+        assertTrue(logs.stream().anyMatch(line ->
+                line.contains("[CAPTURE][DONE] dir/file.txt") && line.contains("decode로 복원 가능")));
+        assertTrue(logs.stream().anyMatch(line ->
+                line.contains("관측된 파일 1개 모두 복원 가능") && line.contains("slide를 정지해도 됩니다")));
+        assertEquals(1, statuses.size(), "status is pushed immediately, without waiting a status interval");
+        assertEquals(1, statuses.get(0).observedFiles());
+        assertEquals(1, statuses.get(0).decodableFiles());
+
+        // A newly observed, still-incomplete file must not re-trigger the all-decodable banner.
+        logs.clear();
+        invoke(service, "trackCompletion", sig, fountainPayload("later.txt", 2, 0));
+        assertTrue(logs.isEmpty());
     }
 
     @Test
@@ -132,6 +179,12 @@ class CaptureServiceInternalTest {
         // Faster capture -> shorter recommended dwell.
         assertTrue((long) (Long) invoke(service, "recommendedDwellMs", sig, 50L, 5000L)
                 < (long) (Long) invoke(service, "recommendedDwellMs", sig, 10L, 5000L));
+    }
+
+    // Builds the ISO-8859-1 payload string of one all-zero fountain symbol frame.
+    private static String fountainPayload(String relPath, int k, int esi) {
+        byte[] frame = QrPayloadSupport.buildPayload(relPath, "0123456789abcdef", k, k * 8, esi, new byte[8]);
+        return new String(frame, StandardCharsets.ISO_8859_1);
     }
 
     private static void writeQrPng(Path path, String payload) throws Exception {

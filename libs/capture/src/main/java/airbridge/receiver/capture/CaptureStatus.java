@@ -8,6 +8,8 @@ public record CaptureStatus(
         long savedImages,
         long blackFramesSkipped,
         long decodeFailures,
+        long observedFiles,
+        long decodableFiles,
         String stopReason
 ) {
 }

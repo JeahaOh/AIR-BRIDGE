@@ -672,19 +672,27 @@ public final class ReceiverGui {
         }
 
         private static String formatStatus(CaptureStatus status) {
-            return String.format("Frames %d, analyzed %d, decoded %d, saved %d, failures %d",
+            String base = String.format("Frames %d, analyzed %d, decoded %d, saved %d, failures %d — 복원 가능 %d/%d 파일",
                     status.totalFrames(),
                     status.analyzedFrames(),
                     status.decodedFrames(),
                     status.savedImages(),
-                    status.decodeFailures());
+                    status.decodeFailures(),
+                    status.decodableFiles(),
+                    status.observedFiles());
+            if (status.observedFiles() > 0 && status.decodableFiles() == status.observedFiles()) {
+                return base + " ✔ 관측된 파일 모두 복원 가능 — slide 정지 가능";
+            }
+            return base;
         }
 
         private static String formatSummary(CaptureSummary summary) {
-            return String.format("Finished: %s, saved %d image(s), unique payloads %d",
+            return String.format("Finished: %s, saved %d image(s), unique payloads %d, 복원 가능 %d/%d 파일",
                     summary.stopReason(),
                     summary.savedImages(),
-                    summary.uniquePayloads());
+                    summary.uniquePayloads(),
+                    summary.decodableFiles(),
+                    summary.observedFiles());
         }
 
         private static String formatDecodeResult(DecodeWorkflow.Result result) {

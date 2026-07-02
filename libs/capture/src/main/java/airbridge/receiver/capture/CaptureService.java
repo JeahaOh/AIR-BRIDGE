@@ -89,6 +89,7 @@ public final class CaptureService {
     private final AtomicLong lastPreviewAtMillis = new AtomicLong();
     private final AtomicInteger savedImageCounter = new AtomicInteger();
     private final Set<String> seenPayloads = Collections.synchronizedSet(new HashSet<>());
+    private final CaptureCompletionTracker completionTracker = new CaptureCompletionTracker();
 
     private volatile String stopReason = "completed";
     private volatile long startedAtMillis;
@@ -208,15 +209,17 @@ public final class CaptureService {
                 seenPayloads.size(),
                 savedImageCounter.get(),
                 blackFramesSkipped.get(),
-                decodeFailures.get()
+                decodeFailures.get(),
+                completionTracker.observedFiles(),
+                completionTracker.decodableFiles()
         );
-        long recommendedDwell = recommendedDwellMs(seenPayloads.size(), elapsedMillis());
-        if (recommendedDwell >= 0) {
-            listener.onLog(String.format(Locale.ROOT,
-                    "[CAPTURE][INFO] 이번 실행 고유 %.1f QR/s -> 다음 패스 slide page-display-ms >= %dms 권장 "
-                            + "(fountain 복구+루프가 흡수하므로 가이드값)",
-                    seenPayloads.size() * 1000.0 / Math.max(1, elapsedMillis()), recommendedDwell));
+        String recommendation = dwellRecommendationLog(seenPayloads.size(), elapsedMillis(), true);
+        if (recommendation != null) {
+            listener.onLog(recommendation);
         }
+        listener.onLog(String.format(Locale.ROOT,
+                "[CAPTURE][INFO] 복원 가능 파일 %d/%d (관측된 파일 기준; 최종 확정은 decode 결과)",
+                summary.decodableFiles(), summary.observedFiles()));
         listener.onFinished(summary);
         return summary;
     }
@@ -335,6 +338,7 @@ public final class CaptureService {
                 if (!seenPayloads.add(packet.payload)) {
                     continue;
                 }
+                trackCompletion(packet.payload);
                 int imageNumber = savedImageCounter.incrementAndGet();
                 Path imagePath = imagesDir.resolve(String.format(Locale.ROOT, "frame_%06d.png", imageNumber));
                 savePermits.acquire();
@@ -393,7 +397,26 @@ public final class CaptureService {
     }
 
     private void logStatus() {
-        CaptureStatus status = new CaptureStatus(
+        CaptureStatus status = buildStatus();
+        listener.onStatus(status);
+        listener.onLog(String.format(
+                "[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d decodableFiles=%d/%d",
+                status.totalFrames(),
+                status.analyzedFrames(),
+                status.decodedFrames(),
+                status.uniquePayloads(),
+                status.savedImages(),
+                status.decodableFiles(),
+                status.observedFiles()));
+        // 매 상태 주기(기본 10초)마다 지금까지 관측된 속도로 다시 계산한 slide 권장값을 별도 줄로 출력한다.
+        String recommendation = dwellRecommendationLog(status.uniquePayloads(), elapsedMillis(), false);
+        if (recommendation != null) {
+            listener.onLog(recommendation);
+        }
+    }
+
+    private CaptureStatus buildStatus() {
+        return new CaptureStatus(
                 totalFrames.get(),
                 analyzedFrames.get(),
                 decodedFrames.get(),
@@ -401,23 +424,34 @@ public final class CaptureService {
                 savedImageCounter.get(),
                 blackFramesSkipped.get(),
                 decodeFailures.get(),
+                completionTracker.observedFiles(),
+                completionTracker.decodableFiles(),
                 stopReason
         );
-        listener.onStatus(status);
-        long elapsed = elapsedMillis();
-        listener.onLog(String.format("[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d",
-                status.totalFrames(),
-                status.analyzedFrames(),
-                status.decodedFrames(),
-                status.uniquePayloads(),
-                status.savedImages()));
-        // 매 상태 주기(기본 10초)마다 지금까지 관측된 속도로 다시 계산한 slide 권장값을 별도 줄로 출력한다.
-        long recommendedDwell = recommendedDwellMs(status.uniquePayloads(), elapsed);
-        if (recommendedDwell >= 0) {
-            listener.onLog(String.format(Locale.ROOT,
-                    "[CAPTURE][INFO] 고유 %.1f QR/s -> slide page-display-ms >= %dms 권장 (가이드값)",
-                    status.uniquePayloads() * 1000.0 / Math.max(1, elapsed), recommendedDwell));
+    }
+
+    // saveLoop(및 resume 스캔)에서 고유 페이로드마다 정확히 한 번 호출된다. 어떤 파일이 막
+    // "복원 가능"해진 순간과, 관측된 파일 전부가 복원 가능해진 순간을 알린다. 송신측으로
+    // 신호를 보낼 채널은 없으므로 slide 정지는 이 안내를 본 운영자 몫이다.
+    private void trackCompletion(String payload) {
+        CaptureCompletionTracker.Offer offer = completionTracker.offer(payload);
+        if (offer.event() != CaptureCompletionTracker.Event.FILE_DECODABLE) {
+            return;
         }
+        listener.onLog(String.format(Locale.ROOT,
+                "[CAPTURE][DONE] %s — 심볼 %d개 수집(k=%d), decode로 복원 가능",
+                offer.relPath(), offer.received(), offer.k()));
+        if (offer.decodableFiles() == offer.observedFiles()) {
+            String rule = "[CAPTURE][DONE] " + "=".repeat(56);
+            listener.onLog(rule);
+            listener.onLog(String.format(Locale.ROOT,
+                    "[CAPTURE][DONE] 관측된 파일 %d개 모두 복원 가능 — slide를 정지해도 됩니다"
+                            + " (아직 한 번도 안 잡힌 파일이 있다면 계속 재생)",
+                    offer.observedFiles()));
+            listener.onLog(rule);
+        }
+        // 상태 주기를 기다리지 않고 상태(GUI 라벨 등)도 즉시 갱신한다.
+        listener.onStatus(buildStatus());
     }
 
     private long elapsedMillis() {
@@ -434,6 +468,28 @@ public final class CaptureService {
         }
         double msPerUnique = (double) elapsedMillis / uniquePayloads;
         return (long) Math.ceil(msPerUnique * PACING_SAFETY_FACTOR);
+    }
+
+    // Pacing guidance with an explicit adjustment direction. The receiver cannot see the
+    // sender's current Page(ms), so the direction is phrased against the recommended floor and
+    // the operator compares it with their own setting. Null when too little was captured.
+    private String dwellRecommendationLog(long uniquePayloads, long elapsedMillis, boolean finalPass) {
+        long recommended = recommendedDwellMs(uniquePayloads, elapsedMillis);
+        if (recommended < 0) {
+            return null;
+        }
+        double uniquePerSec = uniquePayloads * 1000.0 / Math.max(1, elapsedMillis);
+        if (finalPass) {
+            return String.format(Locale.ROOT,
+                    "[CAPTURE][INFO] 이번 실행 고유 %.1f QR/s -> 다음 패스 slide page-display-ms >= %dms 권장 — "
+                            + "지금 slide Page(ms)가 %d보다 작았다면 올리고, 컸다면 %d까지 내려도 됩니다 "
+                            + "(fountain 복구+루프가 흡수하므로 가이드값)",
+                    uniquePerSec, recommended, recommended, recommended);
+        }
+        return String.format(Locale.ROOT,
+                "[CAPTURE][INFO] 고유 %.1f QR/s -> slide page-display-ms >= %dms 권장 — "
+                        + "지금 slide Page(ms)가 %d보다 작으면 올리고, 크면 %d까지 내려도 됩니다 (가이드값)",
+                uniquePerSec, recommended, recommended, recommended);
     }
 
     private void requestStop(String reason) {
@@ -484,6 +540,9 @@ public final class CaptureService {
         appendJsonField(sb, "decodedFrames", String.valueOf(decodedFrames.get()), false, true);
         appendJsonField(sb, "uniquePayloads", String.valueOf(seenPayloads.size()), false, true);
         appendJsonField(sb, "savedImages", String.valueOf(savedImageCounter.get()), false, true);
+        appendJsonField(sb, "observedFiles", String.valueOf(completionTracker.observedFiles()), false, true);
+        appendJsonField(sb, "decodableFiles", String.valueOf(completionTracker.decodableFiles()), false, true);
+        appendJsonField(sb, "unparsedPayloads", String.valueOf(completionTracker.unparsedPayloads()), false, true);
         appendJsonField(sb, "blackFramesSkipped", String.valueOf(blackFramesSkipped.get()), false, true);
         appendJsonField(sb, "decodeFailures", String.valueOf(decodeFailures.get()), false, true);
         appendJsonField(sb, "rawQueueOfferRetries", String.valueOf(rawQueueOfferRetries.get()), false, true);
@@ -530,6 +589,7 @@ public final class CaptureService {
                     String payload = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
                     if (seenPayloads.add(payload)) {
                         restoredPayloads++;
+                        trackCompletion(payload);
                     }
                 } catch (Exception e) {
                     listener.onLog("[CAPTURE][WARN] resume skipped " + imagePath.getFileName() + ": " + e.getMessage());

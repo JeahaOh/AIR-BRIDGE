@@ -215,7 +215,7 @@ QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 심볼이 부족해 �
 주요 유형:
 
 - `O rel/path - OK`
-- `X rel/path - INCOMPLETE (누락: [...])`
+- `X rel/path - INCOMPLETE (심볼 <받은수>/<k> 소스, 복원 불가)`
 - `X rel/path - DECODE_ERROR`
 - `X rel/path - HASH_MISMATCH`
 - `X rel/path - INVALID_PATH`

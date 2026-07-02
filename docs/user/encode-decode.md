@@ -193,7 +193,7 @@ java -jar build/libs/receiver-<version>.jar decode \
 
 ```text
 O src/main/java/App.java - OK
-X src/main/java/App.java - INCOMPLETE (누락: [2, 5])
+X src/main/java/App.java - INCOMPLETE (심볼 8/10 소스, 복원 불가)
 X src/main/java/App.java - HASH_MISMATCH
 X src/main/java/App.java - DECODE_ERROR
 ```
@@ -201,7 +201,9 @@ X src/main/java/App.java - DECODE_ERROR
 의미:
 
 - `OK`: 정상 복원
-- `INCOMPLETE`: 일부 QR 청크 누락
+- `INCOMPLETE`: 복원에 필요한 QR(심볼)을 충분히 못 모음. 특정 한 장이 아니라 **개수**가
+  부족한 것이므로, 같은 화면을 한 번 더 재생/캡처하거나 다음 전송에서 `--repair-overhead`를
+  올려 여유 QR을 늘리면 해결됩니다. (괄호의 `8/10`은 소스 심볼 10개 중 8개만 모였다는 뜻)
 - `HASH_MISMATCH`: 복원은 됐지만 내용 불일치
 - `DECODE_ERROR`: QR payload 복원 실패
 

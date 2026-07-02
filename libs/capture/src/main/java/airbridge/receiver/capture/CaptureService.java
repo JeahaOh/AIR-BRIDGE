@@ -88,7 +88,9 @@ public final class CaptureService {
     private final AtomicLong saveQueueHighWaterMark = new AtomicLong();
     private final AtomicLong lastPreviewAtMillis = new AtomicLong();
     private final AtomicInteger savedImageCounter = new AtomicInteger();
-    private final Set<String> seenPayloads = Collections.synchronizedSet(new HashSet<>());
+    // Dedupe by a 128-bit SHA-256 prefix of the payload instead of retaining every unique
+    // payload string: long captures otherwise grow the heap by ~2KB per unique frame forever.
+    private final Set<PayloadDigest> seenPayloads = Collections.synchronizedSet(new HashSet<>());
     private final CaptureCompletionTracker completionTracker = new CaptureCompletionTracker();
 
     private volatile String stopReason = "completed";
@@ -180,13 +182,15 @@ public final class CaptureService {
         } finally {
             stopRequested.set(true);
             mouseJiggleExecutor.shutdownNow();
-            rawFrameQueue.put(FramePacket.POISON);
+            // A blocking put would hang forever if the consumer thread already died (its
+            // queue never drains); poke with a timeout and stop once the thread is gone.
+            offerPoisonWhileAlive(analyzeThread, () -> rawFrameQueue.offer(FramePacket.POISON, 100, TimeUnit.MILLISECONDS));
             analyzeThread.join();
             fingerprintExecutor.shutdown();
             fingerprintExecutor.awaitTermination(5, TimeUnit.MINUTES);
             decodeExecutor.shutdown();
             decodeExecutor.awaitTermination(5, TimeUnit.MINUTES);
-            saveQueue.put(SavePacket.POISON);
+            offerPoisonWhileAlive(saveThread, () -> saveQueue.offer(SavePacket.POISON, 100, TimeUnit.MILLISECONDS));
             saveThread.join();
             saveExecutor.shutdown();
             saveExecutor.awaitTermination(5, TimeUnit.MINUTES);
@@ -335,7 +339,7 @@ public final class CaptureService {
                 if (packet == SavePacket.POISON) {
                     return;
                 }
-                if (!seenPayloads.add(packet.payload)) {
+                if (!seenPayloads.add(PayloadDigest.of(packet.payload))) {
                     continue;
                 }
                 trackCompletion(packet.payload);
@@ -388,7 +392,10 @@ public final class CaptureService {
                 if (param.getCompressionTypes() != null && param.getCompressionTypes().length > 0) {
                     param.setCompressionType(param.getCompressionTypes()[0]);
                 }
-                param.setCompressionQuality(0.0f);
+                // For the JDK PNG writer, LOWER quality means MORE deflate effort: 0.0 selects
+                // the slowest maximum-compression level. 0.75 picks a fast level, which is what
+                // this live save path needs; camera noise barely compresses better at level 9.
+                param.setCompressionQuality(0.75f);
             }
             writer.write(null, new javax.imageio.IIOImage(image, null, null), param);
         } finally {
@@ -559,6 +566,19 @@ public final class CaptureService {
         highWaterMark.accumulateAndGet(currentSize, Math::max);
     }
 
+    // Retries a poison-pill offer only while the consumer thread is alive; if the queue stays
+    // full because the consumer died, shutdown proceeds instead of blocking forever.
+    private static void offerPoisonWhileAlive(Thread consumer, PoisonOffer offer) throws InterruptedException {
+        while (consumer.isAlive() && !offer.offer()) {
+            // retry; the timeout inside offer() paces the loop
+        }
+    }
+
+    @FunctionalInterface
+    private interface PoisonOffer {
+        boolean offer() throws InterruptedException;
+    }
+
     private void restoreResumeState(Path imagesDir) throws Exception {
         if (!options.resume()) {
             return;
@@ -587,7 +607,7 @@ public final class CaptureService {
                         continue;
                     }
                     String payload = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
-                    if (seenPayloads.add(payload)) {
+                    if (seenPayloads.add(PayloadDigest.of(payload))) {
                         restoredPayloads++;
                         trackCompletion(payload);
                     }
@@ -735,6 +755,28 @@ public final class CaptureService {
                 .replace("\r", "\\r")
                 .replace("\n", "\\n")
                 .replace("\t", "\\t");
+    }
+
+    // 128-bit payload fingerprint for the dedupe set. A collision would silently drop one
+    // frame, which the fountain absorbs like any other lost frame; at 2^-64-ish odds for
+    // realistic session sizes that trade is safe.
+    private record PayloadDigest(long hi, long lo) {
+        static PayloadDigest of(String payload) {
+            byte[] hash;
+            try {
+                hash = java.security.MessageDigest.getInstance("SHA-256")
+                        .digest(payload.getBytes(StandardCharsets.ISO_8859_1));
+            } catch (java.security.NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 not available", e);
+            }
+            long hi = 0L;
+            long lo = 0L;
+            for (int i = 0; i < 8; i++) {
+                hi = (hi << 8) | (hash[i] & 0xFF);
+                lo = (lo << 8) | (hash[i + 8] & 0xFF);
+            }
+            return new PayloadDigest(hi, lo);
+        }
     }
 
     private record FramePacket(long frameId, long capturedAtMillis, BufferedImage image) {

@@ -59,10 +59,11 @@ class CaptureServiceInternalTest {
         invoke(service, "restoreResumeState", new Class<?>[]{Path.class}, imagesDir);
 
         AtomicInteger savedImageCounter = getField(service, "savedImageCounter", AtomicInteger.class);
-        Set<String> seenPayloads = getField(service, "seenPayloads", Set.class);
+        Set<?> seenPayloads = getField(service, "seenPayloads", Set.class);
 
         assertEquals(11, savedImageCounter.get());
-        assertEquals(Set.of("payload-A", "payload-B"), seenPayloads);
+        // The dedupe set stores payload digests, not the payload strings themselves.
+        assertEquals(2, seenPayloads.size());
         assertTrue(logs.stream().anyMatch(line -> line.contains("resume scan started")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("resume skipped unreadable image: frame_000005.png")));
         assertTrue(logs.stream().anyMatch(line -> line.contains("resume scan finished images=4 restoredPayloads=2 nextImageIndex=12")));

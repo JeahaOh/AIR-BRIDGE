@@ -292,9 +292,14 @@ final class FileEncodingPlan implements AutoCloseable {
     // When the output is flattened (no folder structure), the QR file name must stay
     // unique across the whole source tree; basename alone collides for files such as
     // a/sample.txt and b/sample.txt. Derive the prefix from the relative path so each
-    // source file maps to a distinct file name.
+    // source file maps to a distinct file name. Sanitizing alone is not enough: two
+    // relPaths that differ only in sanitized-away characters (e.g. all-Korean names of
+    // equal length) collapse to the same prefix and would silently overwrite each
+    // other's PNGs, so a short relPath hash pins uniqueness.
     private static String buildFlatSafePrefix(String relPath) {
         String sanitized = relPath.replaceAll("[^A-Za-z0-9._-]", "_");
-        return buildSafePrefix(sanitized);
+        String relPathHash = CodecSupport.sha256Hex(
+                relPath.getBytes(java.nio.charset.StandardCharsets.UTF_8)).substring(0, 8);
+        return buildSafePrefix(sanitized) + "-" + relPathHash;
     }
 }

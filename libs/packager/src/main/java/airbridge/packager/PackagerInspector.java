@@ -43,6 +43,11 @@ public final class PackagerInspector {
                     continue;
                 }
                 if (isPackageName(name)) {
+                    // pack renames the nested archive itself too (renameIfMatch applies to it),
+                    // so the rename list must record it for unpack to reverse exactly.
+                    if (matchesExtension(name, targetExts)) {
+                        results.add(name + ".txt");
+                    }
                     try (InputStream in = zip.getInputStream(entry)) {
                         byte[] payload = readAllBytes(in);
                         collectFromZipStream(new ByteArrayInputStream(payload), name + "!/", targetExts, excludedEntryPatterns, results);
@@ -117,6 +122,10 @@ public final class PackagerInspector {
                     continue;
                 }
                 if (isPackageName(name)) {
+                    // Mirror the top level: the nested archive's own rename is recorded too.
+                    if (matchesExtension(name, targetExts)) {
+                        results.add(prefix + name + ".txt");
+                    }
                     byte[] payload = readAllBytes(zis);
                     collectFromZipStream(new ByteArrayInputStream(payload), prefix + name + "!/", targetExts, excludedEntryPatterns, results);
                     continue;

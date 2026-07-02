@@ -1,9 +1,13 @@
 package airbridge.common.fountain;
 
+import java.io.InputStream;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 
@@ -24,8 +28,12 @@ public final class LtDecoder {
 
     // Encoded symbols not yet reduced to a single unknown neighbor. Parallel lists: the
     // remaining-unknown source indices and the symbol's current (partially reduced) value.
+    // Resolved slots stay as nulls; `waiters` maps each unknown source index to the slots
+    // whose neighbor set still contains it, so propagation touches only affected slots
+    // (total peel work is proportional to the sum of symbol degrees, not recoveries x slots).
     private final List<int[]> pendingNeighbors = new ArrayList<>();
     private final List<byte[]> pendingValues = new ArrayList<>();
+    private final Map<Integer, List<Integer>> waiters = new HashMap<>();
     private final Set<Long> seenEsi = new HashSet<>();
 
     public LtDecoder(int k, int symbolSize) {
@@ -91,8 +99,12 @@ public final class LtDecoder {
             recover(unknown.get(0), value, ripple);
             propagate(ripple);
         } else {
+            int slot = pendingNeighbors.size();
             pendingNeighbors.add(toIntArray(unknown));
             pendingValues.add(value);
+            for (int idx : unknown) {
+                waiters.computeIfAbsent(idx, i -> new ArrayList<>()).add(slot);
+            }
         }
     }
 
@@ -108,12 +120,17 @@ public final class LtDecoder {
 
     // Cascades newly recovered sources through the pending set: drop each recovered index from
     // any pending symbol's unknown set (XOR its value out); any symbol that drops to one unknown
-    // recovers that source and feeds the ripple.
+    // recovers that source and feeds the ripple. Only the slots subscribed to the recovered
+    // index are visited; a slot resolved earlier in the cascade shows up as a null and is skipped.
     private void propagate(Queue<Integer> ripple) {
         while (!ripple.isEmpty()) {
             int known = ripple.poll();
             byte[] knownValue = source[known];
-            for (int s = 0; s < pendingNeighbors.size(); s++) {
+            List<Integer> slots = waiters.remove(known);
+            if (slots == null) {
+                continue;
+            }
+            for (int s : slots) {
                 int[] nb = pendingNeighbors.get(s);
                 if (nb == null) {
                     continue;
@@ -144,9 +161,7 @@ public final class LtDecoder {
         if (!isComplete()) {
             throw new IllegalStateException("block is not fully decoded");
         }
-        if (originalLength < 0 || originalLength > (long) k * symbolSize) {
-            throw new IllegalArgumentException("originalLength out of range: " + originalLength);
-        }
+        checkOriginalLength(originalLength);
         byte[] out = new byte[originalLength];
         int written = 0;
         for (int i = 0; i < k && written < originalLength; i++) {
@@ -155,6 +170,67 @@ public final class LtDecoder {
             written += n;
         }
         return out;
+    }
+
+    /**
+     * Streams the reassembled block (trimmed to {@code originalLength}) directly from the
+     * recovered source symbols, without materializing a second full copy of the block next to
+     * the one this decoder already holds. Call only when {@link #isComplete()}; the stream is
+     * only valid while this decoder is alive.
+     */
+    public InputStream reassembleStream(int originalLength) {
+        if (!isComplete()) {
+            throw new IllegalStateException("block is not fully decoded");
+        }
+        checkOriginalLength(originalLength);
+        return new InputStream() {
+            private int symbolIndex;
+            private int offsetInSymbol;
+            private int remaining = originalLength;
+
+            @Override
+            public int read() {
+                byte[] one = new byte[1];
+                return read(one, 0, 1) < 0 ? -1 : one[0] & 0xFF;
+            }
+
+            @Override
+            public int read(byte[] b, int off, int len) {
+                Objects.checkFromIndexSize(off, len, b.length);
+                if (remaining <= 0) {
+                    return -1;
+                }
+                if (len == 0) {
+                    return 0;
+                }
+                int total = 0;
+                while (len > 0 && remaining > 0) {
+                    int n = Math.min(symbolSize - offsetInSymbol, Math.min(len, remaining));
+                    System.arraycopy(source[symbolIndex], offsetInSymbol, b, off, n);
+                    offsetInSymbol += n;
+                    if (offsetInSymbol == symbolSize) {
+                        symbolIndex++;
+                        offsetInSymbol = 0;
+                    }
+                    off += n;
+                    len -= n;
+                    remaining -= n;
+                    total += n;
+                }
+                return total;
+            }
+
+            @Override
+            public int available() {
+                return remaining;
+            }
+        };
+    }
+
+    private void checkOriginalLength(int originalLength) {
+        if (originalLength < 0 || originalLength > (long) k * symbolSize) {
+            throw new IllegalArgumentException("originalLength out of range: " + originalLength);
+        }
     }
 
     private static int indexOf(int[] arr, int value) {

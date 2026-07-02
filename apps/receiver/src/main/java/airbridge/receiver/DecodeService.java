@@ -13,14 +13,20 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 final class DecodeService {
     private static final int DECODE_TASK_MAX_ATTEMPTS = 3;
     private static final long DECODE_RETRY_DELAY_MS = 200L;
+    // QR file name shape produced by encode: <prefix>_NNNofNNN.png
+    private static final Pattern QR_FILE_NAME_PATTERN =
+            Pattern.compile("^(.+)_(\\d+)of(\\d+)\\.png$", Pattern.CASE_INSENSITIVE);
 
     private final int decodeWorkers;
 
@@ -33,6 +39,7 @@ final class DecodeService {
         Files.createDirectories(outPath);
         Map<String, FileChunks> fileChunkMap = new LinkedHashMap<>();
         Set<String> finalizedPaths = new HashSet<>();
+        Set<String> restoredPaths = new HashSet<>();
         List<String> reportLines = new ArrayList<>();
         int restoredCount = 0;
         int hashMismatchCount = 0;
@@ -40,12 +47,22 @@ final class DecodeService {
 
         ExecutorService decodeExecutor = Executors.newFixedThreadPool(decodeWorkers);
         ExecutorCompletionService<QrDecodeTaskResult> completionService = new ExecutorCompletionService<>(decodeExecutor);
+        // File-name identities (dir + prefix + declared total) of files already restored.
+        // Workers consult it before decoding: with repair overhead a file's surplus frames
+        // (~1/3 of all PNGs at the default 0.5) need no PNG read + QR decode once it restored.
+        Set<String> restoredFileKeys = ConcurrentHashMap.newKeySet();
 
         try {
             for (int i = 0; i < qrFiles.size(); i++) {
                 int index = i;
                 Path qrFile = qrFiles.get(i);
-                completionService.submit(() -> QrDecodeSupport.decodeTask(index, qrFile, DECODE_TASK_MAX_ATTEMPTS, DECODE_RETRY_DELAY_MS));
+                completionService.submit(() -> {
+                    String key = qrFileNameKey(qrFile);
+                    if (key != null && restoredFileKeys.contains(key)) {
+                        return QrDecodeTaskResult.skippedRestored(index, qrFile);
+                    }
+                    return QrDecodeSupport.decodeTask(index, qrFile, DECODE_TASK_MAX_ATTEMPTS, DECODE_RETRY_DELAY_MS);
+                });
             }
 
             for (int completed = 0; completed < qrFiles.size(); completed++) {
@@ -64,6 +81,14 @@ final class DecodeService {
 
                 effectiveListener.onLog(String.format("[QR %d/%d] %s",
                         result.index + 1, qrFiles.size(), srcPath.relativize(result.qrFile)));
+
+                if (result.skippedRestored) {
+                    // Surplus frame of a file already restored this run: no decode needed,
+                    // but it still belongs with the consumed PNGs in the success dir.
+                    effectiveListener.onLog("  [SKIP] 이미 복원된 파일의 잉여 QR — decode 생략");
+                    moveDecodedQrFilesToSuccess(List.of(result.qrFile));
+                    continue;
+                }
 
                 if (result.error != null) {
                     effectiveListener.onLog(String.format("  [WARN] QR decode 실패: %s",
@@ -90,17 +115,24 @@ final class DecodeService {
 
                 // The file was already restored (or failed terminally) when it completed earlier;
                 // ignore late/duplicate chunks for it so it is not resurrected or reprocessed.
+                // Surplus PNGs of a successfully restored file still move to the success dir —
+                // left behind they would read as a bogus INCOMPLETE file on the next decode run.
                 if (finalizedPaths.contains(normalizedRelPath)) {
+                    if (restoredPaths.contains(normalizedRelPath)) {
+                        moveDecodedQrFilesToSuccess(List.of(result.qrFile));
+                    }
                     continue;
                 }
 
                 FileChunks fileChunks = fileChunkMap.get(normalizedRelPath);
-                if (fileChunks == null) {
-                    fileChunks = new FileChunks(normalizedRelPath, chunk.k, chunk.gzipLen,
-                            chunk.symbolData.length, chunk.hash16);
-                }
-
                 try {
+                    // Construction validates k/symbolSize (LtDecoder rejects k < 1 etc.), so a
+                    // frame-shaped payload with impossible fields must fail this one chunk, not
+                    // abort the whole decode run.
+                    if (fileChunks == null) {
+                        fileChunks = new FileChunks(normalizedRelPath, chunk.k, chunk.gzipLen,
+                                chunk.symbolData.length, chunk.hash16);
+                    }
                     fileChunks.addChunk(chunk, result.qrFile);
                 } catch (Exception e) {
                     effectiveListener.onLog(String.format("  [WARN] QR decode 실패: %s",
@@ -116,7 +148,16 @@ final class DecodeService {
                 // chunks of files still in progress, instead of the whole transfer at once.
                 if (fileChunks.isComplete()) {
                     switch (restoreCompletedFile(fileChunks, outPath, reportLines, effectiveListener)) {
-                        case RESTORED -> restoredCount++;
+                        case RESTORED -> {
+                            restoredCount++;
+                            restoredPaths.add(normalizedRelPath);
+                            for (Path consumed : fileChunks.qrFiles()) {
+                                String key = qrFileNameKey(consumed);
+                                if (key != null) {
+                                    restoredFileKeys.add(key);
+                                }
+                            }
+                        }
                         case HASH_MISMATCH -> hashMismatchCount++;
                         case DECODE_ERROR, INVALID_PATH -> decodeErrorCount++;
                     }
@@ -145,10 +186,12 @@ final class DecodeService {
 
     private enum RestoreOutcome { RESTORED, HASH_MISMATCH, DECODE_ERROR, INVALID_PATH }
 
+    // Never throws for a single file's failure: an IO error while restoring one file must not
+    // abort the run — the remaining files still decode and the report is still written.
     private RestoreOutcome restoreCompletedFile(FileChunks fileChunks,
                                                 Path outPath,
                                                 List<String> reportLines,
-                                                DecodeListener listener) throws java.io.IOException {
+                                                DecodeListener listener) {
         Path restoredFile;
         try {
             restoredFile = RelativePathSupport.resolveUnderRoot(outPath, fileChunks.relPath);
@@ -157,40 +200,66 @@ final class DecodeService {
             listener.onLog(String.format("  [INVALID_PATH] %s - %s", fileChunks.relPath, e.getMessage()));
             return RestoreOutcome.INVALID_PATH;
         }
-        Path parent = restoredFile.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
-        }
 
         // Stream gzip -> a temp file in the destination directory, computing the hash in the
         // same pass, so memory does not scale with file size. Only move the temp file into
         // place once the hash matches, so a bad payload never lands at the target.
-        Path stagingDir = (parent != null) ? parent : outPath;
-        Path tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
-        String actualHash16;
+        Path tempFile = null;
         try {
-            actualHash16 = CodecSupport.decompressToFile(fileChunks.encodedStream(), tempFile)
+            Path parent = restoredFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Path stagingDir = (parent != null) ? parent : outPath;
+            tempFile = Files.createTempFile(stagingDir, ".airbridge-restore-", ".part");
+            String actualHash16 = CodecSupport.decompressToFile(fileChunks.encodedStream(), tempFile)
                     .substring(0, 16);
+
+            if (!actualHash16.equals(fileChunks.hash16)) {
+                Files.deleteIfExists(tempFile);
+                reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
+                listener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
+                        fileChunks.relPath, fileChunks.hash16, actualHash16));
+                return RestoreOutcome.HASH_MISMATCH;
+            }
+
+            Files.move(tempFile, restoredFile, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
-            Files.deleteIfExists(tempFile);
+            deleteQuietly(tempFile);
             reportLines.add("X " + fileChunks.relPath + " - DECODE_ERROR");
             listener.onLog(String.format("  [DECODE_ERROR] %s - %s", fileChunks.relPath, e.getMessage()));
             return RestoreOutcome.DECODE_ERROR;
         }
 
-        if (!actualHash16.equals(fileChunks.hash16)) {
-            Files.deleteIfExists(tempFile);
-            reportLines.add("X " + fileChunks.relPath + " - HASH_MISMATCH");
-            listener.onLog(String.format("  [HASH_MISMATCH] %s - expected=%s actual=%s",
-                    fileChunks.relPath, fileChunks.hash16, actualHash16));
-            return RestoreOutcome.HASH_MISMATCH;
-        }
-
-        Files.move(tempFile, restoredFile, StandardCopyOption.REPLACE_EXISTING);
         List<Path> movedTargets = moveDecodedQrFilesToSuccess(fileChunks.qrFiles());
         reportLines.add("O " + fileChunks.relPath + " - OK" + formatMovedTargets(movedTargets));
         listener.onLog(String.format("  [RESTORED] %s", fileChunks.relPath));
         return RestoreOutcome.RESTORED;
+    }
+
+    // File identity derived from the QR file name: same directory + same prefix + same
+    // declared symbol total can only be frames of the same source file (encode derives the
+    // prefix uniquely per file within its output dir). Null for foreign file names, which
+    // are then never skipped.
+    private static String qrFileNameKey(Path qrFile) {
+        Matcher matcher = QR_FILE_NAME_PATTERN.matcher(qrFile.getFileName().toString());
+        if (!matcher.matches()) {
+            return null;
+        }
+        Path parent = qrFile.getParent();
+        return (parent != null ? parent.toString() : "") + '\u0000' + matcher.group(1)
+                + '\u0000' + matcher.group(3);
+    }
+
+    private static void deleteQuietly(Path file) {
+        if (file == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(file);
+        } catch (java.io.IOException ignored) {
+            // best-effort cleanup of the staging temp file
+        }
     }
 
     private static List<Path> moveDecodedQrFilesToSuccess(List<Path> qrFiles) {

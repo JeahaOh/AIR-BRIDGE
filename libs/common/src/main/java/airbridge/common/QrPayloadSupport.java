@@ -80,6 +80,27 @@ public final class QrPayloadSupport {
                                 byte[] symbolData) {
     }
 
+    /**
+     * Receiver-side sanity check (no frame-format change): rejects frame-shaped payloads whose
+     * fields cannot come from the encoder. The sender always sets {@code k =
+     * ceil(gzipLen/symbolSize)}, so {@code (k-1)*symbolSize < gzipLen <= k*symbolSize} must
+     * hold; u32 fields read as negative ints (>= 2^31) fail these checks too. Without this, a
+     * corrupt or foreign frame with a bogus huge {@code k} would drive pathological decoder
+     * allocations instead of being counted as one bad frame.
+     */
+    public static void validateFrameFields(ParsedPayload payload) {
+        int k = payload.k();
+        int gzipLen = payload.gzipLen();
+        int symbolSize = payload.symbolData().length;
+        if (k < 1 || payload.esi() < 0 || gzipLen < 1 || symbolSize < 1
+                || gzipLen > (long) k * symbolSize
+                || (long) (k - 1) * symbolSize >= gzipLen) {
+            throw new IllegalArgumentException("페이로드 필드가 유효하지 않습니다 (k=" + k
+                    + ", gzipLen=" + gzipLen + ", esi=" + payload.esi()
+                    + ", symbolSize=" + symbolSize + ")");
+        }
+    }
+
     private static void writeU16(ByteArrayOutputStream out, int value) {
         out.write((value >>> 8) & 0xFF);
         out.write(value & 0xFF);

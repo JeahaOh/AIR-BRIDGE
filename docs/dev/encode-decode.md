@@ -101,6 +101,14 @@ data     : 나머지 바이트 (심볼 1개. symbolSize == data 길이, 파일 �
 
 - `sample.txt` -> `sample_txt_001of010.png`
 
+flat 모드(`folderStructure=false`)와 `reencode`는 전체 relPath에서 프리픽스를 만들되,
+경로 문자 치환(비ASCII → `_`)만으로는 서로 다른 파일이 같은 이름으로 붕괴할 수 있어
+relPath의 SHA-256 앞 8자리를 덧붙입니다.
+
+예:
+
+- `a/sample.txt` -> `a_sample_txt-1a2b3c4d_001of010.png`
+
 ## encode 출력 구조
 
 기본 산출물:
@@ -187,13 +195,26 @@ QR 하나를 읽으면 `QrDecodedChunk`(fountain 심볼 1개)가 만들어지고
 
 파일은 완성되는(`FileChunks.isComplete()`) 즉시 복원되고 `fileChunkMap`에서 제거된다.
 따라서 메모리에는 "아직 진행 중인 파일"의 심볼만 남고, 전송 전체가 한꺼번에 쌓이지 않는다.
-이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 심볼은 `finalizedPaths`로 무시한다.
+이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 심볼은 `finalizedPaths`로 무시하되,
+복원에 성공한 파일의 잉여 PNG는 success 디렉터리로 함께 이동한다(안 그러면 다음 실행에서
+가짜 INCOMPLETE로 보인다). 복원이 끝난 파일과 같은 이름 프리픽스(`디렉터리 + 프리픽스 +
+총 심볼 수`)의 아직 처리 안 된 PNG는 **PNG 읽기·QR 디코드 없이 건너뛰고** 곧장 success로
+옮긴다 — 기본 repair 0.5 기준 전체 PNG의 약 1/3이 이 경로를 탄다.
 QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 심볼이 부족해 복원 못 한(INCOMPLETE) 파일뿐이다.
+
+수집 단계(`collectQrImageFiles`)는 이전 실행이 만든 `*-success` 디렉터리를 건너뛰므로,
+같은 입력 디렉터리로 decode를 재실행해도 이미 소비된 PNG를 다시 처리하지 않는다.
+
+payload 파싱 직후 필드 무결성을 검증한다(`QrPayloadSupport.validateFrameFields`):
+`k >= 1`, `esi >= 0`, `(k-1)*symbolSize < gzipLen <= k*symbolSize`(인코더 불변식).
+불가능한 필드를 가진 프레임(외부 QR, 손상 프레임)은 그 QR 1장만 `QR_READ_ERROR`가 되고
+실행은 계속된다 — 검증 없이는 조작된 `k`가 디코더에서 병적인 할당을 유발할 수 있다.
 
 복원 한 파일의 순서(`restoreCompletedFile`):
 
 1. 출력 경로를 `RelativePathSupport.resolveUnderRoot(...)`로 검증
-2. 복원한 GZIP 스트림을(`FileChunks.encodedStream`) GZIP 해제한 결과를
+2. 복원한 GZIP 스트림을(`FileChunks.encodedStream` — 디코더가 복구해 둔 심볼에서 곧바로
+   스트리밍하며, 블록의 두 번째 사본을 만들지 않는다) GZIP 해제한 결과를
    출력 디렉터리의 임시파일(`.airbridge-restore-*.part`)에 스트리밍 기록
    (`CodecSupport.decompressToFile`). 같은 패스에서 SHA-256을 계산하므로 복원 바이트를
    메모리에 통째로 들고 있지 않는다.
@@ -201,6 +222,9 @@ QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 심볼이 부족해 �
 4. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
    남지 않는다)
 5. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
+
+한 파일 처리 중의 IO 오류(디렉터리 생성/이동 실패 등)는 그 파일의 `DECODE_ERROR`로
+격리되고 실행은 계속된다.
 
 즉 한 파일 복원은 메모리 O(buffer)이고, 전체 decode 메모리도 진행 중 파일 수에 비례하도록 묶인다.
 

@@ -1,6 +1,7 @@
 package airbridge.receiver.capture;
 
 import airbridge.common.QrPayloadSupport;
+import airbridge.common.RelativePathSupport;
 import airbridge.common.fountain.LtPeelTracker;
 
 import java.nio.charset.StandardCharsets;
@@ -9,15 +10,18 @@ import java.util.Map;
 
 /**
  * Live per-file decodability tracking over the unique payloads captured so far. Each payload is
- * parsed as one fountain frame and grouped the same way decode groups symbols (relPath + hash16
- * + k + gzipLen + symbolSize), then its ESI feeds a structural {@link LtPeelTracker} — so "this
- * file is decodable" here means the later {@code decode} run over the saved PNGs will restore
- * it (barring gzip/hash-level corruption). There is no back-channel to the sender; the result
- * is surfaced to the operator, who decides when to stop the slideshow.
+ * parsed as one fountain frame and grouped the way decode groups symbols: by the normalized
+ * {@code relPath}, with the first-seen {@code hash16}/{@code k}/{@code gzipLen}/symbol-size
+ * fixing that file's expected metadata. A frame whose metadata conflicts with the established
+ * one is not counted toward any file — decode rejects such chunks the same way — so "this file
+ * is decodable" here means the later {@code decode} run over the saved PNGs will restore it
+ * (barring gzip/hash-level corruption). There is no back-channel to the sender; the result is
+ * surfaced to the operator, who decides when to stop the slideshow.
  *
  * <p>Only files whose frames were actually captured are visible: a file whose QRs never reached
  * the camera is not counted, so "all observed files decodable" is not proof the whole session
- * was sent. Payloads that are not air-bridge fountain frames (foreign QRs, corrupt reads) are
+ * was sent. Payloads that are not air-bridge fountain frames (foreign QRs, corrupt reads), that
+ * carry an invalid relative path, or that conflict with a file's established metadata are
  * counted as unparsed and otherwise ignored.
  *
  * <p>Thread-safe: offers arrive on the save loop (and the resume scan) while status snapshots
@@ -44,40 +48,54 @@ final class CaptureCompletionTracker {
                  int decodableFiles, int observedFiles) {
     }
 
-    private record FileKey(String relPath, String hash16, int k, int gzipLen, int symbolSize) {
+    private record FileMeta(String hash16, int k, int gzipLen, int symbolSize) {
     }
 
-    private final Map<FileKey, LtPeelTracker> files = new LinkedHashMap<>();
+    private record TrackedFile(FileMeta meta, LtPeelTracker tracker) {
+    }
+
+    private final Map<String, TrackedFile> files = new LinkedHashMap<>();
     private int decodableCount;
     private long unparsedPayloads;
 
     synchronized Offer offer(String payload) {
         QrPayloadSupport.ParsedPayload parsed;
+        String relPath;
         try {
             parsed = QrPayloadSupport.parsePayload(payload.getBytes(StandardCharsets.ISO_8859_1));
+            // Same checks decode applies before grouping: impossible fields and invalid
+            // relative paths are frames decode will reject, so they must not be tracked as
+            // (or feed) a restorable file here.
+            QrPayloadSupport.validateFrameFields(parsed);
+            relPath = RelativePathSupport.normalizeRelativePath(parsed.relPath());
         } catch (RuntimeException e) {
             unparsedPayloads++;
             return ignored();
         }
-        FileKey key = new FileKey(parsed.relPath(), parsed.hash16(), parsed.k(), parsed.gzipLen(),
+        FileMeta meta = new FileMeta(parsed.hash16(), parsed.k(), parsed.gzipLen(),
                 parsed.symbolData().length);
         try {
-            LtPeelTracker tracker = files.get(key);
-            boolean firstSymbolOfFile = tracker == null;
+            TrackedFile file = files.get(relPath);
+            boolean firstSymbolOfFile = file == null;
             if (firstSymbolOfFile) {
-                tracker = new LtPeelTracker(parsed.k());
+                file = new TrackedFile(meta, new LtPeelTracker(parsed.k()));
+            } else if (!file.meta().equals(meta)) {
+                // Conflicting metadata for an already-tracked relPath: decode counts such
+                // chunks as errors and never feeds them to the file, so mirror that.
+                unparsedPayloads++;
+                return ignored();
             }
-            boolean nowDecodable = tracker.offer(parsed.esi());
+            boolean nowDecodable = file.tracker().offer(parsed.esi());
             if (firstSymbolOfFile) {
                 // Register only after the first symbol is accepted, so a frame with impossible
                 // fields cannot leave a phantom never-decodable file behind.
-                files.put(key, tracker);
+                files.put(relPath, file);
             }
             if (nowDecodable) {
                 decodableCount++;
             }
             return new Offer(nowDecodable ? Event.FILE_DECODABLE : Event.PROGRESS,
-                    parsed.relPath(), tracker.receivedCount(), parsed.k(),
+                    relPath, file.tracker().receivedCount(), parsed.k(),
                     decodableCount, files.size());
         } catch (RuntimeException e) {
             // Frame-shaped but with impossible fields (k < 1, negative esi, ...): decode would

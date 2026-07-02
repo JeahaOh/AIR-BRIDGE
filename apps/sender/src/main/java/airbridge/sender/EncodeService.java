@@ -5,7 +5,6 @@ import airbridge.common.QrPayloadSupport;
 import airbridge.common.RelativePathSupport;
 import airbridge.common.fountain.LtFountain;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -124,6 +124,7 @@ final class EncodeService {
 
         int totalFileCount = 0;
         long totalOrigBytes = 0;
+        Set<String> plannedRelPaths = new HashSet<>();
         StringBuilder manifest = new StringBuilder();
         manifest.append("SOURCE : ").append(srcPath).append("\n");
         manifest.append("DATE   : ").append(new Date()).append("\n");
@@ -157,6 +158,19 @@ final class EncodeService {
                         file, sourceRelPath, convertXlsxToCsv, convertOfficeToText, chunkDataSize);
                 boolean submitted = false;
                 try {
+                    // Office conversion rewrites the payload relPath (a.xlsx -> a.csv), so two
+                    // source files can land on one relPath; their interleaved symbol streams
+                    // would corrupt each other at decode (first-seen wins, the rest become
+                    // errors). Encode the first and skip the rest loudly.
+                    if (!plannedRelPaths.add(plan.relPath())) {
+                        effectiveListener.onLog("");
+                        effectiveListener.onLog(String.format(
+                                "  [WARN] 중복 relPath 건너뜀: %s (%s — 변환 결과가 이미 인코딩된 경로와 겹칩니다)",
+                                plan.relPath(), sourceRelPath));
+                        manifest.append(String.format("[SKIP] %s -> %s (중복 relPath)\n",
+                                sourceRelPath, plan.relPath()));
+                        continue;
+                    }
                     totalOrigBytes += plan.fileSize();
                     final int totalSymbols = symbolCount(plan.totalChunks());
 
@@ -324,8 +338,10 @@ final class EncodeService {
         String prefix = folderStructure ? plan.safePrefix() : plan.flatSafePrefix();
         String qrFileName = buildQrFileName(prefix, esi + 1, totalSymbols);
         Path qrFilePath = outDir.resolve(qrFileName);
-        ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
+        // Register before writing: if the write dies halfway, cleanup still removes the
+        // truncated PNG instead of leaving it to poison a later decode run.
         createdFiles.add(qrFilePath);
+        QrImageWriter.writePng(qrImage, qrFilePath);
     }
 
     private static void closeQuietly(FileEncodingPlan plan) {
@@ -415,7 +431,7 @@ final class EncodeService {
                     // use the path-derived prefix to keep names unique across files.
                     String qrFileName = buildQrFileName(plan.flatSafePrefix(), esi + 1, totalSymbols);
                     Path qrFilePath = fileOutDir.resolve(qrFileName);
-                    ImageIO.write(qrImage, "PNG", qrFilePath.toFile());
+                    QrImageWriter.writePng(qrImage, qrFilePath);
 
                     effectiveListener.onLog(String.format("  -> %s", qrFileName));
                     totalQrCount++;

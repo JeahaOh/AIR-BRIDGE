@@ -304,7 +304,7 @@ PNG 저장 시:
 복구 내용:
 
 - 기존 `frame_*.png` 파일 번호 중 최댓값을 찾아 `savedImageCounter` 복원
-- 각 PNG를 다시 decode해 `seenPayloads`를 복원
+- 각 PNG를 다시 decode해 중복 제거 상태를 복원(페이로드 전문이 아니라 128비트 다이제스트만 보관)
 
 효과:
 
@@ -346,8 +346,11 @@ manifest에는 아래 정보가 들어간다.
 - 시작/종료 시각
 - stop reason
 - 총 frames / analyzed / decoded / unique payloads / saved images
-- `observedFiles` / `decodableFiles`: 관측된 파일 수와 그중 심볼이 충분히 모여 복원 가능한 파일 수
-- `unparsedPayloads`: fountain 프레임으로 파싱되지 않은 payload 수(외부 QR 등)
+- `observedFiles` / `decodableFiles`: 관측된 파일 수와 그중 심볼이 충분히 모여 복원 가능한 파일 수.
+  파일은 decode와 동일하게 **정규화된 relPath 기준·첫 메타데이터 우선**으로 묶는다
+- `unparsedPayloads`: decode가 어떤 파일로도 집계하지 않을 payload 수 — fountain 프레임으로
+  파싱되지 않거나(외부 QR 등), 필드가 불가능하거나, relPath가 유효하지 않거나, 이미 관측된
+  파일의 메타데이터와 충돌하는 프레임
 - black frame skip 수
 - decode failure 수
 - queue high-water mark

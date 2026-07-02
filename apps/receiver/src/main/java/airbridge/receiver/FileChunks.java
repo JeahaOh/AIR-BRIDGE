@@ -2,7 +2,6 @@ package airbridge.receiver;
 
 import airbridge.common.fountain.LtDecoder;
 
-import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -58,9 +57,10 @@ final class FileChunks {
 
     /**
      * The reassembled gzip stream. Requires {@link #isComplete()} (call after the completeness
-     * check). Materializes the block in memory, which the decoder already holds.
+     * check). Streams from the decoder's recovered symbols directly, so restore does not hold
+     * a second full copy of the block next to the decoder's.
      */
     InputStream encodedStream() {
-        return new ByteArrayInputStream(decoder.reassemble(gzipLen));
+        return decoder.reassembleStream(gzipLen);
     }
 }

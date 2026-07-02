@@ -74,13 +74,19 @@ public final class RoundTripBenchmark {
 
             long decodePeak;
             int restoredCount;
+            java.util.concurrent.atomic.AtomicLong skippedQr = new java.util.concurrent.atomic.AtomicLong();
             long decodeStart = System.nanoTime();
             try (HeapSampler sampler = new HeapSampler()) {
-                DecodeWorkflow.Result decodeResult = new DecodeWorkflow(decodeWorkers).decode(qr, restored, line -> { });
+                DecodeWorkflow.Result decodeResult = new DecodeWorkflow(decodeWorkers).decode(qr, restored, line -> {
+                    if (line.contains("[SKIP]")) {
+                        skippedQr.incrementAndGet();
+                    }
+                });
                 restoredCount = decodeResult.restoredCount();
                 decodePeak = sampler.maxUsedBytes();
             }
             long decodeMs = msSince(decodeStart);
+            System.out.printf(Locale.ROOT, "decode skipped surplus QR: %d%n", skippedQr.get());
 
             boolean ok = verify(src, restored);
 

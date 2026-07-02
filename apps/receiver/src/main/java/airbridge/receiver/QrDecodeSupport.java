@@ -37,6 +37,17 @@ final class QrDecodeSupport {
         List<Path> files = new ArrayList<>();
         Files.walkFileTree(rootDir, new SimpleFileVisitor<>() {
             @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                // *-success dirs hold PNGs a previous decode already consumed; re-reading
+                // them would re-restore those files and stack -success-success dirs.
+                if (!dir.equals(rootDir) && dir.getFileName() != null
+                        && dir.getFileName().toString().endsWith("-success")) {
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 String fileName = file.getFileName().toString().toLowerCase(Locale.ROOT);
                 if (fileName.endsWith(".png")) {
@@ -135,6 +146,9 @@ final class QrDecodeSupport {
         // recover the original bytes losslessly before parsing the binary frame.
         byte[] bytes = payload.getBytes(StandardCharsets.ISO_8859_1);
         QrPayloadSupport.ParsedPayload parsed = QrPayloadSupport.parsePayload(bytes);
+        // Impossible field combinations become a per-frame QR_READ_ERROR here, instead of
+        // reaching the decoder where a bogus huge k would drive a pathological allocation.
+        QrPayloadSupport.validateFrameFields(parsed);
         return new QrDecodedChunk(
                 parsed.relPath(),
                 parsed.hash16(),

@@ -2,8 +2,10 @@ package airbridge.common.fountain;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 
@@ -24,8 +26,11 @@ public final class LtPeelTracker {
     private int recoveredCount;
 
     // Encoded symbols not yet reduced to a single unknown neighbor (their remaining-unknown
-    // source indices). Mirrors LtDecoder's pending set, minus the symbol values.
+    // source indices). Mirrors LtDecoder's pending set, minus the symbol values; `waiters`
+    // maps each unknown source index to its subscribed slots so propagation touches only
+    // affected slots, exactly like LtDecoder.
     private final List<int[]> pendingNeighbors = new ArrayList<>();
+    private final Map<Integer, List<Integer>> waiters = new HashMap<>();
     private final Set<Long> seenEsi = new HashSet<>();
 
     public LtPeelTracker(int k) {
@@ -75,7 +80,11 @@ public final class LtPeelTracker {
             recover(unknown.get(0), ripple);
             propagate(ripple);
         } else {
+            int slot = pendingNeighbors.size();
             pendingNeighbors.add(toIntArray(unknown));
+            for (int idx : unknown) {
+                waiters.computeIfAbsent(idx, i -> new ArrayList<>()).add(slot);
+            }
         }
         return isComplete();
     }
@@ -91,11 +100,16 @@ public final class LtPeelTracker {
     }
 
     // Cascades newly recovered sources through the pending set, exactly like LtDecoder's
-    // propagate but without XOR-ing values.
+    // propagate but without XOR-ing values. Only slots subscribed to the recovered index are
+    // visited; slots resolved earlier in the cascade show up as nulls and are skipped.
     private void propagate(Queue<Integer> ripple) {
         while (!ripple.isEmpty()) {
             int known = ripple.poll();
-            for (int s = 0; s < pendingNeighbors.size(); s++) {
+            List<Integer> slots = waiters.remove(known);
+            if (slots == null) {
+                continue;
+            }
+            for (int s : slots) {
                 int[] nb = pendingNeighbors.get(s);
                 if (nb == null) {
                     continue;

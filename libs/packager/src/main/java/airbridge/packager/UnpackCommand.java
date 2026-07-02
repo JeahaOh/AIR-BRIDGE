@@ -31,7 +31,18 @@ public final class UnpackCommand implements Runnable {
             }
             Set<String> targetExts = PackCommand.readTargetExts(targetExtLines);
 
-            PackagerRewriter.rewriteInPlaceUnpack(input, targetExts);
+            // The embedded rename list makes un-renaming exact; without it (older packs)
+            // rewriteInPlaceUnpack falls back to the extension heuristic.
+            List<String> packedLines = readEmbeddedTextFile(input, PackagerRewriter.TARGET_ENTRY);
+            Set<String> packedNames = packedLines == null ? null : packedLines.stream()
+                    .map(String::trim)
+                    .filter(line -> !line.isEmpty())
+                    .collect(Collectors.toSet());
+            if (packedNames == null) {
+                System.out.println("WARN embedded target.txt not found; using extension heuristic for un-rename");
+            }
+
+            PackagerRewriter.rewriteInPlaceUnpack(input, targetExts, packedNames);
             Path output = PackagerRewriter.rewriteZipToJarIfManifest(input);
             System.out.printf("Unpacked %s using embedded %s%n",
                     output.toAbsolutePath().normalize(), PackagerRewriter.TARGET_EXT_ENTRY);

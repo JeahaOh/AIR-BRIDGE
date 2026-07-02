@@ -49,13 +49,27 @@ class CaptureCompletionTrackerTest {
     }
 
     @Test
-    void filesGroupByRelPathAndMetadataLikeDecode() {
+    void conflictingMetadataForSameRelPathIsNotCountedLikeDecode() {
         CaptureCompletionTracker tracker = new CaptureCompletionTracker();
-        // Same relPath but a different hash is a different file identity, exactly like decode.
+        // decode groups by relPath and rejects chunks whose metadata conflicts with the
+        // first-seen file; the tracker mirrors that instead of counting a phantom second file.
         tracker.offer(payload("same.txt", HASH_A, 2, 0));
-        tracker.offer(payload("same.txt", HASH_B, 2, 0));
-        assertEquals(2, tracker.observedFiles());
+        CaptureCompletionTracker.Offer conflicting = tracker.offer(payload("same.txt", HASH_B, 2, 0));
+        assertEquals(CaptureCompletionTracker.Event.IGNORED, conflicting.event());
+        assertEquals(1, tracker.observedFiles());
         assertEquals(0, tracker.decodableFiles());
+        assertEquals(1, tracker.unparsedPayloads());
+    }
+
+    @Test
+    void invalidRelativePathIsNotTracked() {
+        CaptureCompletionTracker tracker = new CaptureCompletionTracker();
+        // decode rejects path-escaping relPaths per chunk; a file decode can never restore
+        // must not show up as observed/decodable here.
+        CaptureCompletionTracker.Offer offer = tracker.offer(payload("../escape.txt", HASH_A, 1, 0));
+        assertEquals(CaptureCompletionTracker.Event.IGNORED, offer.event());
+        assertEquals(0, tracker.observedFiles());
+        assertEquals(1, tracker.unparsedPayloads());
     }
 
     @Test

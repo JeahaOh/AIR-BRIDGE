@@ -297,6 +297,32 @@ class PackagerAppTest {
     }
 
     @Test
+    void unpackKeepsGenuineTxtFilesUsingEmbeddedRenameList() throws Exception {
+        // A file that was really named *.txt in the original package is untouched by pack
+        // (txt is never a pack target), so unpack must not strip its extension either. The
+        // embedded target.txt rename list is what tells the two cases apart.
+        Path pkg = tempDir.resolve("app.jar");
+        createZip(pkg, Map.of(
+                "docs/readme.txt", text("genuine text file"),
+                "conf/settings.cfg", text("packed file")));
+        Files.write(tempDir.resolve("target-ext.txt"), List.of("cfg"), StandardCharsets.UTF_8);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", pkg.toString()));
+        Path packed = tempDir.resolve("app.zip");
+        List<String> packedNames = listZipEntries(packed);
+        assertTrue(packedNames.contains("docs/readme.txt"), "genuine txt renamed by pack: " + packedNames);
+        assertTrue(packedNames.contains("conf/settings.cfg.txt"), "target ext not packed: " + packedNames);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
+        List<String> unpackedNames = listZipEntries(packed);
+        assertTrue(unpackedNames.contains("docs/readme.txt"),
+                "genuine txt lost its extension on unpack: " + unpackedNames);
+        assertFalse(unpackedNames.contains("docs/readme"),
+                "genuine txt was stripped on unpack: " + unpackedNames);
+        assertTrue(unpackedNames.contains("conf/settings.cfg"), "packed entry not restored: " + unpackedNames);
+    }
+
+    @Test
     void unpackRecursesIntoRenamedNestedArchives() throws Exception {
         // When target-ext.txt lists "jar", pack renames nested archives to .jar.txt AND packs
         // their contents. Unpack must reverse BOTH: un-rename the archive and recurse to restore

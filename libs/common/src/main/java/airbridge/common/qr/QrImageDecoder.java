@@ -2,11 +2,10 @@ package airbridge.common.qr;
 
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.BinaryBitmap;
-import com.google.zxing.ChecksumException;
 import com.google.zxing.DecodeHintType;
-import com.google.zxing.FormatException;
 import com.google.zxing.MultiFormatReader;
 import com.google.zxing.NotFoundException;
+import com.google.zxing.ReaderException;
 import com.google.zxing.Result;
 import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.common.GlobalHistogramBinarizer;
@@ -152,17 +151,9 @@ public final class QrImageDecoder {
     }
 
     private static String tryDecodeImage(BufferedImage image, List<Map<DecodeHintType, ?>> hintsList) {
-        for (Map<DecodeHintType, ?> hints : hintsList) {
-            try {
-                return decodeQrText(image, hints);
-            } catch (NotFoundException | ChecksumException | FormatException ignored) {
-            }
-        }
-        return null;
-    }
-
-    private static String decodeQrText(BufferedImage image, Map<DecodeHintType, ?> hints)
-            throws NotFoundException, ChecksumException, FormatException {
+        // One luminance source and one BinaryBitmap per binarizer for all hint sets: the
+        // bitmap caches its black matrix, so the (expensive) binarization is not recomputed
+        // for the try-harder pass. Every binarizer/hints combination is still attempted.
         BufferedImageLuminanceSource source = new BufferedImageLuminanceSource(image);
         List<BinaryBitmap> bitmaps = Arrays.asList(
                 new BinaryBitmap(new HybridBinarizer(source)),
@@ -170,18 +161,20 @@ public final class QrImageDecoder {
         );
 
         for (BinaryBitmap bitmap : bitmaps) {
-            MultiFormatReader reader = new MultiFormatReader();
-            try {
-                Result result = reader.decode(bitmap, hints);
-                if (result != null && result.getText() != null && !result.getText().isEmpty()) {
-                    return result.getText();
+            for (Map<DecodeHintType, ?> hints : hintsList) {
+                MultiFormatReader reader = new MultiFormatReader();
+                try {
+                    Result result = reader.decode(bitmap, hints);
+                    if (result != null && result.getText() != null && !result.getText().isEmpty()) {
+                        return result.getText();
+                    }
+                } catch (ReaderException ignored) {
+                } finally {
+                    reader.reset();
                 }
-            } finally {
-                reader.reset();
             }
         }
-
-        throw NotFoundException.getNotFoundInstance();
+        return null;
     }
 
     private static String tryDecodeGridCrops(BufferedImage source,

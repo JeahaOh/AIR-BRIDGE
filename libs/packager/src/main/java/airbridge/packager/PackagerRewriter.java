@@ -39,6 +39,11 @@ public final class PackagerRewriter {
         Path abs = packagePath.toAbsolutePath().normalize();
         String baseName = stripExtension(abs.getFileName().toString());
         Path output = abs.resolveSibling(baseName + ".zip");
+        if (output.equals(abs)) {
+            // A .zip input would otherwise be replaced by its packed form, destroying the
+            // original archive; a .jar input keeps its original next to the output.
+            output = abs.resolveSibling(baseName + "-packed.zip");
+        }
         Path temp = Files.createTempFile(abs.getParent(), "airbridge-pack-", ".zip");
         try (InputStream in = Files.newInputStream(abs);
              OutputStream out = Files.newOutputStream(temp)) {
@@ -49,11 +54,23 @@ public final class PackagerRewriter {
     }
 
     public static void rewriteInPlaceUnpack(Path packagePath, Set<String> targetExts) throws IOException {
+        rewriteInPlaceUnpack(packagePath, targetExts, null);
+    }
+
+    /**
+     * Reverses pack's renames. When {@code packedNames} (the embedded {@code target.txt}
+     * rename list, nested entries as {@code outer.jar!/inner}) is present, only those exact
+     * entries are un-renamed — a file that was genuinely named {@code *.txt} in the original
+     * package keeps its name. A {@code null} list falls back to the extension heuristic for
+     * packages produced before the list existed.
+     */
+    public static void rewriteInPlaceUnpack(Path packagePath, Set<String> targetExts, Set<String> packedNames)
+            throws IOException {
         Path abs = packagePath.toAbsolutePath().normalize();
         Path temp = Files.createTempFile(abs.getParent(), "airbridge-unpack-", ".zip");
         try (InputStream in = Files.newInputStream(abs);
              OutputStream out = Files.newOutputStream(temp)) {
-            rewriteStream(in, out, targetExts, RewriteMode.UNPACK);
+            rewriteStream(in, out, targetExts, RewriteMode.UNPACK, packedNames, "");
         }
         Files.move(temp, abs, StandardCopyOption.REPLACE_EXISTING);
     }
@@ -101,6 +118,14 @@ public final class PackagerRewriter {
                     }
                     outEntry.setMethod(entry.getMethod());
                     if (entry.isDirectory()) {
+                        if (outEntry.getMethod() == ZipEntry.STORED) {
+                            // STORED entries need explicit size/crc before putNextEntry;
+                            // directories are always empty. Normally-built jars store their
+                            // directory entries, so this path is the common one.
+                            outEntry.setSize(0);
+                            outEntry.setCompressedSize(0);
+                            outEntry.setCrc(0);
+                        }
                         jos.putNextEntry(outEntry);
                         jos.closeEntry();
                         continue;
@@ -119,7 +144,8 @@ public final class PackagerRewriter {
         }
     }
 
-    private static void rewriteStream(InputStream input, OutputStream output, Set<String> targetExts, RewriteMode mode)
+    private static void rewriteStream(InputStream input, OutputStream output, Set<String> targetExts,
+                                      RewriteMode mode, Set<String> packedNames, String nestedPrefix)
             throws IOException {
         try (ZipInputStream zis = new ZipInputStream(input);
              ZipOutputStream zos = new ZipOutputStream(output)) {
@@ -141,15 +167,18 @@ public final class PackagerRewriter {
                     drain(zis);
                     continue;
                 }
-                String newName = renameIfMatch(originalName, targetExts, mode);
+                String newName = renameIfMatch(originalName, targetExts, mode, packedNames, nestedPrefix);
 
                 byte[] payload = readAllBytes(zis);
                 // On unpack a nested archive arrives renamed (e.g. inner.jar.txt) when "jar"/"zip"
                 // is a target ext, so its package-ness shows on the un-renamed name. Recurse if
                 // either name is a package so the nested entries are reversed too (symmetric with
-                // pack, which recurses on the original ".jar" name).
+                // pack, which recurses on the original ".jar" name). The rename list records
+                // nested entries against the un-renamed outer name (outer.jar!/inner), so the
+                // prefix passed down uses newName.
                 if (PackagerInspector.isPackageName(originalName) || PackagerInspector.isPackageName(newName)) {
-                    payload = rewriteNestedPackage(payload, targetExts, mode, List.of());
+                    payload = rewriteNestedPackage(payload, targetExts, mode, List.of(),
+                            packedNames, nestedPrefix + newName + "!/");
                 }
 
                 if (seen.add(newName)) {
@@ -192,11 +221,11 @@ public final class PackagerRewriter {
                     drain(zis);
                     continue;
                 }
-                String newName = renameIfMatch(originalName, targetExts, RewriteMode.PACK);
+                String newName = renameIfMatch(originalName, targetExts, RewriteMode.PACK, null, "");
 
                 byte[] payload = readAllBytes(zis);
                 if (PackagerInspector.isPackageName(originalName)) {
-                    payload = rewriteNestedPackage(payload, targetExts, RewriteMode.PACK, excludedEntryPatterns);
+                    payload = rewriteNestedPackage(payload, targetExts, RewriteMode.PACK, excludedEntryPatterns, null, "");
                 }
 
                 if (seen.add(newName)) {
@@ -214,14 +243,16 @@ public final class PackagerRewriter {
             byte[] payload,
             Set<String> targetExts,
             RewriteMode mode,
-            List<String> excludedEntryPatterns
+            List<String> excludedEntryPatterns,
+            Set<String> packedNames,
+            String nestedPrefix
     ) throws IOException {
         try (ByteArrayInputStream in = new ByteArrayInputStream(payload);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             if (mode == RewriteMode.PACK) {
                 rewritePackStream(in, out, targetExts, List.of(), List.of(), excludedEntryPatterns);
             } else {
-                rewriteStream(in, out, targetExts, mode);
+                rewriteStream(in, out, targetExts, mode, packedNames, nestedPrefix);
             }
             return out.toByteArray();
         }
@@ -277,7 +308,8 @@ public final class PackagerRewriter {
         writeEntry(zos, entry, payload);
     }
 
-    private static String renameIfMatch(String originalName, Set<String> targetExts, RewriteMode mode) {
+    private static String renameIfMatch(String originalName, Set<String> targetExts, RewriteMode mode,
+                                        Set<String> packedNames, String nestedPrefix) {
         String fileName = Path.of(originalName).getFileName().toString();
         int dot = fileName.lastIndexOf('.');
         boolean extensionless = dot < 0 || dot == fileName.length() - 1;
@@ -293,17 +325,34 @@ public final class PackagerRewriter {
                 }
                 return originalName;
             case UNPACK:
-                if (originalName.endsWith(".txt")) {
-                    String candidate = originalName.substring(0, originalName.length() - 4);
-                    String candidateFileName = Path.of(candidate).getFileName().toString();
-                    int candidateDot = candidateFileName.lastIndexOf('.');
-                    if (candidateDot < 0 || candidateDot == candidateFileName.length() - 1) {
+                if (!originalName.endsWith(".txt")) {
+                    return originalName;
+                }
+                String candidate = originalName.substring(0, originalName.length() - 4);
+                String candidateFileName = Path.of(candidate).getFileName().toString();
+                int candidateDot = candidateFileName.lastIndexOf('.');
+                boolean candidateExtensionless = candidateDot < 0 || candidateDot == candidateFileName.length() - 1;
+                String candidateExt = candidateExtensionless
+                        ? ""
+                        : candidateFileName.substring(candidateDot + 1).toLowerCase(Locale.ROOT);
+                // With the embedded rename list, only entries pack actually renamed lose the
+                // suffix; a file genuinely named *.txt in the original keeps its name. Lists
+                // written before nested-archive renames were recorded miss *.jar.txt/*.zip.txt
+                // entries, so those un-rename by shape as a compatibility exception.
+                if (packedNames != null) {
+                    if (packedNames.contains(nestedPrefix + originalName)) {
                         return candidate;
                     }
-                    String candidateExt = candidateFileName.substring(candidateDot + 1).toLowerCase(Locale.ROOT);
-                    if (targetExts.contains(candidateExt)) {
+                    if (PackagerInspector.isPackageName(candidate) && targetExts.contains(candidateExt)) {
                         return candidate;
                     }
+                    return originalName;
+                }
+                if (candidateExtensionless) {
+                    return candidate;
+                }
+                if (targetExts.contains(candidateExt)) {
+                    return candidate;
                 }
                 return originalName;
             default:

@@ -52,6 +52,7 @@
 출력 규칙:
 
 - 입력이 `sample.jar`면 출력은 같은 디렉터리의 `sample.zip`
+- 입력이 이미 `.zip`이면 원본을 덮어쓰지 않도록 `sample-packed.zip`으로 저장한다
 - 원본 파일은 그대로 두고 새 파일을 만든다
 
 대상 확장자 결정 순서:
@@ -77,7 +78,8 @@
 `pack`은 출력 zip 루트에 메타데이터 두 파일을 추가한다.
 
 - `target-ext.txt`: 이번 rewrite에 사용한 대상 확장자 목록
-- `target.txt`: `.txt` suffix가 붙은 엔트리 이름 목록
+- `target.txt`: `.txt` suffix가 붙은 엔트리 이름 목록. 중첩 아카이브 자체의 rename과
+  그 내부 엔트리(`outer.jar!/inner.dat.txt` 형식)도 포함한다
 
 이 메타데이터는 `unpack`이 복원 기준으로 사용합니다.
 
@@ -92,7 +94,9 @@
 
 1. 입력 파일을 제자리 rewrite 한다.
 2. `target-ext.txt`, `target.txt` 메타데이터 엔트리는 제거한다.
-3. 대상 확장자 엔트리와 확장자 없는 엔트리의 `.txt` suffix를 제거한다.
+3. `target.txt`의 이름 목록에 있는 엔트리만 `.txt` suffix를 제거한다 — pack이 rename하지
+   않은, 원래부터 `.txt`였던 파일(예: `readme.txt`)은 이름을 유지한다. 목록이 없는
+   구버전 패키지는 확장자 휴리스틱(대상 확장자·확장자 없음)으로 복원한다.
 4. 중첩 `jar`/`zip`도 내부까지 재귀적으로 복원한다.
 5. 결과 zip에 `META-INF/MANIFEST.MF`가 있으면 `.jar`로 다시 써서 파일 확장자도 `.jar`로 되돌린다.
 

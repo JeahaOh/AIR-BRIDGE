@@ -1,5 +1,6 @@
 package airbridge.common;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -40,7 +41,9 @@ public final class CodecSupport {
     public static CompressedStreamInfo compressToFile(InputStream source, Path target) throws IOException {
         MessageDigest digest = newSha256();
         long rawByteCount = 0;
-        try (OutputStream fileOut = Files.newOutputStream(target);
+        // The BufferedOutputStream coalesces the deflater's ~512-byte flushes into 64KB file
+        // writes; without it every deflated block is its own syscall.
+        try (OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(target), 64 * 1024);
              GZIPOutputStream gzos = new GZIPOutputStream(fileOut) {{
                  def.setLevel(Deflater.BEST_COMPRESSION);
              }}) {
@@ -69,7 +72,7 @@ public final class CodecSupport {
         MessageDigest digest = newSha256();
         try (GZIPInputStream gzis = new GZIPInputStream(compressedSource);
              DigestInputStream digestIn = new DigestInputStream(gzis, digest);
-             OutputStream out = Files.newOutputStream(target)) {
+             OutputStream out = new BufferedOutputStream(Files.newOutputStream(target), 64 * 1024)) {
             digestIn.transferTo(out);
         }
         return toHex(digest.digest());

@@ -16,6 +16,18 @@ final class SlideDefaults {
     static final int DEFAULT_BLACK_FRAME_MS;
     // 슬라이드쇼를 반복 재생하는 기본 횟수다.
     static final int DEFAULT_LOOP_COUNT;
+    // 한 장을 보여주는 시간(ms)의 하한이다. 모니터 주사율을 감안한 고속 재생용 최소값.
+    static final int MIN_PAGE_DISPLAY_MS = 20;
+    // 한 장을 보여주는 시간(ms)의 상한이다.
+    static final int MAX_PAGE_DISPLAY_MS = 10_000;
+    // 한 장을 보여주는 시간(ms)의 스피너 증감 단위다.
+    static final int PAGE_DISPLAY_STEP_MS = 10;
+    // 장면 사이 블랙 프레임 시간(ms)의 하한이다.
+    static final int MIN_BLACK_FRAME_MS = 1;
+    // 장면 사이 블랙 프레임 시간(ms)의 상한이다.
+    static final int MAX_BLACK_FRAME_MS = 2_000;
+    // 장면 사이 블랙 프레임 시간(ms)의 스피너 증감 단위다.
+    static final int BLACK_FRAME_STEP_MS = 10;
     // 메모리에 유지할 이미지 캐시 최대 개수다.
     static final int MAX_CACHE_SIZE = 200;
     // 시작 직후 미리 읽어 둘 이미지 개수다.

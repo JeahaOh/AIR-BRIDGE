@@ -404,29 +404,25 @@ public final class CaptureService {
                 stopReason
         );
         listener.onStatus(status);
-        listener.onLog(String.format("[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d%s",
+        long elapsed = elapsedMillis();
+        listener.onLog(String.format("[CAPTURE][INFO] frames=%d analyzed=%d decoded=%d uniquePayloads=%d saved=%d",
                 status.totalFrames(),
                 status.analyzedFrames(),
                 status.decodedFrames(),
                 status.uniquePayloads(),
-                status.savedImages(),
-                pacingHint(status.uniquePayloads(), elapsedMillis())));
+                status.savedImages()));
+        // 매 상태 주기(기본 10초)마다 지금까지 관측된 속도로 다시 계산한 slide 권장값을 별도 줄로 출력한다.
+        long recommendedDwell = recommendedDwellMs(status.uniquePayloads(), elapsed);
+        if (recommendedDwell >= 0) {
+            listener.onLog(String.format(Locale.ROOT,
+                    "[CAPTURE][INFO] 고유 %.1f QR/s -> slide page-display-ms >= %dms 권장 (가이드값)",
+                    status.uniquePayloads() * 1000.0 / Math.max(1, elapsed), recommendedDwell));
+        }
     }
 
     private long elapsedMillis() {
         long started = startedAtMillis;
         return started > 0 ? System.currentTimeMillis() - started : 0;
-    }
-
-    // Slide-pacing guideline based on the unique-symbol capture rate observed so far. Empty
-    // until enough symbols are captured to advise.
-    private String pacingHint(long uniquePayloads, long elapsedMillis) {
-        long recommended = recommendedDwellMs(uniquePayloads, elapsedMillis);
-        if (recommended < 0) {
-            return "";
-        }
-        double uniquePerSec = uniquePayloads * 1000.0 / elapsedMillis;
-        return String.format(Locale.ROOT, " | 고유 %.1f/s -> slide 권장 >= %dms", uniquePerSec, recommended);
     }
 
     // Recommended slide page-display-ms for the next pass: roughly the average interval between

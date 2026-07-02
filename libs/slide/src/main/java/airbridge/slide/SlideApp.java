@@ -262,8 +262,10 @@ public class SlideApp {
         JButton reloadButton = new JButton("Reload");
         reloadButton.addActionListener(event -> loadImagesFromInput());
 
-        pageDisplaySpinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_PAGE_DISPLAY_MS, 50, 10_000, 50));
-        blackFrameSpinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_BLACK_FRAME_MS, 0, 2_000, 10));
+        pageDisplaySpinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_PAGE_DISPLAY_MS,
+                SlideDefaults.MIN_PAGE_DISPLAY_MS, SlideDefaults.MAX_PAGE_DISPLAY_MS, SlideDefaults.PAGE_DISPLAY_STEP_MS));
+        blackFrameSpinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_BLACK_FRAME_MS,
+                SlideDefaults.MIN_BLACK_FRAME_MS, SlideDefaults.MAX_BLACK_FRAME_MS, SlideDefaults.BLACK_FRAME_STEP_MS));
         loopCountSpinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_LOOP_COUNT, 0, 9_999, 1));
         installSpinnerBehavior(pageDisplaySpinner);
         installSpinnerBehavior(blackFrameSpinner);

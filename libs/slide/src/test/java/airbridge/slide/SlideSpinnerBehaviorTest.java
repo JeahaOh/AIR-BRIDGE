@@ -21,6 +21,39 @@ class SlideSpinnerBehaviorTest {
     }
 
     @Test
+    void spinnerBoundsAllowFastPlayback() {
+        // 고속 재생을 위해 Page 하한은 20ms, Black 하한은 1ms까지 허용한다.
+        assertEquals(20, SlideDefaults.MIN_PAGE_DISPLAY_MS);
+        assertEquals(1, SlideDefaults.MIN_BLACK_FRAME_MS);
+    }
+
+    @Test
+    void pageSpinnerEditorEnforcesNewLowerBound() throws Exception {
+        AtomicReference<AssertionError> failure = new AtomicReference<>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            try {
+                JSpinner spinner = new JSpinner(new SpinnerNumberModel(SlideDefaults.DEFAULT_PAGE_DISPLAY_MS,
+                        SlideDefaults.MIN_PAGE_DISPLAY_MS, SlideDefaults.MAX_PAGE_DISPLAY_MS,
+                        SlideDefaults.PAGE_DISPLAY_STEP_MS));
+                JSpinner.DefaultEditor editor = (JSpinner.DefaultEditor) spinner.getEditor();
+
+                SlideApp.configureNumericSpinnerEditor(spinner, editor);
+
+                NumberFormatter formatter = assertInstanceOf(NumberFormatter.class, editor.getTextField().getFormatter());
+                assertEquals(20, formatter.getMinimum());
+                assertEquals(10_000, formatter.getMaximum());
+            } catch (AssertionError e) {
+                failure.set(e);
+            }
+        });
+
+        if (failure.get() != null) {
+            throw failure.get();
+        }
+    }
+
+    @Test
     void configureNumericSpinnerEditorRestrictsInvalidInput() throws Exception {
         AtomicReference<AssertionError> failure = new AtomicReference<>();
 

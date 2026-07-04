@@ -482,8 +482,9 @@ public class SlideApp {
         playing = true;
         startMouseJiggle();
         playPauseButton.setText("Pause");
-        showCurrentImage();
-        scheduleDisplayPhase();
+        if (showCurrentImage()) {
+            scheduleDisplayPhase();
+        }
         focusMainWindow();
     }
 
@@ -518,6 +519,9 @@ public class SlideApp {
     }
 
     private void scheduleBlackPhase() {
+        if (blackTimer != null) {
+            blackTimer.stop();
+        }
         blackTimer = new Timer(getSpinnerValue(blackFrameSpinner), event -> {
             if (!playing) {
                 return;
@@ -533,8 +537,9 @@ public class SlideApp {
             enterPostFinishBlackout();
             return;
         }
-        showCurrentImage();
-        scheduleDisplayPhase();
+        if (showCurrentImage()) {
+            scheduleDisplayPhase();
+        }
     }
 
     private void navigateRelative(int delta) {
@@ -545,33 +550,32 @@ public class SlideApp {
             focusMainWindow();
             return;
         }
-        showCurrentImage();
-        if (playing) {
+        boolean loaded = showCurrentImage();
+        if (playing && loaded) {
             scheduleDisplayPhase();
         }
         focusMainWindow();
     }
 
-    private void showCurrentImage() {
+    private boolean showCurrentImage() {
         if (imageFiles.isEmpty()) {
-            return;
+            return false;
         }
         int generation = imageLoadGeneration.get();
         int index = playback.currentIndex();
         Path current = imageFiles.get(index);
         BufferedImage currentImage = getCachedImage(current);
-        if (currentImage != null || isImageCached(current)) {
+        boolean isCached = currentImage != null || isImageCached(current);
+        if (isCached) {
             slideCanvas.setImage(currentImage);
         } else {
             queueImageLoad(current, generation, true);
-            if (slideCanvas.getImage() == null) {
-                slideCanvas.setImage(null);
-            }
         }
         playback.markCurrentImageShown();
         syncSelection(index);
         prefetchAround(index);
         setStatusText(buildStatusPrefix(playing ? "PLAY" : "PAUSE") + currentRelativePath());
+        return isCached;
     }
 
     private void showBlackFrame() {
@@ -605,8 +609,8 @@ public class SlideApp {
         if (!playback.selectIndex(selectedIndex)) {
             return;
         }
-        showCurrentImage();
-        if (playing) {
+        boolean loaded = showCurrentImage();
+        if (playing && loaded) {
             scheduleDisplayPhase();
         }
     }
@@ -705,6 +709,9 @@ public class SlideApp {
                 if (shouldRefreshCurrent) {
                     slideCanvas.setImage(getCachedImage(path));
                     slideCanvas.repaint();
+                    if (playing) {
+                        scheduleDisplayPhase();
+                    }
                 }
             });
         });
@@ -811,6 +818,7 @@ public class SlideApp {
             blackTimer.stop();
             blackTimer = null;
         }
+        cancelCloseTimer();
     }
 
     private void cancelCloseTimer() {
@@ -1032,6 +1040,10 @@ public class SlideApp {
 
     private static final class SlideCanvas extends JPanel {
         private BufferedImage image;
+        private BufferedImage scaledImage;
+        private int lastWidth = -1;
+        private int lastHeight = -1;
+        private BufferedImage lastRawImage = null;
 
         private SlideCanvas() {
             setBackground(COLOR_BG);
@@ -1040,6 +1052,10 @@ public class SlideApp {
 
         private void setImage(BufferedImage image) {
             this.image = image;
+            if (image != lastRawImage) {
+                scaledImage = null;
+                lastRawImage = image;
+            }
             repaint();
         }
 
@@ -1053,19 +1069,33 @@ public class SlideApp {
             if (image == null) {
                 return;
             }
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-            g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
 
-            int availableWidth = Math.max(1, getWidth() - 40);
-            int availableHeight = Math.max(1, getHeight() - 40);
-            double scale = Math.min(availableWidth / (double) image.getWidth(), availableHeight / (double) image.getHeight());
-            int drawWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
-            int drawHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
-            int x = (getWidth() - drawWidth) / 2;
-            int y = (getHeight() - drawHeight) / 2;
-            g2.drawImage(image, x, y, drawWidth, drawHeight, null);
-            g2.dispose();
+            int w = getWidth();
+            int h = getHeight();
+
+            if (scaledImage == null || w != lastWidth || h != lastHeight) {
+                lastWidth = w;
+                lastHeight = h;
+
+                int availableWidth = Math.max(1, w - 40);
+                int availableHeight = Math.max(1, h - 40);
+                double scale = Math.min(availableWidth / (double) image.getWidth(), availableHeight / (double) image.getHeight());
+                int drawWidth = Math.max(1, (int) Math.round(image.getWidth() * scale));
+                int drawHeight = Math.max(1, (int) Math.round(image.getHeight() * scale));
+
+                BufferedImage newScaled = new BufferedImage(drawWidth, drawHeight, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = newScaled.createGraphics();
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2d.drawImage(image, 0, 0, drawWidth, drawHeight, null);
+                g2d.dispose();
+
+                scaledImage = newScaled;
+            }
+
+            int x = (w - scaledImage.getWidth()) / 2;
+            int y = (h - scaledImage.getHeight()) / 2;
+            g.drawImage(scaledImage, x, y, null);
         }
     }
 

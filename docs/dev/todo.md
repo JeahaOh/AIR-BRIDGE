@@ -58,16 +58,9 @@
 - [ ] **Windows 실기 검증** — `receiver`의 카메라 인식/캡처 동작을 Windows 실기에서 최종 확인.
   (디바이스 이름 열거·probe 타임아웃·폴더 picker 코드는 반영됨. ffmpeg 미설치 시
   디바이스 이름은 안 뜨고 brute-force로 동작 → 필요하면 번들 ffmpeg 사용으로 후속 개선.)
-- [ ] **P4d. `chunkDataSize` 기본값 튜닝** — 바이트 모드 전환 후 QR 용량 한계까지 키워 QR 장수↓.
-  버전/ECC 용량 검증 필요 → 별도 작업.
 
 ### 정확성·성능 감사 후속 항목 중 미해결 과제
 
-- [ ] **slide 타이머·페인트 검토(실기 필요)** — 감사 지적: `scheduleBlackPhase()`가 이전
-  black 타이머를 정지하지 않아 스피너 변경 시 고아 타이머가 남을 수 있음; dwell 타이머가
-  이미지 표시 전에 시작돼 캐시 미스 시 실효 dwell이 깎임; 종료 blackout에서 빠져나와도
-  5분 closeTimer가 살아 있음; `SlideCanvas`가 매 paint마다 BILINEAR 재스케일. Swing 실기
-  확인 없이 바꾸기엔 캡처 신뢰도에 영향 가능 → 실기 검증과 함께 진행.
 - [ ] **QrImageDecoder 회전 변형 제거 검토** — zxing QR 디코더는 회전 불변이라 90/180/270
   재렌더 시도가 실패 경로 비용만 4배로 늘린다는 지적. 경계 프레임에서의 영향을 벤치마크로
   확인한 뒤 제거.

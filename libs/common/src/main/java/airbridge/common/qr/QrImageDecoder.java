@@ -111,40 +111,30 @@ public final class QrImageDecoder {
             return null;
         }
 
-        int[] rotations = {0, 90, 180, 270};
-        for (int rotation : rotations) {
-            BufferedImage candidate = rotation == 0 ? source : rotateImage(source, rotation);
+        String decoded = tryDecodeImage(source, hintsList);
+        if (decoded != null) {
+            return decoded;
+        }
+
+        if (colorVariants) {
+            BufferedImage gray = toGray(source);
             try {
-                String decoded = tryDecodeImage(candidate, hintsList);
+                decoded = tryDecodeImage(gray, hintsList);
                 if (decoded != null) {
                     return decoded;
                 }
+            } finally {
+                gray.flush();
+            }
 
-                if (colorVariants) {
-                    BufferedImage gray = toGray(candidate);
-                    try {
-                        decoded = tryDecodeImage(gray, hintsList);
-                        if (decoded != null) {
-                            return decoded;
-                        }
-                    } finally {
-                        gray.flush();
-                    }
-
-                    BufferedImage bw = toBlackAndWhite(candidate);
-                    try {
-                        decoded = tryDecodeImage(bw, hintsList);
-                        if (decoded != null) {
-                            return decoded;
-                        }
-                    } finally {
-                        bw.flush();
-                    }
+            BufferedImage bw = toBlackAndWhite(source);
+            try {
+                decoded = tryDecodeImage(bw, hintsList);
+                if (decoded != null) {
+                    return decoded;
                 }
             } finally {
-                if (rotation != 0) {
-                    candidate.flush();
-                }
+                bw.flush();
             }
         }
         return null;
@@ -238,26 +228,7 @@ public final class QrImageDecoder {
         return scaled;
     }
 
-    private static BufferedImage rotateImage(BufferedImage source, int degrees) {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        boolean swap = degrees == 90 || degrees == 270;
-        BufferedImage rotated = new BufferedImage(
-                swap ? height : width,
-                swap ? width : height,
-                BufferedImage.TYPE_INT_RGB
-        );
-        Graphics2D g = rotated.createGraphics();
-        g.setColor(Color.WHITE);
-        g.fillRect(0, 0, rotated.getWidth(), rotated.getHeight());
-        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.translate(rotated.getWidth() / 2.0, rotated.getHeight() / 2.0);
-        g.rotate(Math.toRadians(degrees));
-        g.translate(-width / 2.0, -height / 2.0);
-        g.drawImage(source, 0, 0, null);
-        g.dispose();
-        return rotated;
-    }
+
 
     private static BufferedImage toGray(BufferedImage source) {
         BufferedImage gray = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_BYTE_GRAY);

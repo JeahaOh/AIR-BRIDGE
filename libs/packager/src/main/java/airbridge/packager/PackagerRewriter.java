@@ -120,12 +120,32 @@ public final class PackagerRewriter {
                 rewriteUnpackStream(in, out, targetExts, packedNames, "", seenSourceNames, originalNames);
             }
             requireSequentiallyReadable(abs, originalNames, seenSourceNames);
+
+            Path backup = abs.resolveSibling(abs.getFileName() + ".bak");
+            Files.move(abs, backup, StandardCopyOption.REPLACE_EXISTING);
+
+            boolean writeSuccess = false;
             try {
-                Files.move(temp, abs, StandardCopyOption.ATOMIC_MOVE);
-            } catch (IOException atomicFailed) {
-                Files.move(temp, abs, StandardCopyOption.REPLACE_EXISTING);
+                try {
+                    Files.move(temp, abs, StandardCopyOption.ATOMIC_MOVE);
+                } catch (IOException atomicFailed) {
+                    Files.move(temp, abs, StandardCopyOption.REPLACE_EXISTING);
+                }
+                writeSuccess = true;
+            } finally {
+                if (writeSuccess) {
+                    Files.deleteIfExists(backup);
+                } else {
+                    try {
+                        Files.move(backup, abs, StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException rollbackFailed) {
+                        System.err.printf("FATAL: Rollback failed during unpack recovery. Original backup saved at: %s. Error: %s%n",
+                                backup.toAbsolutePath(), rollbackFailed.getMessage());
+                        throw rollbackFailed;
+                    }
+                }
             }
-            moved = true;
+            moved = writeSuccess;
         } finally {
             if (!moved) {
                 Files.deleteIfExists(temp);
@@ -288,9 +308,7 @@ public final class PackagerRewriter {
                     }
                 }
                 if (!seen.add(newName)) {
-                    System.out.printf("WARN duplicate entry %s%s skipped (first occurrence kept)%n",
-                            nestedPrefix, newName);
-                    continue;
+                    throw new IOException("Duplicate entry detected in archive: " + nestedPrefix + newName);
                 }
                 if (!newName.equals(originalName)) {
                     renames.add(nestedPrefix + newName);
@@ -365,9 +383,7 @@ public final class PackagerRewriter {
                             streamEntry(zos, copyEntry(entry, originalName), zis);
                             continue;
                         }
-                        System.out.printf("WARN duplicate entry %s%s skipped (first occurrence kept)%n",
-                                nestedPrefix, newName);
-                        continue;
+                        throw new IOException("Duplicate entry detected in archive: " + nestedPrefix + newName);
                     }
                     streamEntry(zos, copyEntry(entry, newName), zis);
                     continue;
@@ -407,9 +423,7 @@ public final class PackagerRewriter {
                         writeEntry(zos, copyEntry(entry, originalName), payload);
                         continue;
                     }
-                    System.out.printf("WARN duplicate entry %s%s skipped (first occurrence kept)%n",
-                            nestedPrefix, newName);
-                    continue;
+                    throw new IOException("Duplicate entry detected in archive: " + nestedPrefix + newName);
                 }
                 writeEntry(zos, copyEntry(entry, newName), payload);
             }

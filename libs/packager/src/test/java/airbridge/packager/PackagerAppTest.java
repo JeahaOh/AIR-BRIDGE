@@ -601,7 +601,7 @@ class PackagerAppTest {
     }
 
     @Test
-    void packSkipsDuplicateEntriesWithWarn() throws Exception {
+    void packFailsOnDuplicateEntries() throws Exception {
         byte[] first = text("FIRST COPY");
         byte[] second = text("SECOND COPY");
         Path input = tempDir.resolve("app.jar");
@@ -611,16 +611,9 @@ class PackagerAppTest {
         )));
         Files.write(tempDir.resolve("target-ext.txt"), List.of("bin"), StandardCharsets.UTF_8);
 
-        String packOut = captureStdout(() ->
-                assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", input.toString())));
-        assertTrue(packOut.contains("WARN duplicate entry dup.bin.txt skipped"), packOut);
-
-        Path packed = tempDir.resolve("app.zip");
-        assertLinesMatch(List.of("dup.bin.txt"), readZipTextEntry(packed, "target.txt"));
-        org.junit.jupiter.api.Assertions.assertArrayEquals(first, readZipEntryBytes(packed, "dup.bin.txt"));
-
-        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
-        org.junit.jupiter.api.Assertions.assertArrayEquals(first, readZipEntryBytes(packed, "dup.bin"));
+        String packErr = captureStderr(() ->
+                assertEquals(1, new CommandLine(new PackagerApp()).execute("pack", "--in", input.toString())));
+        assertTrue(packErr.contains("Duplicate entry detected"), packErr);
     }
 
     // --- hostile and awkward entry names ------------------------------------------------

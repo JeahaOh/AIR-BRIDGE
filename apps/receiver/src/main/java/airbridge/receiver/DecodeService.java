@@ -83,10 +83,8 @@ final class DecodeService {
                         result.index + 1, qrFiles.size(), srcPath.relativize(result.qrFile)));
 
                 if (result.skippedRestored) {
-                    // Surplus frame of a file already restored this run: no decode needed,
-                    // but it still belongs with the consumed PNGs in the success dir.
-                    effectiveListener.onLog("  [SKIP] 이미 복원된 파일의 잉여 QR — decode 생략");
-                    moveDecodedQrFilesToSuccess(List.of(result.qrFile));
+                    effectiveListener.onLog("  [SKIP] 이미 복원된 파일의 잉여 QR — decode 생략 및 파일 삭제");
+                    deleteDecodedQrFiles(List.of(result.qrFile));
                     continue;
                 }
 
@@ -119,7 +117,7 @@ final class DecodeService {
                 // left behind they would read as a bogus INCOMPLETE file on the next decode run.
                 if (finalizedPaths.contains(normalizedRelPath)) {
                     if (restoredPaths.contains(normalizedRelPath)) {
-                        moveDecodedQrFilesToSuccess(List.of(result.qrFile));
+                        deleteDecodedQrFiles(List.of(result.qrFile));
                     }
                     continue;
                 }
@@ -231,8 +229,8 @@ final class DecodeService {
             return RestoreOutcome.DECODE_ERROR;
         }
 
-        List<Path> movedTargets = moveDecodedQrFilesToSuccess(fileChunks.qrFiles());
-        reportLines.add("O " + fileChunks.relPath + " - OK" + formatMovedTargets(movedTargets));
+        List<Path> deletedFiles = deleteDecodedQrFiles(fileChunks.qrFiles());
+        reportLines.add("O " + fileChunks.relPath + " - OK" + formatDeletedFiles(deletedFiles));
         listener.onLog(String.format("  [RESTORED] %s", fileChunks.relPath));
         return RestoreOutcome.RESTORED;
     }
@@ -262,44 +260,28 @@ final class DecodeService {
         }
     }
 
-    private static List<Path> moveDecodedQrFilesToSuccess(List<Path> qrFiles) {
-        List<Path> movedTargets = new ArrayList<>();
+    private static List<Path> deleteDecodedQrFiles(List<Path> qrFiles) {
+        List<Path> deletedFiles = new ArrayList<>();
         for (Path qrFile : qrFiles) {
             try {
-                Path parent = qrFile.getParent();
-                if (parent == null) {
-                    continue;
+                if (Files.deleteIfExists(qrFile)) {
+                    deletedFiles.add(qrFile);
                 }
-
-                Path successDir = buildSuccessDir(parent);
-                Files.createDirectories(successDir);
-                Path target = successDir.resolve(qrFile.getFileName());
-                Files.move(qrFile, target, StandardCopyOption.REPLACE_EXISTING);
-                movedTargets.add(target);
             } catch (Exception e) {
-                // decode 진행은 유지하고 이동 실패만 로그 문자열에 남긴다.
+                // decode 진행은 유지하고 삭제 실패만 로그 문자열에 남긴다.
             }
         }
-        return movedTargets;
+        return deletedFiles;
     }
 
-    private static Path buildSuccessDir(Path sourceDir) {
-        Path parent = sourceDir.getParent();
-        Path dirName = sourceDir.getFileName();
-        if (parent == null || dirName == null) {
-            return sourceDir.resolve("success");
-        }
-        return parent.resolve(dirName + "-success");
-    }
-
-    private static String formatMovedTargets(List<Path> movedTargets) {
-        if (movedTargets.isEmpty()) {
+    private static String formatDeletedFiles(List<Path> deletedFiles) {
+        if (deletedFiles.isEmpty()) {
             return "";
         }
         List<String> paths = new ArrayList<>();
-        for (Path path : movedTargets) {
+        for (Path path : deletedFiles) {
             paths.add(path.toString());
         }
-        return " (moved: " + paths + ")";
+        return " (deleted: " + paths + ")";
     }
 }

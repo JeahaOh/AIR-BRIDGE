@@ -51,7 +51,7 @@ class ReceiverRoundTripTest {
         assertEquals(0, encodeExit);
         assertEquals(0, decodeExit);
         assertArrayEquals(sourceData, Files.readAllBytes(restoredDir.resolve("nested/sample.txt")));
-        assertTrue(Files.isDirectory(qrDir.resolve("nested-success")));
+        assertTrue(!Files.exists(qrDir.resolve("nested-success")));
         assertTrue(Files.readString(restoredDir.resolve("_restore_result.txt"), StandardCharsets.UTF_8)
                 .contains("O nested/sample.txt - OK"));
     }

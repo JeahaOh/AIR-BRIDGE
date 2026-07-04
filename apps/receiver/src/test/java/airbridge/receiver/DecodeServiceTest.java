@@ -53,10 +53,7 @@ class DecodeServiceTest {
         assertArrayEquals(sourceData, Files.readAllBytes(outputDir.resolve("docs/sample.bin")));
 
         Path successDir = inputDir.resolve("batch-success");
-        assertTrue(Files.isDirectory(successDir));
-        try (Stream<Path> stream = Files.list(successDir)) {
-            assertEquals(qrFiles.size(), stream.filter(path -> path.getFileName().toString().endsWith(".png")).count());
-        }
+        assertFalse(Files.exists(successDir));
         try (Stream<Path> stream = Files.list(batchDir)) {
             assertEquals(0, stream.filter(path -> path.getFileName().toString().endsWith(".png")).count());
         }

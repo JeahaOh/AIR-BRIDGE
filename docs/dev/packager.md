@@ -92,7 +92,7 @@
   보존할 수 없다. WARN을 출력하고 제거한 뒤 pack 메타데이터로 대체한다.
 - 이름에 CR/LF가 들어간 엔트리는 줄 기반 rename 목록에 기록할 수 없으므로
   rename하지 않고 그대로 통과시킨다.
-- 같은 이름의 중복 엔트리는 첫 번째 것만 남기고 WARN을 출력한다.
+- 같은 이름의 중복 엔트리가 감지되면 데이터 손실을 방지하기 위해 가공을 중단하고 IOException을 던진다.
 
 예:
 
@@ -125,7 +125,7 @@
 
 동작 요약:
 
-1. 입력 파일을 제자리 rewrite 한다(임시 파일에 쓴 뒤 원자적 move를 시도).
+1. 입력 파일을 제자리 rewrite 한다. 이때 쓰기 오류로 인한 원본 훼손을 예방하기 위해, 덮어쓰기 직전 원본 파일을 임시 백업(`.bak`)해두었다가 성공 시 폐기하고 실패 시 복원하는 롤백 메커니즘을 적용한다.
 2. `target-ext.txt`, `target.txt` 메타데이터 엔트리는 최상위/중첩 모두 제거한다.
 3. `target.txt`의 이름 목록에 있는 엔트리만 `.txt` suffix를 제거한다 — pack이 rename하지
    않은, 원래부터 `.txt`였던 파일(예: `readme.txt`)은 이름을 유지한다. 예외: 목록이 있어도
@@ -149,7 +149,7 @@
 5. 중첩 `jar`/`zip`도 내부까지 재귀적으로 복원한다. pack과 같은 zip 매직 게이트를
    적용해, zip이 아닌 바이트는 WARN과 함께 그대로 복사한다.
 6. 결과 zip에 `META-INF/MANIFEST.MF`가 있으면 `.jar`로 다시 써서 파일 확장자도 `.jar`로 되돌린다.
-   엔트리는 버퍼링 없이 스트리밍 복사하며(STORED는 central directory의 size/crc 사용),
+   엔트리는 버퍼링 없이 스트리밍 복사하며(STORED는 central directory of size/crc 사용),
    원본 zip 핸들을 닫은 뒤에 move/삭제하므로 Windows에서도 안전하다. 대상 `.jar`가
    이미 있으면 WARN 후 덮어쓴다(pack 후 같은 폴더에서 unpack하는 문서화된 흐름에서는
    원본 jar가 재구성본으로 대체된다는 뜻이다).
@@ -196,8 +196,7 @@
   메타데이터를 최대한 유지한다. 단 central directory에만 존재하는 엔트리 comment는
   스트림 rewrite에서 보존되지 않는다.
 - 중첩 아카이브가 아닌 엔트리는 전체 버퍼링 없이 스트리밍 복사한다.
-- rename 충돌·중복 엔트리는 `seen` 집합과 원본 이름 집합으로 방지하며, 조용히
-  드롭하지 않고 WARN을 출력한다.
+- rename 충돌은 seen 집합과 원본 이름 집합으로 방지하며 원래 이름을 유지하고 WARN을 출력하며, 중복 엔트리는 감지 시 즉시 IOException을 던지고 실패한다.
 - rewrite 중 실패하면 입력 옆에 만든 `airbridge-*` 임시 파일을 정리한다.
 - 순차 ZipInputStream 패스가 본 엔트리 이름 집합이 central directory 이름 집합을
   모두 포함하지 못하면(자가압축해제형 preamble, 앞에 다른 zip이 concat돼 뒤쪽 EOCD가
@@ -220,7 +219,7 @@
 - 이름만 아카이브인 엔트리(가짜 `.jar`)의 내용 보존 왕복
 - rename 충돌(`a.cfg` + 진짜 `a.cfg.txt`) 시 양쪽 모두 보존
 - `target`/`target-ext`/`target.txt`라는 이름의 사용자 엔트리 처리와 WARN
-- 중복 엔트리 이름(수제 raw zip)의 first-wins + WARN
+- 중복 엔트리 이름(수제 raw zip) 감지 시 IOException 실패
 - Windows에서 불법인 문자(`:` `*` `?`), 공백/개행이 든 엔트리 이름 왕복
 - rename 목록 없는 구버전 패키지의 휴리스틱 복원
 - 중첩 아카이브 rename이 빠진 구버전 목록의 모양 기반 복원(zip 매직 게이트 포함)

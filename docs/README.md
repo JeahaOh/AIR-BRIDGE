@@ -43,7 +43,6 @@ payload 프레임 형식을 바꾸는 변경은 sender·receiver·테스트·문
 - `dev/faster.md`: `slide` / `capture` 성능 튜닝 메모
 - `dev/packager.md`: `identify` / `pack` / `unpack` 내부 동작 정리
 - `dev/slide-capture.md`: `slide` / `capture` 내부 동작과 상태 전이 정리
-- `dev/sketch.md`: slide↔capture 속도 협상 설계 메모(방법 A 착수 여부 미결정 기록)
 - `dev/codex/README.md`: AI 어시스턴트 작업용 보조 문서, 프롬프트, 검증 스크립트 안내
 - `dev/todo.md`: 현재 남아 있는 작업만 정리한 TODO
 

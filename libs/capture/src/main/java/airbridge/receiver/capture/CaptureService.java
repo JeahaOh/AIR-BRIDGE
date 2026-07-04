@@ -92,6 +92,11 @@ public final class CaptureService {
     // payload string: long captures otherwise grow the heap by ~2KB per unique frame forever.
     private final Set<PayloadDigest> seenPayloads = Collections.synchronizedSet(new HashSet<>());
     private final CaptureCompletionTracker completionTracker = new CaptureCompletionTracker();
+    private final BufferedImagePool imagePool;
+
+    private static final ThreadLocal<BufferedImage> FINGERPRINT_BUFFER = ThreadLocal.withInitial(() ->
+        new BufferedImage(33, 32, BufferedImage.TYPE_BYTE_GRAY)
+    );
 
     private volatile String stopReason = "completed";
     private volatile long startedAtMillis;
@@ -108,6 +113,11 @@ public final class CaptureService {
                 new ArrayBlockingQueue<>(Math.max(CaptureDefaults.MAX_PENDING_DECODE, options.decodeWorkers() * 2)),
                 new ThreadPoolExecutor.CallerRunsPolicy()
         );
+        int poolCapacity = CaptureDefaults.RAW_QUEUE_CAPACITY
+                + CaptureDefaults.SAVE_QUEUE_CAPACITY
+                + CaptureDefaults.MAX_PENDING_DECODE
+                + 10;
+        this.imagePool = new BufferedImagePool(options.width(), options.height(), BufferedImage.TYPE_INT_RGB, poolCapacity);
     }
 
     public CaptureSummary run() throws Exception {
@@ -163,13 +173,17 @@ public final class CaptureService {
                     continue;
                 }
 
-                BufferedImage copy = copyImage(image);
+                BufferedImage copy = copyImage(image, imagePool);
                 emitPreviewIfDue(copy);
                 long frameId = frameSequence.incrementAndGet();
                 totalFrames.incrementAndGet();
                 FramePacket packet = new FramePacket(frameId, System.currentTimeMillis(), copy);
-                while (!stopRequested.get() && !rawFrameQueue.offer(packet, 100, TimeUnit.MILLISECONDS)) {
+                boolean offered = false;
+                while (!stopRequested.get() && !(offered = rawFrameQueue.offer(packet, 100, TimeUnit.MILLISECONDS))) {
                     rawQueueOfferRetries.incrementAndGet();
+                }
+                if (!offered) {
+                    imagePool.release(copy);
                 }
                 updateHighWaterMark(rawQueueHighWaterMark, rawFrameQueue.size());
 
@@ -194,6 +208,14 @@ public final class CaptureService {
             saveThread.join();
             saveExecutor.shutdown();
             saveExecutor.awaitTermination(5, TimeUnit.MINUTES);
+
+            // Clean up any remaining images in the raw queue
+            FramePacket p;
+            while ((p = rawFrameQueue.poll()) != null) {
+                if (p != FramePacket.POISON && p.image != null) {
+                    imagePool.release(p.image);
+                }
+            }
         }
 
         String finishedAt = Instant.now().toString();
@@ -270,6 +292,7 @@ public final class CaptureService {
                 analyzedFrames.incrementAndGet();
                 if (fingerprint.meanLuma <= CaptureDefaults.BLACK_FRAME_LUMA_THRESHOLD) {
                     blackFramesSkipped.incrementAndGet();
+                    imagePool.release(packet.image);
                     pendingFingerprint = null;
                     pendingPacket = null;
                     pendingCount = 0;
@@ -279,14 +302,19 @@ public final class CaptureService {
                 if (activeFingerprint != null
                         && hammingDistance(activeFingerprint.bits, fingerprint.bits) <= CaptureDefaults.SAME_SCREEN_DISTANCE_THRESHOLD) {
                     if (packet.capturedAtMillis - activeSinceMillis >= options.sameSignalSeconds() * 1000L) {
+                        imagePool.release(packet.image);
                         requestStop("same-signal");
                         return;
                     }
+                    imagePool.release(packet.image);
                     continue;
                 }
 
                 if (pendingFingerprint == null
                         || hammingDistance(pendingFingerprint.bits, fingerprint.bits) > CaptureDefaults.SAME_SCREEN_DISTANCE_THRESHOLD) {
+                    if (pendingPacket != null) {
+                        imagePool.release(pendingPacket.image);
+                    }
                     pendingFingerprint = fingerprint;
                     pendingPacket = packet;
                     pendingCount = 1;
@@ -294,6 +322,9 @@ public final class CaptureService {
                 }
 
                 pendingCount++;
+                if (pendingPacket != null) {
+                    imagePool.release(pendingPacket.image);
+                }
                 pendingPacket = packet;
                 if (pendingCount >= 2) {
                     activeFingerprint = pendingFingerprint;
@@ -311,6 +342,10 @@ public final class CaptureService {
             requestStop("analyze-error");
             listener.onLog("[CAPTURE][ERROR] " + e.getMessage());
             throw new RuntimeException("캡처 분석 실패", e);
+        } finally {
+            if (pendingPacket != null) {
+                imagePool.release(pendingPacket.image);
+            }
         }
     }
 
@@ -318,16 +353,21 @@ public final class CaptureService {
         decodePermits.acquire();
         decodeExecutor.submit(() -> {
             long startedAt = System.nanoTime();
+            boolean submittedToSave = false;
             try {
                 String payload = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(packet.image);
                 decodedFrames.incrementAndGet();
                 saveQueue.put(new SavePacket(packet.frameId, packet.capturedAtMillis, packet.image, payload));
                 updateHighWaterMark(saveQueueHighWaterMark, saveQueue.size());
+                submittedToSave = true;
             } catch (Exception ignored) {
                 decodeFailures.incrementAndGet();
             } finally {
                 decodeNanos.addAndGet(System.nanoTime() - startedAt);
                 decodePermits.release();
+                if (!submittedToSave) {
+                    imagePool.release(packet.image);
+                }
             }
         });
     }
@@ -340,6 +380,7 @@ public final class CaptureService {
                     return;
                 }
                 if (!seenPayloads.add(PayloadDigest.of(packet.payload))) {
+                    imagePool.release(packet.image);
                     continue;
                 }
                 trackCompletion(packet.payload);
@@ -358,6 +399,14 @@ public final class CaptureService {
             requestStop("save-error");
             listener.onLog("[CAPTURE][ERROR] " + e.getMessage());
             throw new RuntimeException("캡처 이미지 저장 실패", e);
+        } finally {
+            // Clean up any remaining images in the save queue
+            SavePacket p;
+            while ((p = saveQueue.poll()) != null) {
+                if (p != SavePacket.POISON && p.image != null) {
+                    imagePool.release(p.image);
+                }
+            }
         }
     }
 
@@ -373,6 +422,7 @@ public final class CaptureService {
         } finally {
             saveNanos.addAndGet(System.nanoTime() - startedAt);
             savePermits.release();
+            imagePool.release(packet.image);
         }
     }
 
@@ -600,8 +650,9 @@ public final class CaptureService {
                     .toList()) {
                 scannedImages++;
                 maxImageNumber = Math.max(maxImageNumber, extractSavedImageNumber(imagePath, scannedImages));
+                BufferedImage image = null;
                 try {
-                    BufferedImage image = ImageIO.read(imagePath.toFile());
+                    image = ImageIO.read(imagePath.toFile());
                     if (image == null) {
                         listener.onLog("[CAPTURE][WARN] resume skipped unreadable image: " + imagePath.getFileName());
                         continue;
@@ -613,6 +664,10 @@ public final class CaptureService {
                     }
                 } catch (Exception e) {
                     listener.onLog("[CAPTURE][WARN] resume skipped " + imagePath.getFileName() + ": " + e.getMessage());
+                } finally {
+                    if (image != null) {
+                        image.flush();
+                    }
                 }
             }
         }
@@ -641,8 +696,8 @@ public final class CaptureService {
         return String.format(Locale.ROOT, "%.3f", nanos / 1_000_000d);
     }
 
-    private static BufferedImage copyImage(BufferedImage source) {
-        BufferedImage copy = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+    private static BufferedImage copyImage(BufferedImage source, BufferedImagePool pool) {
+        BufferedImage copy = pool.acquire();
         Graphics2D g = copy.createGraphics();
         g.drawImage(source, 0, 0, null);
         g.dispose();
@@ -698,7 +753,7 @@ public final class CaptureService {
     private static ScreenFingerprint computeFingerprint(BufferedImage image) {
         int width = 33;
         int height = 32;
-        BufferedImage scaled = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+        BufferedImage scaled = FINGERPRINT_BUFFER.get();
         Graphics2D g = scaled.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
         g.drawImage(image, 0, 0, width, height, null);
@@ -791,5 +846,34 @@ public final class CaptureService {
     }
 
     private record ScreenFingerprint(long[] bits, int meanLuma) {
+    }
+
+    private static final class BufferedImagePool {
+        private final int width;
+        private final int height;
+        private final int imageType;
+        private final ArrayBlockingQueue<BufferedImage> pool;
+
+        BufferedImagePool(int width, int height, int imageType, int capacity) {
+            this.width = width;
+            this.height = height;
+            this.imageType = imageType;
+            this.pool = new ArrayBlockingQueue<>(capacity);
+        }
+
+        BufferedImage acquire() {
+            BufferedImage img = pool.poll();
+            if (img == null) {
+                img = new BufferedImage(width, height, imageType);
+            }
+            return img;
+        }
+
+        void release(BufferedImage img) {
+            if (img == null) return;
+            if (!pool.contains(img)) {
+                pool.offer(img);
+            }
+        }
     }
 }

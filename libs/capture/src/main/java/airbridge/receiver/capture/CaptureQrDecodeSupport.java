@@ -17,7 +17,8 @@ final class CaptureQrDecodeSupport {
             new double[]{0.9, 0.75, 0.6},
             new double[]{0.75},
             3,
-            true
+            true,
+            false
     );
 
     private CaptureQrDecodeSupport() {

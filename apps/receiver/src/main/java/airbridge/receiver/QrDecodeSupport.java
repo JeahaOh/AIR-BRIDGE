@@ -27,7 +27,8 @@ final class QrDecodeSupport {
             new double[]{0.9, 0.8, 0.7, 0.6, 0.5},
             new double[]{0.85, 0.7, 0.55},
             3,
-            false
+            false,
+            true
     );
 
     private QrDecodeSupport() {

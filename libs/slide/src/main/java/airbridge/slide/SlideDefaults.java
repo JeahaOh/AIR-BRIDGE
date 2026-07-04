@@ -6,8 +6,8 @@ import java.util.Properties;
 
 final class SlideDefaults {
     private static final String SETTINGS_RESOURCE = "slide.properties";
-    private static final int FALLBACK_PAGE_DISPLAY_MS = 100;
-    private static final int FALLBACK_BLACK_FRAME_MS = 50;
+    private static final int FALLBACK_PAGE_DISPLAY_MS = 80;
+    private static final int FALLBACK_BLACK_FRAME_MS = 10;
     private static final int FALLBACK_LOOP_COUNT = 1;
 
     // 한 장의 이미지를 보여주는 기본 시간이다.

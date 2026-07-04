@@ -46,12 +46,13 @@ public final class QrImageDecoder {
                            double[] centeredRatios,
                            double[] gridRatios,
                            int gridSize,
-                           boolean colorVariants) {
+                           boolean colorVariants,
+                           boolean tryHarder) {
     }
 
     /** Tries every variant the {@code strategy} allows, throwing {@link NotFoundException} if none decode. */
     public static String decodeQrPayloadWithRetries(BufferedImage original, Strategy strategy) throws Exception {
-        List<Map<DecodeHintType, ?>> hintsList = buildDecodeHintsList();
+        List<Map<DecodeHintType, ?>> hintsList = buildDecodeHintsList(strategy.tryHarder());
 
         String decoded = tryDecodeCandidateVariants(original, hintsList, strategy.colorVariants());
         if (decoded != null) {
@@ -92,11 +93,15 @@ public final class QrImageDecoder {
         throw NotFoundException.getNotFoundInstance();
     }
 
-    private static List<Map<DecodeHintType, ?>> buildDecodeHintsList() {
+    private static List<Map<DecodeHintType, ?>> buildDecodeHintsList(boolean tryHarder) {
         Map<DecodeHintType, Object> normalHints = new EnumMap<>(DecodeHintType.class);
         // ISO-8859-1 recovers the payload bytes 1:1 (QR 8-bit byte mode, no ECI).
         normalHints.put(DecodeHintType.CHARACTER_SET, "ISO-8859-1");
         normalHints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
+
+        if (!tryHarder) {
+            return Collections.singletonList(normalHints);
+        }
 
         Map<DecodeHintType, Object> tryHarderHints = new EnumMap<>(normalHints);
         tryHarderHints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);

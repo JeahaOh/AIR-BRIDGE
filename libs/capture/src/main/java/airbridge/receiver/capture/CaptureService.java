@@ -54,11 +54,6 @@ public final class CaptureService {
     private final CaptureListener listener;
     private final ArrayBlockingQueue<FramePacket> rawFrameQueue = new ArrayBlockingQueue<>(CaptureDefaults.RAW_QUEUE_CAPACITY);
     private final LinkedBlockingQueue<SavePacket> saveQueue = new LinkedBlockingQueue<>(CaptureDefaults.SAVE_QUEUE_CAPACITY);
-    private final ExecutorService fingerprintExecutor = Executors.newFixedThreadPool(CaptureDefaults.FINGERPRINT_WORKERS, r -> {
-        Thread thread = new Thread(r, "qer-capture-fingerprint");
-        thread.setDaemon(true);
-        return thread;
-    });
     private final ExecutorService saveExecutor = Executors.newFixedThreadPool(CaptureDefaults.SAVE_WORKERS, r -> {
         Thread thread = new Thread(r, "qer-capture-save-worker");
         thread.setDaemon(true);
@@ -100,6 +95,7 @@ public final class CaptureService {
 
     private volatile String stopReason = "completed";
     private volatile long startedAtMillis;
+    private volatile ScreenFingerprint lastGrabbedFingerprint = null;
 
     public CaptureService(CaptureOptions options, CaptureListener listener) {
         this.options = options;
@@ -173,11 +169,27 @@ public final class CaptureService {
                     continue;
                 }
 
+                long fpStart = System.nanoTime();
+                ScreenFingerprint fp = computeFingerprint(image);
+                fingerprintNanos.addAndGet(System.nanoTime() - fpStart);
+
+                if (fp.meanLuma <= CaptureDefaults.BLACK_FRAME_LUMA_THRESHOLD) {
+                    blackFramesSkipped.incrementAndGet();
+                    continue;
+                }
+
+                if (lastGrabbedFingerprint != null
+                        && hammingDistance(lastGrabbedFingerprint.bits, fp.bits) <= CaptureDefaults.SAME_SCREEN_DISTANCE_THRESHOLD) {
+                    continue;
+                }
+
+                lastGrabbedFingerprint = fp;
+
                 BufferedImage copy = copyImage(image, imagePool);
                 emitPreviewIfDue(copy);
                 long frameId = frameSequence.incrementAndGet();
                 totalFrames.incrementAndGet();
-                FramePacket packet = new FramePacket(frameId, System.currentTimeMillis(), copy);
+                FramePacket packet = new FramePacket(frameId, System.currentTimeMillis(), copy, fp);
                 boolean offered = false;
                 while (!stopRequested.get() && !(offered = rawFrameQueue.offer(packet, 100, TimeUnit.MILLISECONDS))) {
                     rawQueueOfferRetries.incrementAndGet();
@@ -198,10 +210,9 @@ public final class CaptureService {
             mouseJiggleExecutor.shutdownNow();
             // A blocking put would hang forever if the consumer thread already died (its
             // queue never drains); poke with a timeout and stop once the thread is gone.
+            // analyzeThread is stopped via poison pill
             offerPoisonWhileAlive(analyzeThread, () -> rawFrameQueue.offer(FramePacket.POISON, 100, TimeUnit.MILLISECONDS));
             analyzeThread.join();
-            fingerprintExecutor.shutdown();
-            fingerprintExecutor.awaitTermination(5, TimeUnit.MINUTES);
             decodeExecutor.shutdown();
             decodeExecutor.awaitTermination(5, TimeUnit.MINUTES);
             offerPoisonWhileAlive(saveThread, () -> saveQueue.offer(SavePacket.POISON, 100, TimeUnit.MILLISECONDS));
@@ -260,36 +271,25 @@ public final class CaptureService {
         ScreenFingerprint pendingFingerprint = null;
         FramePacket pendingPacket = null;
         int pendingCount = 0;
-        long nextFrameId = 1L;
         boolean producerDone = false;
-        Map<Long, Future<AnalyzedPacket>> pendingAnalysis = new TreeMap<>();
 
         try {
-            while (!producerDone || !pendingAnalysis.isEmpty()) {
-                while (!producerDone && pendingAnalysis.size() < CaptureDefaults.MAX_PENDING_FINGERPRINT) {
-                    FramePacket packet = rawFrameQueue.poll(50, TimeUnit.MILLISECONDS);
-                    if (packet == null) {
-                        break;
-                    }
-                    if (packet == FramePacket.POISON) {
+            while (!producerDone || !rawFrameQueue.isEmpty()) {
+                FramePacket packet = rawFrameQueue.poll(50, TimeUnit.MILLISECONDS);
+                if (packet == null) {
+                    if (stopRequested.get() && rawFrameQueue.isEmpty()) {
                         producerDone = true;
-                        break;
                     }
-                    pendingAnalysis.put(packet.frameId, fingerprintExecutor.submit(() ->
-                            analyzePacket(packet)));
-                }
-
-                Future<AnalyzedPacket> nextFuture = pendingAnalysis.get(nextFrameId);
-                if (nextFuture == null) {
                     continue;
                 }
+                if (packet == FramePacket.POISON) {
+                    producerDone = true;
+                    break;
+                }
 
-                AnalyzedPacket analyzedPacket = nextFuture.get();
-                pendingAnalysis.remove(nextFrameId);
-                nextFrameId++;
-                FramePacket packet = analyzedPacket.packet;
-                ScreenFingerprint fingerprint = analyzedPacket.fingerprint;
+                ScreenFingerprint fingerprint = packet.fingerprint;
                 analyzedFrames.incrementAndGet();
+
                 if (fingerprint.meanLuma <= CaptureDefaults.BLACK_FRAME_LUMA_THRESHOLD) {
                     blackFramesSkipped.incrementAndGet();
                     imagePool.release(packet.image);
@@ -556,14 +556,7 @@ public final class CaptureService {
         }
     }
 
-    private AnalyzedPacket analyzePacket(FramePacket packet) {
-        long startedAt = System.nanoTime();
-        try {
-            return new AnalyzedPacket(packet, computeFingerprint(packet.image));
-        } finally {
-            fingerprintNanos.addAndGet(System.nanoTime() - startedAt);
-        }
-    }
+
 
     private void emitPreviewIfDue(BufferedImage source) {
         long now = System.currentTimeMillis();
@@ -834,15 +827,12 @@ public final class CaptureService {
         }
     }
 
-    private record FramePacket(long frameId, long capturedAtMillis, BufferedImage image) {
-        private static final FramePacket POISON = new FramePacket(-1, -1, null);
+    private record FramePacket(long frameId, long capturedAtMillis, BufferedImage image, ScreenFingerprint fingerprint) {
+        private static final FramePacket POISON = new FramePacket(-1, -1, null, null);
     }
 
     private record SavePacket(long frameId, long capturedAtMillis, BufferedImage image, String payload) {
         private static final SavePacket POISON = new SavePacket(-1, -1, null, null);
-    }
-
-    private record AnalyzedPacket(FramePacket packet, ScreenFingerprint fingerprint) {
     }
 
     private record ScreenFingerprint(long[] bits, int meanLuma) {

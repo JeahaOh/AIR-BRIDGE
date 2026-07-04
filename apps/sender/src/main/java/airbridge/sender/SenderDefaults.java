@@ -6,7 +6,7 @@ import java.util.List;
 
 final class SenderDefaults {
     // 한 QR에 넣을 원본 데이터 청크(= fountain 심볼) 크기다.
-    static final int DEFAULT_CHUNK_DATA_SIZE = 2000;
+    static final int DEFAULT_CHUNK_DATA_SIZE = 2600;
     // fountain 복구 심볼 여유분 비율이다. k개 소스 심볼에 더해 ceil(k*비율)개의 복구 심볼을
     // 추가로 내보내, 단방향 채널에서 일부 프레임을 놓쳐도 복원되도록 한다.
     static final double DEFAULT_REPAIR_OVERHEAD = 0.5;
@@ -15,7 +15,7 @@ final class SenderDefaults {
     // 생성할 QR PNG 한 변의 기본 픽셀 크기다.
     static final int DEFAULT_QR_IMAGE_SIZE = 1200;
     // QR 생성 시 사용할 기본 오류 정정 레벨이다.
-    static final ErrorCorrectionLevel DEFAULT_QR_ERROR_LEVEL = ErrorCorrectionLevel.M;
+    static final ErrorCorrectionLevel DEFAULT_QR_ERROR_LEVEL = ErrorCorrectionLevel.L;
     // QR 아래 파일명/청크 정보 라벨 영역 높이다.
     static final int DEFAULT_LABEL_HEIGHT = 80;
     // 출력 폴더를 원본 디렉터리 구조대로 나눌지 여부다.

@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SlideSpinnerBehaviorTest {
     @Test
     void defaultsUseFastPlaybackTiming() {
-        assertEquals(100, SlideDefaults.DEFAULT_PAGE_DISPLAY_MS);
-        assertEquals(50, SlideDefaults.DEFAULT_BLACK_FRAME_MS);
+        assertEquals(80, SlideDefaults.DEFAULT_PAGE_DISPLAY_MS);
+        assertEquals(10, SlideDefaults.DEFAULT_BLACK_FRAME_MS);
     }
 
     @Test

@@ -1,10 +1,9 @@
 package airbridge.packager;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.PushbackInputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -18,54 +17,6 @@ import java.util.zip.ZipInputStream;
 
 public final class PackagerInspector {
     private PackagerInspector() {
-    }
-
-    public static List<String> collectPackedNames(Path packagePath, Set<String> targetExts) throws IOException {
-        return collectPackedNames(packagePath, targetExts, List.of());
-    }
-
-    public static List<String> collectPackedNames(Path packagePath, Set<String> targetExts, List<String> excludedEntryPatterns)
-            throws IOException {
-        if (!isPackageName(packagePath.getFileName().toString())) {
-            throw new IllegalArgumentException("Input must be a .jar or .zip: " + packagePath);
-        }
-
-        List<String> results = new ArrayList<>();
-        try (ZipFile zip = new ZipFile(packagePath.toFile())) {
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry entry = entries.nextElement();
-                if (entry.isDirectory()) {
-                    continue;
-                }
-                String name = entry.getName();
-                if (PackEntryFilters.matchesAny(name, excludedEntryPatterns)) {
-                    continue;
-                }
-                if (isPackageName(name)) {
-                    // pack renames the nested archive itself too (renameIfMatch applies to it),
-                    // so the rename list must record it for unpack to reverse exactly.
-                    if (matchesExtension(name, targetExts)) {
-                        results.add(name + ".txt");
-                    }
-                    try (InputStream in = zip.getInputStream(entry)) {
-                        byte[] payload = readAllBytes(in);
-                        collectFromZipStream(new ByteArrayInputStream(payload), name + "!/", targetExts, excludedEntryPatterns, results);
-                    }
-                    continue;
-                }
-                if (matchesExtension(name, targetExts)) {
-                    results.add(name + ".txt");
-                    continue;
-                }
-                if (isExtensionless(name)) {
-                    results.add(name + ".txt");
-                }
-            }
-        }
-
-        results.sort(String::compareTo);
-        return results;
     }
 
     public static List<String> collectUniqueExtensions(Path packagePath) throws IOException {
@@ -91,8 +42,13 @@ public final class PackagerInspector {
                 }
                 if (isPackageName(name)) {
                     try (InputStream in = zip.getInputStream(entry)) {
-                        byte[] payload = readAllBytes(in);
-                        collectExtensionsFromZipStream(new ByteArrayInputStream(payload), excludedEntryPatterns, results);
+                        PushbackInputStream pin = new PushbackInputStream(in, 4);
+                        if (startsWithZipMagic(pin)) {
+                            collectExtensionsFromZipStream(pin, excludedEntryPatterns, results);
+                        } else {
+                            // Named like an archive but not one: token it like a plain file.
+                            addExtensionToken(name, results);
+                        }
                     }
                     continue;
                 }
@@ -103,48 +59,14 @@ public final class PackagerInspector {
         return new ArrayList<>(results);
     }
 
-    private static void collectFromZipStream(
-            InputStream input,
-            String prefix,
-            Set<String> targetExts,
-            List<String> excludedEntryPatterns,
-            List<String> results
-    ) throws IOException {
-        try (ZipInputStream zis = new ZipInputStream(input)) {
-            ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                if (entry.isDirectory()) {
-                    continue;
-                }
-                String name = entry.getName();
-                if (PackEntryFilters.matchesAny(name, excludedEntryPatterns)) {
-                    drain(zis);
-                    continue;
-                }
-                if (isPackageName(name)) {
-                    // Mirror the top level: the nested archive's own rename is recorded too.
-                    if (matchesExtension(name, targetExts)) {
-                        results.add(prefix + name + ".txt");
-                    }
-                    byte[] payload = readAllBytes(zis);
-                    collectFromZipStream(new ByteArrayInputStream(payload), prefix + name + "!/", targetExts, excludedEntryPatterns, results);
-                    continue;
-                }
-                if (matchesExtension(name, targetExts)) {
-                    results.add(prefix + name + ".txt");
-                    continue;
-                }
-                if (isExtensionless(name)) {
-                    results.add(prefix + name + ".txt");
-                }
-                drain(zis);
-            }
-        }
-    }
-
+    /**
+     * Scans a nested archive straight off the parent stream — no full-payload buffering.
+     * The parent stream ends at the entry boundary, which is exactly where the nested
+     * central directory stops the inner ZipInputStream.
+     */
     private static void collectExtensionsFromZipStream(InputStream input, List<String> excludedEntryPatterns, Set<String> results)
             throws IOException {
-        try (ZipInputStream zis = new ZipInputStream(input)) {
+        try (ZipInputStream zis = new ZipInputStream(new CloseShieldInputStream(input))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (entry.isDirectory()) {
@@ -152,22 +74,24 @@ public final class PackagerInspector {
                 }
                 String name = entry.getName();
                 if (PackEntryFilters.matchesAny(name, excludedEntryPatterns)) {
-                    drain(zis);
                     continue;
                 }
                 if (isPackageName(name)) {
-                    byte[] payload = readAllBytes(zis);
-                    collectExtensionsFromZipStream(new ByteArrayInputStream(payload), excludedEntryPatterns, results);
+                    PushbackInputStream pin = new PushbackInputStream(zis, 4);
+                    if (startsWithZipMagic(pin)) {
+                        collectExtensionsFromZipStream(pin, excludedEntryPatterns, results);
+                    } else {
+                        addExtensionToken(name, results);
+                    }
                     continue;
                 }
                 addExtensionToken(name, results);
-                drain(zis);
             }
         }
     }
 
     private static void addExtensionToken(String name, Set<String> results) {
-        String fileName = Path.of(name).getFileName().toString();
+        String fileName = EntryNames.lastSegment(name);
         int dot = fileName.lastIndexOf('.');
         if (dot <= 0 || dot == fileName.length() - 1) {
             if (!fileName.isBlank()) {
@@ -179,36 +103,41 @@ public final class PackagerInspector {
         results.add(ext);
     }
 
-    private static boolean matchesExtension(String name, Set<String> targetExts) {
-        int dot = name.lastIndexOf('.');
-        if (dot < 0 || dot == name.length() - 1) {
-            return false;
-        }
-        String ext = name.substring(dot + 1).toLowerCase(Locale.ROOT);
-        return targetExts.contains(ext);
-    }
-
-    private static boolean isExtensionless(String name) {
-        String fileName = Path.of(name).getFileName().toString();
-        if (fileName.isBlank()) {
-            return false;
-        }
-        int dot = fileName.lastIndexOf('.');
-        return dot < 0 || dot == fileName.length() - 1;
-    }
-
     public static boolean isPackageName(String name) {
         String lower = name.toLowerCase(Locale.ROOT);
         return lower.endsWith(".jar") || lower.endsWith(".zip");
     }
 
-    private static void drain(InputStream input) throws IOException {
-        input.transferTo(OutputStream.nullOutputStream());
+    private static boolean startsWithZipMagic(PushbackInputStream in) throws IOException {
+        byte[] head = new byte[4];
+        int read = 0;
+        while (read < head.length) {
+            int n = in.read(head, read, head.length - read);
+            if (n < 0) {
+                break;
+            }
+            read += n;
+        }
+        if (read > 0) {
+            in.unread(head, 0, read);
+        }
+        return read == 4
+                && head[0] == 0x50 && head[1] == 0x4B
+                && head[2] == 0x03 && head[3] == 0x04;
     }
 
-    private static byte[] readAllBytes(InputStream input) throws IOException {
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        input.transferTo(out);
-        return out.toByteArray();
+    /**
+     * Lets the inner ZipInputStream be closed (releasing its Inflater) without closing
+     * the enclosing entry stream mid-scan.
+     */
+    private static final class CloseShieldInputStream extends FilterInputStream {
+        CloseShieldInputStream(InputStream in) {
+            super(in);
+        }
+
+        @Override
+        public void close() {
+            // keep the underlying stream open
+        }
     }
 }

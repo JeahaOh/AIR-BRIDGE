@@ -1,13 +1,17 @@
 package airbridge.packager;
 
 import java.io.InputStream;
-import java.nio.file.FileSystems;
-import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 public final class PackEntryFilters {
+    // Patterns come from one small properties list, so this cache stays bounded.
+    private static final Map<String, CompiledPattern> COMPILED = new ConcurrentHashMap<>();
+
     private PackEntryFilters() {
     }
 
@@ -60,31 +64,93 @@ public final class PackEntryFilters {
         if (normalized.isEmpty()) {
             return false;
         }
-        String fileName = lastSegment(normalized);
+        String fileName = EntryNames.lastSegment(normalized);
         for (String pattern : patterns) {
-            if (pattern.indexOf('/') >= 0) {
-                if (globMatches(normalized, pattern)) {
-                    return true;
-                }
-                continue;
-            }
-            if (globMatches(fileName, pattern)) {
+            CompiledPattern compiled = compile(pattern);
+            String value = compiled.fullPath ? normalized : fileName;
+            if (compiled.matcher.matcher(value).matches()) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean globMatches(String value, String pattern) {
-        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
-        return matcher.matches(java.nio.file.Path.of(value));
+    /**
+     * Whether a directory entry (trailing '/' stripped) should be dropped from the packed
+     * output. Only path-oriented patterns apply here: an "X/**" pattern drops the "X/" entry
+     * itself (whose children the same pattern also drops), and a full-path glob is matched
+     * against the whole name. Name-only patterns (".DS_Store", ".Trash-*", …) are NOT applied
+     * to directories: dropping the directory entry while their children — matched only on
+     * their own last segment — survive would orphan the subtree and break the round trip.
+     */
+    public static boolean matchesAnyDirectory(String directoryEntryName, List<String> patterns) {
+        String normalized = directoryEntryName == null ? "" : directoryEntryName.trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        for (String pattern : patterns) {
+            CompiledPattern compiled = compile(pattern);
+            if (compiled.directoryMatcher != null && compiled.directoryMatcher.matcher(normalized).matches()) {
+                return true;
+            }
+            if (compiled.fullPath && compiled.matcher.matcher(normalized).matches()) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static String lastSegment(String path) {
-        int slash = path.lastIndexOf('/');
-        if (slash < 0) {
-            return path;
+    private static CompiledPattern compile(String pattern) {
+        return COMPILED.computeIfAbsent(pattern, CompiledPattern::new);
+    }
+
+    /**
+     * Platform-independent glob over '/'-separated entry names, compiled once per pattern:
+     * '**' crosses segments, '*' and '?' stay within one segment, everything else is
+     * literal (no brace/bracket syntax). Matching is case-sensitive on every OS, unlike
+     * the default-filesystem PathMatcher this replaces.
+     */
+    private static final class CompiledPattern {
+        final boolean fullPath;
+        final Pattern matcher;
+        final Pattern directoryMatcher;
+
+        CompiledPattern(String pattern) {
+            this.fullPath = pattern.indexOf('/') >= 0;
+            this.matcher = Pattern.compile(toRegex(pattern));
+            this.directoryMatcher = pattern.endsWith("/**")
+                    ? Pattern.compile(toRegex(pattern.substring(0, pattern.length() - 3)))
+                    : null;
         }
-        return path.substring(slash + 1);
+
+        private static String toRegex(String glob) {
+            StringBuilder sb = new StringBuilder();
+            int i = 0;
+            while (i < glob.length()) {
+                char c = glob.charAt(i);
+                if (c == '*') {
+                    if (i + 1 < glob.length() && glob.charAt(i + 1) == '*') {
+                        sb.append(".*");
+                        i += 2;
+                    } else {
+                        sb.append("[^/]*");
+                        i++;
+                    }
+                } else if (c == '?') {
+                    sb.append("[^/]");
+                    i++;
+                } else {
+                    if ("\\.[]{}()<>+-=!^$|".indexOf(c) >= 0) {
+                        sb.append('\\');
+                    }
+                    sb.append(c);
+                    i++;
+                }
+            }
+            return sb.toString();
+        }
     }
 }

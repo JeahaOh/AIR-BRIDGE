@@ -1,6 +1,5 @@
 package airbridge.packager;
 
-import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -14,38 +13,45 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 
 @Command(name = "pack", mixinStandardHelpOptions = true,
         description = "Append .txt suffix to target package entries")
-public final class PackCommand implements Runnable {
+public final class PackCommand implements Callable<Integer> {
     @Option(names = "--in", required = true, description = "Input jar/zip path")
     Path input;
 
     @Override
-    public void run() {
+    public Integer call() {
         try {
-            Path baseDir = resolveBaseDir(input);
-            Path targetExtPath = baseDir.resolve("target-ext.txt");
+            Path abs = PackagerCli.requireExistingPackage(input);
+            Path targetExtPath = resolveBaseDir(abs).resolve("target-ext.txt");
             List<String> excludedEntryPatterns = PackEntryFilters.loadExcludePatterns();
-            List<String> targetExtLines = Files.exists(targetExtPath)
-                    ? Files.readAllLines(targetExtPath, StandardCharsets.UTF_8)
-                    : inferTargetExtLines(input, excludedEntryPatterns);
+            List<String> targetExtLines;
+            if (Files.exists(targetExtPath)) {
+                try {
+                    targetExtLines = Files.readAllLines(targetExtPath, StandardCharsets.UTF_8);
+                } catch (java.nio.charset.CharacterCodingException e) {
+                    throw new IOException("target-ext.txt is not valid UTF-8: " + targetExtPath, e);
+                }
+            } else {
+                targetExtLines = inferTargetExtLines(abs, excludedEntryPatterns);
+            }
             Set<String> targetExts = readTargetExts(targetExtLines);
 
-            List<String> packed = PackagerInspector.collectPackedNames(input, targetExts, excludedEntryPatterns);
-            Path zipOutput = PackagerRewriter.rewriteToZip(
-                    input,
+            PackagerRewriter.PackResult result = PackagerRewriter.packToZip(
+                    abs,
                     targetExts,
                     normalizeTargetExtLines(targetExtLines),
-                    packed,
                     excludedEntryPatterns
             );
 
             System.out.printf("Embedded %d target extension(s) and %d target entry name(s) into %s%n",
-                    targetExts.size(), packed.size(), zipOutput.toAbsolutePath());
-            System.out.printf("Saved packed package to %s%n", zipOutput.toAbsolutePath());
-        } catch (Exception e) {
-            throw new CommandLine.ExecutionException(new CommandLine(this), "pack failed", e);
+                    targetExts.size(), result.packedNames().size(), result.output().toAbsolutePath());
+            System.out.printf("Saved packed package to %s%n", result.output().toAbsolutePath());
+            return 0;
+        } catch (IllegalArgumentException | IOException e) {
+            return PackagerCli.fail("pack", e);
         }
     }
 
@@ -81,8 +87,7 @@ public final class PackCommand implements Runnable {
     }
 
     private static Path resolveBaseDir(Path input) {
-        Path abs = input.toAbsolutePath().normalize();
-        Path parent = abs.getParent();
+        Path parent = input.getParent();
         return parent != null ? parent : Path.of(".").toAbsolutePath().normalize();
     }
 }

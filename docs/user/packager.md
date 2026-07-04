@@ -63,6 +63,11 @@ java -jar build/libs/receiver-<version>.jar pack --in /path/to/sender.jar
 - 입력 파일과 같은 폴더의 `target-ext.txt`가 있으면 그 목록을 사용한다.
 - `target-ext.txt`가 없으면 패키지를 읽어서 자동 추론한다.
 - 이미지 확장자 일부는 목록에 있어도 패킹 대상에서 제외될 수 있다.
+- 이름을 바꿀 수 없는 특이 케이스(이름 충돌, 원래부터 `target.txt`인 파일,
+  이름만 `.jar`/`.zip`이고 실제 아카이브가 아닌 파일 등)는 `WARN ...` 한 줄로
+  알려 주고 안전한 쪽으로 처리한다. 내용이 조용히 사라지지 않는다.
+- 파일이 없거나 `.jar`/`.zip`이 아니거나 zip이 손상된 경우 한 줄 에러와 함께
+  실패(exit code 1)한다.
 
 ## 3. unpack
 
@@ -80,7 +85,11 @@ java -jar build/libs/sender-<version>.jar unpack --in /path/to/sender.zip
 주의:
 
 - `unpack`은 패키지 안에 들어 있는 메타데이터를 기준으로 복원한다.
-- 패킹되지 않은 일반 zip에는 동작하지 않을 수 있다.
+- 패킹되지 않은 일반 zip이면 `WARN embedded target-ext.txt not found; aborting`을
+  출력하고 아무것도 바꾸지 않은 채 실패(exit code 1)한다. 스크립트에서 exit code로
+  성공 여부를 판단할 수 있다.
+- 같은 폴더에 원본 `.jar`가 남아 있으면 복원된 `.jar`가 그 자리를 덮어쓴다
+  (덮어쓰기 전에 `WARN overwriting existing file ...`을 출력).
 
 ## 빠른 예시
 

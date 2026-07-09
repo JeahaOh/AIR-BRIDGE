@@ -33,7 +33,7 @@ class DecodeServiceTest {
     Path tempDir;
 
     @Test
-    void decodeRestoresFileAndMovesQrFilesToSuccessDirectory() throws Exception {
+    void decodeRestoresFileAndDeletesQrFiles() throws Exception {
         Path inputDir = tempDir.resolve("qr");
         Path batchDir = inputDir.resolve("batch");
         Path outputDir = tempDir.resolve("restored");
@@ -52,8 +52,7 @@ class DecodeServiceTest {
         assertEquals(0, summary.decodeErrorCount());
         assertArrayEquals(sourceData, Files.readAllBytes(outputDir.resolve("docs/sample.bin")));
 
-        Path successDir = inputDir.resolve("batch-success");
-        assertFalse(Files.exists(successDir));
+        assertFalse(Files.exists(inputDir.resolve("batch-success")));
         try (Stream<Path> stream = Files.list(batchDir)) {
             assertEquals(0, stream.filter(path -> path.getFileName().toString().endsWith(".png")).count());
         }

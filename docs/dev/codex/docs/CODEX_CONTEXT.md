@@ -47,7 +47,7 @@ Current responsibilities:
 - collect PNG files for decode from a directory tree
 - decode QR payloads from PNG images
 - reconstruct files and write `_restore_result.txt`
-- move successfully consumed PNGs into sibling `*-success` folders
+- delete successfully consumed PNGs from the input tree
 - capture QR frames from a camera/UVC source into `captured-images/`
 - write `capture-manifest.json`
 - inspect archive extensions with `identify`
@@ -83,7 +83,7 @@ Takes a directory of QR PNG files and produces:
 
 - restored files under the output root
 - `_restore_result.txt`
-- sibling `*-success` folders for successfully consumed PNGs
+- successful input PNG cleanup
 
 ### `sender slide`
 

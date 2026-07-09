@@ -59,7 +59,7 @@ PNG files
   -> SHA-256 prefix compare
   -> RelativePathSupport safety check
   -> restored file write
-  -> source PNG move to sibling *-success directory on success
+  -> source PNG delete on success
 ```
 
 Primary reports:
@@ -146,4 +146,4 @@ Validate in roughly this order:
 6. concatenated chunk data can be GZIP-inflated
 7. restored bytes match the payload `hash16`
 8. restored output path is safe under the output root
-9. successful input PNGs are moved to the matching `*-success` directory
+9. successful input PNGs are deleted from the input tree

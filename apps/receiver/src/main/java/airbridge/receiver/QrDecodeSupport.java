@@ -39,8 +39,8 @@ final class QrDecodeSupport {
         Files.walkFileTree(rootDir, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                // *-success dirs hold PNGs a previous decode already consumed; re-reading
-                // them would re-restore those files and stack -success-success dirs.
+                // Legacy *-success dirs may hold PNGs an older decode already consumed.
+                // Keep skipping them so old work directories do not re-restore files.
                 if (!dir.equals(rootDir) && dir.getFileName() != null
                         && dir.getFileName().toString().endsWith("-success")) {
                     return FileVisitResult.SKIP_SUBTREE;

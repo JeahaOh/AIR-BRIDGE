@@ -45,12 +45,11 @@ GUI에서는 `duration`, `max payloads`, `same signal` 값을 직접 입력하�
 복원이 실행되는 동안에는 QR PNG 입력 폴더, 복원 출력 폴더, `Browse`, `Decode`
 버튼이 잠깁니다.
 
-성공한 QR PNG는 입력 폴더 옆의 `*-success` 폴더로 이동될 수 있습니다.
+성공한 QR PNG는 입력 폴더에서 삭제됩니다.
 
 예:
 
-- `captured-images/frame_000001.png`
-- `captured-images-success/frame_000001.png`
+- `captured-images/frame_000001.png` 성공 후 해당 PNG 삭제
 
 ## 폴더 선택창
 

@@ -113,8 +113,8 @@ final class DecodeService {
 
                 // The file was already restored (or failed terminally) when it completed earlier;
                 // ignore late/duplicate chunks for it so it is not resurrected or reprocessed.
-                // Surplus PNGs of a successfully restored file still move to the success dir —
-                // left behind they would read as a bogus INCOMPLETE file on the next decode run.
+                // Surplus PNGs of a successfully restored file are deleted too; left behind
+                // they would read as a bogus INCOMPLETE file on the next decode run.
                 if (finalizedPaths.contains(normalizedRelPath)) {
                     if (restoredPaths.contains(normalizedRelPath)) {
                         deleteDecodedQrFiles(List.of(result.qrFile));
@@ -268,7 +268,7 @@ final class DecodeService {
                     deletedFiles.add(qrFile);
                 }
             } catch (Exception e) {
-                // decode 진행은 유지하고 삭제 실패만 로그 문자열에 남긴다.
+                // Best-effort cleanup: deletion failure must not fail a restored file.
             }
         }
         return deletedFiles;

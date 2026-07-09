@@ -144,11 +144,11 @@ sender GUI의 `Slide` 탭에서 QR PNG 출력 폴더를 선택합니다. `Page(m
 
 복원이 실행되는 동안에는 `Decode` 탭의 입력값을 바꿀 수 없습니다.
 
-복원에 사용된 QR PNG는 입력 폴더 옆의 `*-success` 디렉터리로 이동될 수 있습니다.
+복원에 성공한 QR PNG는 입력 폴더에서 삭제됩니다.
 
 예:
 
-- `batch/0001.png` 성공 후 `batch-success/0001.png`
+- `batch/0001.png` 성공 후 해당 PNG 삭제
 
 ## Decode 결과 확인
 

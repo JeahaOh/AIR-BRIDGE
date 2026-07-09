@@ -39,7 +39,7 @@ Validate:
 - restored file bytes
 - `_restore_result.txt` contents
 - QR count or chunk expectations when relevant
-- success-folder side effects when relevant
+- successful input PNG cleanup side effects when relevant
 
 ## For The Package Helper Flow
 

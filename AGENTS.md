@@ -95,7 +95,8 @@ Current responsibilities:
    - A file rebuilds once the fountain decoder peels enough distinct symbols to
      recover all k source symbols; no specific frame is required, so dropped
      frames are tolerated. Order does not matter; duplicate esi is ignored.
-   - Successful decode moves source PNGs into sibling `*-success` directories.
+   - Successful decode deletes the source PNGs it consumed; legacy `*-success`
+     directories are still skipped when collecting input PNGs.
    - Not-enough-symbols (INCOMPLETE), QR read failures, hash mismatches, and
      invalid paths are first-class outcomes and must stay explicit.
    - `reencode` re-emits a failed file's whole symbol stream (no per-chunk index).

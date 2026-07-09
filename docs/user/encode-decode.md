@@ -176,15 +176,15 @@ java -jar build/libs/receiver-<version>.jar decode \
   --decode-workers 4
 ```
 
-복원 성공한 QR PNG는 입력 폴더 옆의 `*-success` 디렉터리로 이동될 수 있습니다. 복원이
-이미 끝난 파일의 남은 QR(복구용 여분)도 함께 이동됩니다.
+복원 성공한 QR PNG는 입력 폴더에서 삭제됩니다. 복원이 이미 끝난 파일의 남은
+QR(복구용 여분)도 함께 삭제됩니다.
 
 예:
 
-- `batch/0001.png` 성공 후 `batch-success/0001.png`
+- `batch/0001.png` 성공 후 해당 PNG 삭제
 
-같은 입력 폴더로 decode를 다시 실행하면 `*-success` 디렉터리는 건너뛰므로, 이미 복원된
-QR을 다시 처리하지 않습니다.
+구버전 실행이 남긴 `*-success` 디렉터리는 계속 건너뛰므로, 오래된 작업 폴더에서도
+이미 복원된 QR을 다시 처리하지 않습니다.
 
 ## 결과 파일 읽는 법
 

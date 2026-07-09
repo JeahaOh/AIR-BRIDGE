@@ -200,14 +200,14 @@ QR 하나를 읽으면 `QrDecodedChunk`(fountain 심볼 1개)가 만들어지고
 파일은 완성되는(`FileChunks.isComplete()`) 즉시 복원되고 `fileChunkMap`에서 제거된다.
 따라서 메모리에는 "아직 진행 중인 파일"의 심볼만 남고, 전송 전체가 한꺼번에 쌓이지 않는다.
 이미 복원(또는 종료 판정)된 파일에 대한 지연/중복 심볼은 `finalizedPaths`로 무시하되,
-복원에 성공한 파일의 잉여 PNG는 success 디렉터리로 함께 이동한다(안 그러면 다음 실행에서
+복원에 성공한 파일의 잉여 PNG는 함께 삭제한다(안 그러면 다음 실행에서
 가짜 INCOMPLETE로 보인다). 복원이 끝난 파일과 같은 이름 프리픽스(`디렉터리 + 프리픽스 +
-총 심볼 수`)의 아직 처리 안 된 PNG는 **PNG 읽기·QR 디코드 없이 건너뛰고** 곧장 success로
-옮긴다 — 기본 repair 0.5 기준 전체 PNG의 약 1/3이 이 경로를 탄다.
+총 심볼 수`)의 아직 처리 안 된 PNG는 **PNG 읽기·QR 디코드 없이 건너뛰고** 곧장
+삭제한다 — 기본 repair 0.5 기준 전체 PNG의 약 1/3이 이 경로를 탄다.
 QR 루프가 끝난 뒤 `fileChunkMap`에 남은 항목은 심볼이 부족해 복원 못 한(INCOMPLETE) 파일뿐이다.
 
-수집 단계(`collectQrImageFiles`)는 이전 실행이 만든 `*-success` 디렉터리를 건너뛰므로,
-같은 입력 디렉터리로 decode를 재실행해도 이미 소비된 PNG를 다시 처리하지 않는다.
+수집 단계(`collectQrImageFiles`)는 구버전 실행이 만든 `*-success` 디렉터리를 계속
+건너뛰므로, 오래된 작업 디렉터리를 decode해도 이미 소비된 PNG를 다시 처리하지 않는다.
 
 payload 파싱 직후 필드 무결성을 검증한다(`QrPayloadSupport.validateFrameFields`):
 `k >= 1`, `esi >= 0`, `(k-1)*symbolSize < gzipLen <= k*symbolSize`(인코더 불변식).
@@ -225,7 +225,7 @@ payload 파싱 직후 필드 무결성을 검증한다(`QrPayloadSupport.validat
 3. 계산된 SHA-256 앞 16자리를 payload의 `hash16`과 비교
 4. 일치하면 임시파일을 최종 경로로 move(불일치/오류 시 임시파일 삭제 → 잘못된 파일이 최종 경로에
    남지 않는다)
-5. 성공한 QR PNG는 원래 폴더의 sibling인 `*-success` 디렉터리로 이동
+5. 성공한 QR PNG는 입력 위치에서 삭제
 
 한 파일 처리 중의 IO 오류(디렉터리 생성/이동 실패 등)는 그 파일의 `DECODE_ERROR`로
 격리되고 실행은 계속된다.
@@ -234,7 +234,7 @@ payload 파싱 직후 필드 무결성을 검증한다(`QrPayloadSupport.validat
 
 예:
 
-- `qr/batch/a.png` 성공 후 이동 대상: `qr/batch-success/a.png`
+- `qr/batch/a.png` 성공 후 해당 PNG 삭제
 
 ## decode 결과 분류
 
@@ -287,7 +287,7 @@ encode와 decode 모두 상대경로 안전성은 `RelativePathSupport`에 의�
 
 - `ReceiverRoundTripTest`: `sender encode` -> `receiver decode` end-to-end round trip
   (중첩 경로, `--encode-root` 상위 경로 상대화 포함)
-- `DecodeServiceTest`: 성공 복원, success 폴더 이동, incomplete, hash mismatch, QR read error,
+- `DecodeServiceTest`: 성공 복원 후 QR PNG 삭제, incomplete, hash mismatch, QR read error,
   path traversal 차단, 완료 후 중복 청크 무시(1회 복원)
 - `CodecSupportTest`: 스트리밍 GZIP 압축/해제가 in-memory 경로와 바이트 동일 + round-trip
 - `QrPayloadSupportTest`: 바이너리 프레임 build/parse round trip(매직·UTF-8 경로·잘린 프레임 거부)
@@ -334,5 +334,6 @@ encode( source -> encoded ) -> slide( encoded ) -> capture( -> captured ) -> dec
 - hash 비교는 전체 SHA-256이 아니라 앞 16자리만 사용한다.
 - chunking 기준은 GZIP 바이트 길이다(Base64 단계 없음). QR은 8-bit 바이트 모드를 쓴다.
 - QR 파일명은 decode의 복원 근거가 아니다. 실제 복원 기준은 payload다.
-- 성공 시 QR 원본 PNG를 `*-success`로 이동하므로, decode 입력 디렉터리를 후처리 파이프라인과 공유할 때 주의가 필요하다.
+- 성공 시 QR 원본 PNG를 삭제하므로, decode 입력 디렉터리를 보존해야 하는 후처리
+  파이프라인과 공유할 때 주의가 필요하다.
 - GUI 실행 중 입력 잠금과 취소 동작은 core service가 아니라 GUI adapter와 workflow 계약에서 관리한다.

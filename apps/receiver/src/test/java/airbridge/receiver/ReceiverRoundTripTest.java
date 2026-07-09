@@ -52,6 +52,7 @@ class ReceiverRoundTripTest {
         assertEquals(0, decodeExit);
         assertArrayEquals(sourceData, Files.readAllBytes(restoredDir.resolve("nested/sample.txt")));
         assertTrue(!Files.exists(qrDir.resolve("nested-success")));
+        assertEquals(0, countPngFiles(qrDir));
         assertTrue(Files.readString(restoredDir.resolve("_restore_result.txt"), StandardCharsets.UTF_8)
                 .contains("O nested/sample.txt - OK"));
     }
@@ -89,6 +90,7 @@ class ReceiverRoundTripTest {
         assertEquals(0, decodeExit);
         // Restored under project/sub/file.txt (relative to encode-root), not just sub/file.txt.
         assertArrayEquals(sourceData, Files.readAllBytes(restoredDir.resolve("project/sub/file.txt")));
+        assertEquals(0, countPngFiles(qrDir));
         assertTrue(Files.readString(restoredDir.resolve("_restore_result.txt"), StandardCharsets.UTF_8)
                 .contains("O project/sub/file.txt - OK"));
     }
@@ -142,8 +144,15 @@ class ReceiverRoundTripTest {
         assertEquals(0, decodeExit);
         assertArrayEquals(sourceData, Files.readAllBytes(restoredDir.resolve("nested/sample.txt")),
                 "lost " + dropped + "/" + pngs.size() + " frames but should still restore");
+        assertEquals(0, countPngFiles(qrDir));
         assertTrue(Files.readString(restoredDir.resolve("_restore_result.txt"), StandardCharsets.UTF_8)
                 .contains("O nested/sample.txt - OK"));
+    }
+
+    private static long countPngFiles(Path root) throws Exception {
+        try (Stream<Path> stream = Files.walk(root)) {
+            return stream.filter(path -> path.getFileName().toString().toLowerCase().endsWith(".png")).count();
+        }
     }
 
     private static byte[] randomBytes(int size, long seed) {

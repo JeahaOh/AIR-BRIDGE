@@ -21,7 +21,7 @@ all line up.
 - [ ] Failure outcomes stay explicit where relevant:
       `INCOMPLETE`, `DECODE_ERROR`, `HASH_MISMATCH`, `INVALID_PATH`,
       `QR_READ_ERROR`, and similar.
-- [ ] `*-success` move behavior reviewed if decode touched file-finalization
+- [ ] Successful input PNG deletion reviewed if decode touched file-finalization
       logic.
 - [ ] Packager metadata safety reviewed if `identify`, `pack`, or `unpack`
       changed.

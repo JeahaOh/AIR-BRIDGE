@@ -38,7 +38,7 @@
 
 - restored files
 - `_restore_result.txt`
-- sibling `*-success` directories for successfully consumed PNGs
+- deletion of successfully consumed input PNGs
 - console summary
 
 ### Must Validate

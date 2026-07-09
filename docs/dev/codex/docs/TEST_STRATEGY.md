@@ -138,4 +138,4 @@ For a full `encode -> decode` round-trip, compare:
 - restored relative paths
 - restored file bytes
 - decode report contents in `_restore_result.txt`
-- success-folder side effects when decode is expected to move source PNGs
+- successful input PNG deletion side effects when decode restores files

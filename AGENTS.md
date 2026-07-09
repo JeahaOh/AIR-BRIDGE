@@ -8,7 +8,7 @@ restoring them on the receiving side.
 
 The real command surface today is:
 
-- `sender`: `encode`, `gui`, `slide`, `unpack`, hidden `reencode`
+- `sender`: `encode`, `gui`, `query`, `slide`, `unpack`, hidden `reencode`
 - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 Running either jar with no command opens the GUI; any command or CLI option
@@ -17,6 +17,8 @@ keeps CLI behavior.
 Important distinction:
 
 - `encode -> slide -> capture -> decode` is the QR transfer pipeline.
+- `query` is a sender-side source generation helper: DB SELECT/WITH results
+  become CSV files that can later be included in `encode` inputs.
 - `identify -> pack -> unpack` is a helper flow for `jar` or `zip` artifacts.
 
 Do not treat `pack` and `unpack` as generic archive stages inside the QR
@@ -32,13 +34,14 @@ libs/
   common/
   slide/
   capture/
+  query/
   packager/
 ```
 
 Current responsibilities:
 
 - `apps/sender`
-  - Picocli entrypoint for `encode`, `unpack`, `gui`, hidden `reencode`
+  - Picocli entrypoint for `encode`, `query`, `unpack`, `gui`, hidden `reencode`
   - direct `slide` launcher (early token dispatch; also registered as a subcommand)
   - Swing GUI (`SenderGui`: Encode/Slide tabs)
 - `apps/receiver`
@@ -51,6 +54,8 @@ Current responsibilities:
   - Swing slideshow UI for QR image playback
 - `libs/capture`
   - camera/UVC capture pipeline and QR dedupe
+- `libs/query`
+  - sender-side `query` command for running SELECT/WITH SQL and writing CSV/report files
 - `libs/packager`
   - `identify`, `pack`, `unpack` helpers for `jar` or `zip` artifacts
 
@@ -114,17 +119,20 @@ Current responsibilities:
 - Keep archive rewrite logic in `libs/packager`.
 - Keep slideshow UI behavior in `libs/slide`.
 - Keep live capture logic in `libs/capture`.
+- Keep DB query extraction logic in `libs/query`.
 - Avoid introducing imaginary generic layers when the existing module split is
   already sufficient.
 
 Preferred dependency direction:
 
 ```text
-sender   -> common, packager, slide
+sender   -> common, packager, query, slide
 receiver -> common, capture, packager
 slide    -> common
 capture  -> common, zxing, javacv/opencv
 packager -> picocli, zip utilities
+query    -> picocli, HikariCP, commons-csv, JDBC drivers (MySQL, PostgreSQL,
+            Oracle, SQL Server, MariaDB, IBM DB2, H2)
 common   -> shared helpers + zxing (QR decode/payload)
 ```
 
@@ -163,6 +171,15 @@ jar/zip
   -> restored zip/jar
 ```
 
+Optional query source-generation flow:
+
+```text
+database
+  -> sender query
+  -> CSV/report files
+  -> sender encode
+```
+
 ## Testing Expectations
 
 When changing encode/decode/common payload logic, update or inspect at least:
@@ -175,6 +192,13 @@ When changing encode/decode/common payload logic, update or inspect at least:
 When changing package helper logic, update or inspect:
 
 - `libs/packager/src/test/java/airbridge/packager/PackagerAppTest.java`
+
+When changing query extraction logic, update or inspect:
+
+- `libs/query/src/test/java/airbridge/query/QueryConfigTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryParserTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryExecutorIntegrationTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryCommandTest.java`
 
 When changing slide behavior, update or inspect:
 

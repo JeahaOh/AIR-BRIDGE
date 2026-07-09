@@ -20,6 +20,15 @@
 build/libs/receiver-<version>.jar
 ```
 
+같은 폴더에 receiver 기본 명령용 스크립트도 생성됩니다.
+
+```bash
+build/libs/capture.sh
+build/libs/capture.bat
+build/libs/decode.sh
+build/libs/decode.bat
+```
+
 ## 기본 실행
 
 기본 실행 방식:
@@ -77,6 +86,13 @@ java -jar build/libs/receiver-<version>.jar decode \
 
 ```bash
 java -jar build/libs/receiver-<version>.jar capture
+```
+
+빌드 산출물의 기본 스크립트를 써도 됩니다.
+
+```bash
+./build/libs/capture.sh
+./build/libs/decode.sh
 ```
 
 장치는 `--device`에 정수 인덱스 또는 장치 이름 일부를 줄 수 있습니다

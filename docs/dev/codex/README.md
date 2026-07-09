@@ -7,9 +7,10 @@ docs and prompts live here, and verification scripts live in `scripts/`.
 ## Scope
 
 - `apps/sender` and `apps/receiver`
-- `libs/common`, `libs/slide`, `libs/capture`, and `libs/packager`
+- `libs/common`, `libs/slide`, `libs/capture`, `libs/packager`, and `libs/query`
 - the QR transfer flow: `encode -> slide -> capture -> decode`
 - the package helper flow: `identify -> pack -> unpack`
+- the optional source-generation flow: `sender query -> sender encode`
 - the current Gradle test workflow for this repository
 
 ## Included Files
@@ -48,6 +49,7 @@ Useful live repo docs:
 
 - `README.ko.md`
 - `docs/dev/encode-decode.md`
+- `docs/dev/query.md`
 - `docs/dev/packager.md`
 - `docs/dev/slide-capture.md`
 
@@ -57,6 +59,8 @@ Useful live repo docs:
   do not currently go through a binary transfer archive.
 - `identify`, `pack`, and `unpack` are helper commands for `jar` or `zip`
   artifacts and are separate from the QR round-trip.
+- `sender query` exports DB `SELECT`/`WITH` results to CSV files that can become
+  part of the later `encode` input. It is not a QR payload stage.
 - The current QR payload has no explicit format version field. Any payload
   change is a compatibility change and must be coordinated across sender,
   receiver, tests, and docs.

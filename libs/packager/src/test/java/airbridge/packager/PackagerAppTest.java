@@ -1079,6 +1079,25 @@ class PackagerAppTest {
     }
 
     @Test
+    void unpackDoesNotOverwriteExistingUserBakFile() throws Exception {
+        Path input = tempDir.resolve("app.jar");
+        createZip(input, Map.of("assets/blob.dat", text("dat")));
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", input.toString()));
+        Path packed = tempDir.resolve("app.zip");
+        Path existingBackup = tempDir.resolve("app.zip.bak");
+        byte[] userBackup = text("user backup must survive");
+        Files.write(existingBackup, userBackup);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
+
+        org.junit.jupiter.api.Assertions.assertArrayEquals(userBackup, Files.readAllBytes(existingBackup));
+        try (var stream = Files.list(tempDir)) {
+            assertTrue(stream.noneMatch(p -> p.getFileName().toString().startsWith("airbridge-unpack-backup-")),
+                    "successful unpack must not leak temporary backups");
+        }
+    }
+
+    @Test
     void packReportsMalformedLocalTargetExtAsItsOwnError() throws Exception {
         Path input = tempDir.resolve("app.jar");
         createZip(input, Map.of("assets/blob.dat", text("dat")));

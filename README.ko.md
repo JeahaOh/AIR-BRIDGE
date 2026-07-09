@@ -4,7 +4,7 @@
 
 이 프로젝트는 `sender`와 `receiver` 두 애플리케이션이 한 쌍으로 동작합니다. 주요 전송 흐름은 `encode`, `slide`, `capture`, `decode`로 이어지며, 송신 측에서 파일을 이미지 시퀀스로 변환하고 수신 측에서 이를 다시 복원합니다.
 
-보조 명령인 `identify`, `pack`, `unpack`는 `sender`를 대상 환경에 반입하기 전에 파일 구성 확인과 패키징 작업을 돕기 위한 기능입니다.
+`sender query`는 DB 조회 결과를 CSV로 추출해 `encode` 입력 소스 중 일부를 만드는 선택 기능입니다. 보조 명령인 `identify`, `pack`, `unpack`는 `sender`를 대상 환경에 반입하기 전에 파일 구성 확인과 패키징 작업을 돕기 위한 기능입니다.
 
 ## 경고
 
@@ -49,6 +49,19 @@ build/libs/sender-<version>.jar
 build/libs/receiver-<version>.jar
 ```
 
+같은 폴더에 기본 명령 실행용 스크립트도 생성됩니다.
+
+```bash
+build/libs/encode.sh
+build/libs/encode.bat
+build/libs/slide.sh
+build/libs/slide.bat
+build/libs/capture.sh
+build/libs/capture.bat
+build/libs/decode.sh
+build/libs/decode.bat
+```
+
 버전 형식은 `{major}.{minor}.{yymmdd}.{hh24mi}` 입니다.
 
 실행 기준은 `sender` 와 `receiver` 모두 jar 입니다.
@@ -58,7 +71,7 @@ build/libs/receiver-<version>.jar
 
 ## 기본 명령
 
-- `sender`: `encode`, `gui`, `slide`, `unpack`
+- `sender`: `encode`, `gui`, `query`, `slide`, `unpack`
 - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 ## 기본 경로
@@ -81,12 +94,23 @@ java -jar build/libs/sender-<version>.jar --help
 java -jar build/libs/receiver-<version>.jar --help
 ```
 
+## AI / 자동화 도구 참고
+
+AI나 스크립트가 전송 준비를 자동화할 때는 명령 책임을 분리합니다.
+
+1. DB `SELECT`/`WITH` 결과가 CSV 소스로 필요할 때만 `sender query`를 사용합니다.
+2. `query` 출력 폴더는 `sender encode` 입력 후보 중 하나이지, 필수 QR 파이프라인 단계가 아닙니다.
+3. 전송할 파일/폴더를 정한 뒤 `sender encode`를 명시적으로 실행합니다.
+4. 실제 QR 전송 경로는 `sender slide`, `receiver capture`, `receiver decode`입니다.
+5. `query`, `pack`, `unpack`이 QR payload 형식을 바꾼다고 가정하지 않습니다.
+
 ## 배포 문서
 
 - `warning`: `docs/user/warning.ko.md`
 - `sender`: `docs/user/deploy-sender.md`
 - `receiver`: `docs/user/deploy-receiver.md`
 - `encode / decode`: `docs/user/encode-decode.md`
+- `query`: `docs/user/query.md`
 - `slide / capture`: `docs/user/slide-capture.md`
 - `packager`: `docs/user/packager.md`
 - `tuning`: `docs/user/tuning.md`

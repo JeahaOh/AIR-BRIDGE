@@ -6,6 +6,7 @@ import airbridge.common.BannerSupport;
 import airbridge.common.CliSupport;
 import airbridge.common.ConsoleSupport;
 import airbridge.packager.UnpackCommand;
+import airbridge.query.QueryCommand;
 import airbridge.sender.gui.SenderGui;
 import airbridge.slide.SlideApp;
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
@@ -39,6 +40,7 @@ import java.util.concurrent.CountDownLatch;
         subcommands = {
                 Sender.EncodeCommand.class,
                 Sender.GuiCommand.class,
+                QueryCommand.class,
                 Sender.SlideCommand.class,
                 UnpackCommand.class,
                 Sender.ReencodeCommand.class
@@ -63,7 +65,11 @@ public class Sender implements Runnable {
         String[] slideArgs = extractDirectSlideArgs(args);
         if (slideArgs != null) {
             BannerSupport.print(SENDER_TITLE);
-            SlideApp.launch(slideArgs);
+            try {
+                SlideApp.launch(slideArgs);
+            } finally {
+                BannerSupport.print(SENDER_TITLE + " complete");
+            }
             return;
         }
         int exitCode = newCommandLine().execute(args);

@@ -10,9 +10,9 @@
 
 The project is built around a paired `sender` and `receiver`. Its main transfer flow is `encode`, `slide`, `capture`, and `decode`: the sender converts files into an image sequence, and the receiver restores them back into files.
 
-보조 명령인 `identify`, `pack`, `unpack`는 `sender`를 대상 환경에 반입하기 전에 파일 구성 확인과 패키징 작업을 돕기 위한 기능입니다.
+`sender query`는 DB 조회 결과를 CSV로 추출해 `encode` 입력 소스 중 일부를 만드는 선택 기능입니다. 보조 명령인 `identify`, `pack`, `unpack`는 `sender`를 대상 환경에 반입하기 전에 파일 구성 확인과 패키징 작업을 돕기 위한 기능입니다.
 
-The helper commands `identify`, `pack`, and `unpack` are intended for inspecting file contents and preparing packaging before moving `sender` into a target environment.
+`sender query` is an optional source-generation command that exports DB query results to CSV files that can become part of the later `encode` input. The helper commands `identify`, `pack`, and `unpack` are intended for inspecting file contents and preparing packaging before moving `sender` into a target environment.
 
 ## 경고 / Warning
 
@@ -64,8 +64,12 @@ Build the full project with:
 ```
 
 기본 산출물은 `build/libs/sender-<version>.jar` 와 `build/libs/receiver-<version>.jar` 입니다.
+같은 폴더에 기본 명령 실행용 `encode.sh/.bat`, `slide.sh/.bat`, `capture.sh/.bat`,
+`decode.sh/.bat`도 생성됩니다.
 
 The primary artifacts are `build/libs/sender-<version>.jar` and `build/libs/receiver-<version>.jar`.
+The same directory also contains default-command launchers: `encode.sh/.bat`,
+`slide.sh/.bat`, `capture.sh/.bat`, and `decode.sh/.bat`.
 
 실행 기준은 `sender` 와 `receiver` 모두 jar입니다.
 
@@ -91,7 +95,7 @@ Running the jar without a command opens the GUI. Supplying a command or CLI opti
 
 ## 기본 명령 / Commands
 
-- `sender`: `encode`, `gui`, `slide`, `unpack`
+- `sender`: `encode`, `gui`, `query`, `slide`, `unpack`
 - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 
 ## 기본 경로 / Default Paths
@@ -118,6 +122,16 @@ java -jar build/libs/sender-<version>.jar --help
 java -jar build/libs/receiver-<version>.jar --help
 ```
 
+## AI / Automation Notes
+
+When an AI agent or script prepares a transfer, keep command responsibilities separate:
+
+1. Use `sender query` only when DB `SELECT`/`WITH` results are needed as CSV source files.
+2. Treat the query output directory as one possible input directory for `sender encode`, not as a required QR pipeline stage.
+3. Run `sender encode` explicitly after choosing the files or folders to transfer.
+4. Use `sender slide`, `receiver capture`, and `receiver decode` for the actual QR transfer path.
+5. Do not assume `query`, `pack`, or `unpack` changes QR payload format.
+
 ## 문서 / Docs
 
 - [warning ko](docs/user/warning.ko.md)
@@ -125,6 +139,7 @@ java -jar build/libs/receiver-<version>.jar --help
 - [sender deployment](docs/user/deploy-sender.md)
 - [receiver deployment](docs/user/deploy-receiver.md)
 - [encode / decode usage](docs/user/encode-decode.md)
+- [query usage](docs/user/query.md)
 - [slide / capture usage](docs/user/slide-capture.md)
 - [packager usage](docs/user/packager.md)
 - [tuning](docs/user/tuning.md)

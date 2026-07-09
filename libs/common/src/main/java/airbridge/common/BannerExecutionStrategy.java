@@ -16,23 +16,38 @@ import java.util.Set;
  */
 public final class BannerExecutionStrategy implements CommandLine.IExecutionStrategy {
     private final String title;
-    private final Set<String> skipLeafCommands;
+    private final Set<String> skipStartLeafCommands;
     private final CommandLine.IExecutionStrategy delegate = new CommandLine.RunLast();
 
-    public BannerExecutionStrategy(String title, String... skipLeafCommands) {
+    public BannerExecutionStrategy(String title, String... skipStartLeafCommands) {
         this.title = title;
-        this.skipLeafCommands = Set.of(skipLeafCommands);
+        this.skipStartLeafCommands = Set.of(skipStartLeafCommands);
     }
 
     @Override
     public int execute(CommandLine.ParseResult parseResult) {
-        if (shouldPrintBanner(parseResult)) {
+        boolean shouldPrintCompletionBanner = shouldPrintCompletionBanner(parseResult);
+        if (shouldPrintStartBanner(parseResult)) {
             BannerSupport.print(title);
         }
-        return delegate.execute(parseResult);
+        try {
+            return delegate.execute(parseResult);
+        } finally {
+            if (shouldPrintCompletionBanner) {
+                BannerSupport.print(title + " complete");
+            }
+        }
     }
 
-    private boolean shouldPrintBanner(CommandLine.ParseResult parseResult) {
+    private boolean shouldPrintStartBanner(CommandLine.ParseResult parseResult) {
+        if (!shouldPrintCompletionBanner(parseResult)) {
+            return false;
+        }
+        CommandLine.ParseResult leaf = leaf(parseResult);
+        return !skipStartLeafCommands.contains(leaf.commandSpec().name());
+    }
+
+    private boolean shouldPrintCompletionBanner(CommandLine.ParseResult parseResult) {
         for (CommandLine.ParseResult cur = parseResult; cur != null; cur = cur.subcommand()) {
             if (cur.isUsageHelpRequested() || cur.isVersionHelpRequested()) {
                 return false;
@@ -41,10 +56,14 @@ public final class BannerExecutionStrategy implements CommandLine.IExecutionStra
         if (!parseResult.hasSubcommand()) {
             return false;
         }
+        return true;
+    }
+
+    private static CommandLine.ParseResult leaf(CommandLine.ParseResult parseResult) {
         CommandLine.ParseResult leaf = parseResult;
         while (leaf.subcommand() != null) {
             leaf = leaf.subcommand();
         }
-        return !skipLeafCommands.contains(leaf.commandSpec().name());
+        return leaf;
     }
 }

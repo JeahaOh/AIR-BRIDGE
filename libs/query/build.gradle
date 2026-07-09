@@ -1,0 +1,20 @@
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    api "info.picocli:picocli:${picocliVersion}"
+    implementation 'com.zaxxer:HikariCP:5.1.0'
+    implementation 'org.apache.commons:commons-csv:1.10.0'
+    implementation 'org.slf4j:slf4j-api:2.0.12'
+    implementation 'ch.qos.logback:logback-classic:1.5.3'
+
+    // Bundled JDBC drivers keep sender query usable in offline target environments.
+    implementation 'com.mysql:mysql-connector-j:8.3.0'
+    implementation 'org.postgresql:postgresql:42.7.2'
+    implementation 'com.oracle.database.jdbc:ojdbc11:23.3.0.23.09'
+    implementation 'com.microsoft.sqlserver:mssql-jdbc:12.6.1.jre11'
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
+    implementation 'com.ibm.db2:jcc:12.1.5.0'
+    implementation 'com.h2database:h2:2.2.224'
+}

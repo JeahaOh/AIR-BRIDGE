@@ -27,7 +27,7 @@ ext {
     openblasVersion = '0.3.26-1.5.10'
 }
 
-def buildVersion = "0.9.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"
+def buildVersion = "0.95.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"
 version = buildVersion
 
 tasks.register('syncRootLibs', Sync) {
@@ -39,8 +39,45 @@ tasks.register('syncGuiUserManual', Sync) {
     into layout.buildDirectory.dir('gui-user-manual')
 }
 
-tasks.register('printRootLibs') {
+tasks.register('writeLauncherScripts') {
     dependsOn tasks.named('syncRootLibs')
+    def libsDirProvider = layout.buildDirectory.dir('libs')
+    def projectVersion = project.version.toString()
+    outputs.dir(libsDirProvider)
+    doLast {
+        def libsDir = libsDirProvider.get().asFile
+        libsDir.mkdirs()
+        [
+                encode : ['sender', 'encode'],
+                slide  : ['sender', 'slide'],
+                capture: ['receiver', 'capture'],
+                decode : ['receiver', 'decode']
+        ].each { name, command ->
+            String app = command[0]
+            String subcommand = command[1]
+            String jarName = "${app}-${projectVersion}.jar"
+
+            File sh = new File(libsDir, "${name}.sh")
+            sh.text = """#!/usr/bin/env sh
+set -eu
+SCRIPT_DIR=\$(cd "\$(dirname "\$0")" && pwd)
+exec java -jar "\$SCRIPT_DIR/${jarName}" ${subcommand} "\$@"
+"""
+            sh.setExecutable(true, false)
+
+            File bat = new File(libsDir, "${name}.bat")
+            bat.text = """@echo off\r
+setlocal\r
+set "SCRIPT_DIR=%~dp0"\r
+java -jar "%SCRIPT_DIR%${jarName}" ${subcommand} %*\r
+exit /b %ERRORLEVEL%\r
+"""
+        }
+    }
+}
+
+tasks.register('printRootLibs') {
+    dependsOn tasks.named('writeLauncherScripts')
     // Capture project state at configuration time so the doLast blocks never touch
     // Task.project at execution time (deprecated in Gradle 9, fails in Gradle 10;
     // also required for configuration-cache compatibility).
@@ -90,6 +127,7 @@ tasks.register('printRootLibs') {
 
 tasks.named('build') {
     dependsOn tasks.named('syncGuiUserManual')
+    dependsOn tasks.named('writeLauncherScripts')
     finalizedBy tasks.named('printRootLibs')
 }
 

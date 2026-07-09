@@ -102,6 +102,20 @@ jar/zip
 
 These commands do not participate in QR payload generation or reconstruction.
 
+## Optional Query Source Flow
+
+`sender query` is a source-generation helper:
+
+```text
+DB SELECT/WITH results
+  -> sender query
+  -> CSV/report output directory
+  -> sender encode --in <query output>
+```
+
+This flow is optional. The query output directory is one possible encode input,
+not a required QR transfer stage.
+
 ## Ordering Rule
 
 QR reconstruction must use payload metadata, not PNG filenames.

@@ -8,15 +8,26 @@
 
 - `encode`: 입력 파일을 QR 이미지 세트로 변환
 - `gui`: sender GUI 실행. 현재는 encode와 slide 화면을 제공
+- `query`: DB SELECT/WITH 조회 결과를 CSV로 추출해 encode 입력 소스 중 일부 생성
 - `slide`: QR 이미지 또는 일반 이미지 세트를 화면에 재생
 - `unpack`: 패킹된 jar/zip의 `.txt` suffix를 제거
 
-대부분은 `encode`와 `slide`만 알면 됩니다.
+대부분은 `encode`와 `slide`만 알면 됩니다. DB 조회 결과를 전송해야 할 때만
+`query`를 먼저 사용합니다.
 
 ## 산출물
 
 ```bash
 build/libs/sender-<version>.jar
+```
+
+같은 폴더에 sender 기본 명령용 스크립트도 생성됩니다.
+
+```bash
+build/libs/encode.sh
+build/libs/encode.bat
+build/libs/slide.sh
+build/libs/slide.bat
 ```
 
 ## 기본 실행
@@ -28,7 +39,7 @@ java -jar build/libs/sender-<version>.jar
 ```
 
 명령 없이 실행하면 sender GUI가 열립니다. jar를 더블 클릭해 실행하는 경우도
-같은 동작을 목표로 합니다. `encode`, `slide`, `unpack`, `--help`처럼 명령이나
+같은 동작을 목표로 합니다. `encode`, `query`, `slide`, `unpack`, `--help`처럼 명령이나
 CLI 옵션을 지정하면 CLI로 동작합니다.
 
 도움말:
@@ -73,10 +84,31 @@ encode 실행 중에는 Encode 탭의 입력값과 Browse 버튼이 잠기며, �
 `Stop`으로 요청합니다. 중단된 encode는 이번 실행에서 만든 QR PNG와 manifest
 파일을 정리합니다.
 
+DB 조회 결과를 CSV 소스로 만들기:
+
+```bash
+java -jar build/libs/sender-<version>.jar query
+```
+
+처음 사용할 때는 템플릿을 생성합니다.
+
+```bash
+java -jar build/libs/sender-<version>.jar query init
+```
+
+생성된 CSV 결과 폴더는 이후 `encode --in` 입력으로 사용할 수 있습니다.
+
 QR 이미지를 화면에 재생하기:
 
 ```bash
 java -jar build/libs/sender-<version>.jar slide
+```
+
+빌드 산출물의 기본 스크립트를 써도 됩니다.
+
+```bash
+./build/libs/encode.sh
+./build/libs/slide.sh
 ```
 
 초기 입력 디렉터리를 지정해 열 수도 있습니다.
@@ -94,6 +126,7 @@ java -jar build/libs/sender-<version>.jar unpack --in /path/to/sender.zip
 ## 먼저 보면 좋은 문서
 
 - [`encode-decode.md`](encode-decode.md)
+- [`query.md`](query.md)
 - [`slide-capture.md`](slide-capture.md)
 - [`packager.md`](packager.md)
 
@@ -102,6 +135,7 @@ java -jar build/libs/sender-<version>.jar unpack --in /path/to/sender.zip
 - `java -jar build/libs/sender-<version>.jar --help`
 - `java -jar build/libs/sender-<version>.jar`
 - `java -jar build/libs/sender-<version>.jar gui`
+- `java -jar build/libs/sender-<version>.jar query --help`
 - `java -jar build/libs/sender-<version>.jar encode --help`
 - `java -jar build/libs/sender-<version>.jar slide --help`
 - `java -jar build/libs/sender-<version>.jar unpack --help`

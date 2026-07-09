@@ -11,6 +11,7 @@ root
    ├─ common/
    ├─ slide/
    ├─ capture/
+   ├─ query/
    └─ packager/
 ```
 
@@ -24,6 +25,7 @@ that do not exist in the codebase.
 
 - Picocli entrypoint for sender behavior
 - `encode` command orchestration
+- `query` command registration
 - hidden `reencode` command orchestration
 - direct `slide` launch handoff
 - sender-specific defaults and source collection
@@ -104,16 +106,30 @@ Key classes:
 - `airbridge.packager.UnpackCommand`
 - `airbridge.packager.PackagerRewriter`
 
+### `libs/query`
+
+- sender-side DB query extraction
+- CSV/report output generation for later `sender encode` input
+- JDBC driver selection and connection pooling
+
+Key classes:
+
+- `airbridge.query.QueryCommand`
+- `airbridge.query.QueryConfig`
+- `airbridge.query.QueryParser`
+- `airbridge.query.QueryExecutor`
+
 ## Dependency Direction
 
 Current build-level dependencies:
 
 ```text
-sender   -> common, packager, slide
+sender   -> common, packager, query, slide
 receiver -> common, capture, packager
 slide    -> common
 capture  -> common, zxing, javacv/opencv
 packager -> picocli
+query    -> picocli, HikariCP, commons-csv, JDBC drivers
 common   -> picocli, zxing
 ```
 
@@ -129,6 +145,7 @@ receiver(test) -> sender
 - Keep receiver-only command logic in `apps/receiver`.
 - Keep reusable payload/path/codec helpers in `libs/common`.
 - Keep archive rewrite behavior in `libs/packager`.
+- Keep DB query extraction behavior in `libs/query`.
 - Keep Swing-specific slideshow code in `libs/slide`.
 - Keep live capture runtime concerns in `libs/capture`.
 

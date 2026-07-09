@@ -6,6 +6,27 @@
 
 날짜는 변경이 머지된 날 기준이며, 최신 묶음이 위에 온다.
 
+## 2026-07-09
+
+### 변경
+
+- 버전 prefix를 `0.95`로 올렸다. 빌드 산출물 버전 형식은
+  `0.95.<yyMMdd>.<HHmm>`이다.
+- `packager unpack`: 제자리 복원 중 사용하는 롤백 백업을 고정 `<입력>.bak`
+  이름 대신 충돌 없는 임시 파일로 바꿔, 사용자가 같은 폴더에 보관한 `.bak`
+  파일을 덮어쓰지 않도록 했다.
+
+### 추가
+
+- `sender query`: DB의 `SELECT`/`WITH` 조회 결과를 CSV와 실행 보고서로 추출해
+  `sender encode` 입력 소스로 사용할 수 있는 CLI 전용 명령을 추가했다. `query init`은
+  `config.csv`/`queries.sql` 템플릿을 만들고, `query --list`는 DB 접속 없이 SQL 파일의
+  쿼리 목록을 확인한다. GUI와 receiver에는 연결하지 않는다. 내장 JDBC 드라이버는
+  MySQL/PostgreSQL/Oracle/MSSQL/MariaDB/IBM DB2/H2를 포함한다.
+- 빌드 산출물(`build/libs`)에 기본 명령 실행용 `encode`, `slide`, `capture`, `decode`
+  스크립트를 mac/Linux용 `.sh`와 Windows용 `.bat`로 함께 생성한다.
+- CLI 명령 실행 종료 시 완료 배너를 출력한다.
+
 ## 2026-07-03
 
 ### 수정

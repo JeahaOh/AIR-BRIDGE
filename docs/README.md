@@ -21,6 +21,7 @@ payload 프레임 형식을 바꾸는 변경은 sender·receiver·테스트·문
 - `user/deploy-receiver.md`: `receiver`를 실제로 실행하는 방법
 - `user/deploy-sender.md`: `sender`를 실제로 실행하는 방법
 - `user/encode-decode.md`: `encode` / `decode` 사용자 실행 가이드
+- `user/query.md`: `sender query` DB 조회 결과 CSV 추출 가이드
 - `user/packager.md`: `identify` / `pack` / `unpack` 사용자 실행 가이드
 - `user/slide-capture.md`: `slide` / `capture` 사용자 실행 가이드
 - `user/tuning.md`: JVM과 실행 성능 관련 선택적 조정 가이드
@@ -40,6 +41,7 @@ payload 프레임 형식을 바꾸는 변경은 sender·receiver·테스트·문
 ## 개발용 문서
 
 - `dev/encode-decode.md`: `encode` / `decode` 내부 동작과 payload 규칙 정리
+- `dev/query.md`: `sender query` 내부 동작과 DB-to-CSV 추출 흐름 정리
 - `dev/faster.md`: `slide` / `capture` 성능 튜닝 메모
 - `dev/packager.md`: `identify` / `pack` / `unpack` 내부 동작 정리
 - `dev/slide-capture.md`: `slide` / `capture` 내부 동작과 상태 전이 정리

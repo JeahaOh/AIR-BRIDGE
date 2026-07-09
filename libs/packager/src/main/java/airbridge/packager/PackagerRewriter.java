@@ -121,11 +121,13 @@ public final class PackagerRewriter {
             }
             requireSequentiallyReadable(abs, originalNames, seenSourceNames);
 
-            Path backup = abs.resolveSibling(abs.getFileName() + ".bak");
-            Files.move(abs, backup, StandardCopyOption.REPLACE_EXISTING);
+            Path backup = Files.createTempFile(abs.getParent(), "airbridge-unpack-backup-", ".zip");
+            boolean backupHoldsOriginal = false;
 
             boolean writeSuccess = false;
             try {
+                Files.move(abs, backup, StandardCopyOption.REPLACE_EXISTING);
+                backupHoldsOriginal = true;
                 try {
                     Files.move(temp, abs, StandardCopyOption.ATOMIC_MOVE);
                 } catch (IOException atomicFailed) {
@@ -135,14 +137,19 @@ public final class PackagerRewriter {
             } finally {
                 if (writeSuccess) {
                     Files.deleteIfExists(backup);
-                } else {
+                    backupHoldsOriginal = false;
+                } else if (backupHoldsOriginal) {
                     try {
                         Files.move(backup, abs, StandardCopyOption.REPLACE_EXISTING);
+                        backupHoldsOriginal = false;
                     } catch (IOException rollbackFailed) {
                         System.err.printf("FATAL: Rollback failed during unpack recovery. Original backup saved at: %s. Error: %s%n",
                                 backup.toAbsolutePath(), rollbackFailed.getMessage());
                         throw rollbackFailed;
                     }
+                }
+                if (!backupHoldsOriginal) {
+                    Files.deleteIfExists(backup);
                 }
             }
             moved = writeSuccess;

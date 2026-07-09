@@ -83,6 +83,33 @@
 
 ---
 
+## `sender query`
+
+### Input
+
+- `config.csv`
+- `queries.sql`
+- optional output directory override
+
+### Output
+
+- CSV files
+- query execution report
+- console summary
+
+### Must Validate
+
+- config and SQL files exist and parse
+- only read-oriented `SELECT`/`WITH` queries are accepted
+- DB credentials are not logged in cleartext
+
+### Must Not
+
+- require network access unless the user explicitly points it at a DB
+- change QR payload format or decode behavior
+
+---
+
 ## `receiver capture`
 
 ### Input

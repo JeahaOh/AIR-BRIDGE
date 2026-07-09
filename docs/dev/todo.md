@@ -7,7 +7,7 @@
 - 최종 배포 산출물은 `sender`, `receiver` 두 앱만 유지한다.
 - 루트 구조는 `apps/*`, `libs/*` 기준으로 유지한다.
 - 공개 명령은 아래 기준으로 유지한다.
-  - `sender`: `encode`, `gui`, `slide`, `unpack`
+  - `sender`: `encode`, `gui`, `query`, `slide`, `unpack`
   - `receiver`: `decode`, `capture`, `gui`, `identify`, `pack`
 - `printer`는 별도 명령이 아니라 `--help`, `--version`에서 쓰는 공통 배너 출력으로 본다.
 - 공통 배너와 버전 출력 유틸은 `common`에 둔다.

@@ -35,6 +35,7 @@ Current responsibilities:
 - emit LT fountain symbols over the gzip stream as QR payload frames
   (binary frames, 8-bit byte mode; k systematic + repair symbols)
 - render QR PNG files plus `_manifest.txt`
+- export DB `SELECT`/`WITH` results to CSV files with `query`
 - launch the Swing slideshow app for playback
 - unpack a previously packed `zip` back into its original archive shape
 - re-emit a failed file's whole symbol stream with hidden `reencode`
@@ -64,6 +65,17 @@ Takes a source directory and produces:
 Important implementation fact:
 
 - encode works directly from source files, not from a packaged transfer archive
+
+### `sender query`
+
+Reads `config.csv` and `queries.sql`, runs read-oriented DB queries, and writes
+CSV/report files that may be used as one source directory for a later
+`sender encode` run.
+
+Important implementation fact:
+
+- query is optional source generation. It does not participate in QR payload
+  framing, fountain coding, slide, capture, or decode.
 
 ### `receiver decode`
 
@@ -114,3 +126,5 @@ embedded metadata, and converts back to `.jar` when appropriate.
 - Path traversal and unsafe restore paths must be rejected.
 - `identify`, `pack`, and `unpack` operate on archive entry names, not on QR
   payload contents.
+- `sender query` operates before `sender encode` only when DB result CSV files
+  are part of the source material.

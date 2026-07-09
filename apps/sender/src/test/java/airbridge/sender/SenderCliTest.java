@@ -26,6 +26,7 @@ class SenderCliTest {
         assertTrue(result.stdout().contains("air-bridge sender - "));
         assertTrue(result.stdout().contains("Usage: sender"));
         assertTrue(result.stdout().contains("gui"));
+        assertTrue(result.stdout().contains("query"));
     }
 
     @Test
@@ -61,8 +62,26 @@ class SenderCliTest {
     void commandArgsStayCli() {
         assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"--help"}));
         assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"encode", "--help"}));
+        assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"query"}));
         assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"slide"}));
         assertFalse(Sender.shouldLaunchGuiByDefault(new String[]{"--lang"}));
+    }
+
+    @Test
+    void queryInitCreatesTemplatesFromSenderCli() {
+        Path config = tempDir.resolve("config.csv");
+        Path sql = tempDir.resolve("queries.sql");
+
+        Result result = execute(
+                "query",
+                "init",
+                "--config=" + config,
+                "--sql=" + sql
+        );
+
+        assertEquals(0, result.exitCode());
+        assertTrue(Files.exists(config));
+        assertTrue(Files.exists(sql));
     }
 
     @Test

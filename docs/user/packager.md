@@ -88,6 +88,8 @@ java -jar build/libs/sender-<version>.jar unpack --in /path/to/sender.zip
 - 패킹되지 않은 일반 zip이면 `WARN embedded target-ext.txt not found; aborting`을
   출력하고 아무것도 바꾸지 않은 채 실패(exit code 1)한다. 스크립트에서 exit code로
   성공 여부를 판단할 수 있다.
+- `unpack`은 제자리 복원 중 충돌 없는 임시 백업을 사용한다. 같은 폴더에 사용자가
+  만든 `<입력>.bak` 파일이 있어도 덮어쓰지 않는다.
 - 같은 폴더에 원본 `.jar`가 남아 있으면 복원된 `.jar`가 그 자리를 덮어쓴다
   (덮어쓰기 전에 `WARN overwriting existing file ...`을 출력).
 

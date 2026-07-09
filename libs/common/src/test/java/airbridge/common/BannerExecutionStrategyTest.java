@@ -37,12 +37,18 @@ class BannerExecutionStrategyTest {
 
     @Test
     void printsBannerForResolvedSubcommand() {
-        assertTrue(run("sub").contains("____"));
+        String output = run("sub");
+
+        assertTrue(output.contains("air-bridge test - "));
+        assertTrue(output.contains("air-bridge test complete - "));
     }
 
     @Test
-    void skipsBannerForOptedOutLeafCommand() {
-        assertFalse(run("cap").contains("____"));
+    void skipsStartBannerForOptedOutLeafCommandButPrintsCompletionBanner() {
+        String output = run("cap");
+
+        assertFalse(output.contains("air-bridge test - "));
+        assertTrue(output.contains("air-bridge test complete - "));
     }
 
     @Test

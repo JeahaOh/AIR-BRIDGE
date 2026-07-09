@@ -3,6 +3,7 @@ apply plugin: 'application'
 dependencies {
     implementation project(':common')
     implementation project(':packager')
+    implementation project(':query')
     implementation project(':slide')
     implementation "info.picocli:picocli:${picocliVersion}"
     implementation "com.google.zxing:core:${zxingVersion}"

@@ -67,6 +67,5 @@ work/
 **/ffmpeg/win-x64/*
 
 fixtures/
-.gradle-home
-.gradlew-home
-.gradlew-home-x
+.gradle-home*/
+.gradlew-home*/

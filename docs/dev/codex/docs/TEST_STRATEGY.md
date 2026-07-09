@@ -8,8 +8,9 @@ Highest priority in this repository:
 2. `sender encode` behavior
 3. `receiver decode` round-trip and failure classification
 4. package helper behavior in `libs/packager`
-5. slide file ordering and chooser behavior
-6. capture option normalization and internal pipeline behavior
+5. query extraction behavior in `libs/query`
+6. slide file ordering and chooser behavior
+7. capture option normalization and internal pipeline behavior
 
 ## Current High-Value Tests
 
@@ -27,6 +28,14 @@ Encode/decode and shared helpers:
 Package helpers:
 
 - `libs/packager/src/test/java/airbridge/packager/PackagerAppTest.java`
+
+Query:
+
+- `libs/query/src/test/java/airbridge/query/QueryConfigTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryParserTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryExecutorIntegrationTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryCommandTest.java`
+- `libs/query/src/test/java/airbridge/query/QueryJdbcDriverTest.java`
 
 Slide:
 
@@ -67,6 +76,16 @@ Add or update tests for:
 - packed zip rewrite
 - unpack reversal
 - jar reconstruction when manifest is present
+
+### Query
+
+Add or update tests for:
+
+- config parsing and password source precedence
+- SQL parsing and SELECT/WITH filtering
+- CSV/report output
+- command help/init/list modes
+- bundled JDBC driver class availability
 
 ### Slide
 

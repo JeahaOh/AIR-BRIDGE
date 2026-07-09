@@ -5,6 +5,7 @@
 - `deploy-sender.md`
 - `deploy-receiver.md`
 - `encode-decode.md`
+- `query.md`
 - `packager.md`
 - `slide-capture.md`
 - `tuning.md`

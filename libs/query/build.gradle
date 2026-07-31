@@ -2,6 +2,32 @@ plugins {
     id 'java-library'
 }
 
+def jdbcDriverDependencies = [
+        mysql     : 'com.mysql:mysql-connector-j:8.3.0',
+        postgresql: 'org.postgresql:postgresql:42.7.2',
+        oracle    : 'com.oracle.database.jdbc:ojdbc11:23.3.0.23.09',
+        sqlserver : 'com.microsoft.sqlserver:mssql-jdbc:12.6.1.jre11',
+        mariadb   : 'org.mariadb.jdbc:mariadb-java-client:3.3.3',
+        db2       : 'com.ibm.db2:jcc:12.1.5.0',
+        h2        : 'com.h2database:h2:2.2.224'
+]
+
+def requestedJdbcDrivers = (findProperty('queryJdbcDrivers') ?: 'all')
+        .toString()
+        .split(',')
+        .collect { it.trim().toLowerCase(Locale.ROOT) }
+        .findAll { !it.isEmpty() }
+
+if (requestedJdbcDrivers.isEmpty() || requestedJdbcDrivers.contains('all')) {
+    requestedJdbcDrivers = jdbcDriverDependencies.keySet() as List
+}
+
+def unknownJdbcDrivers = requestedJdbcDrivers.findAll { !jdbcDriverDependencies.containsKey(it) }
+if (!unknownJdbcDrivers.isEmpty()) {
+    throw new GradleException("Unknown queryJdbcDrivers value(s): ${unknownJdbcDrivers.join(', ')}. " +
+            "Supported values: all, ${jdbcDriverDependencies.keySet().join(', ')}")
+}
+
 dependencies {
     api "info.picocli:picocli:${picocliVersion}"
     implementation 'com.zaxxer:HikariCP:5.1.0'
@@ -10,11 +36,10 @@ dependencies {
     implementation 'ch.qos.logback:logback-classic:1.5.3'
 
     // Bundled JDBC drivers keep sender query usable in offline target environments.
-    implementation 'com.mysql:mysql-connector-j:8.3.0'
-    implementation 'org.postgresql:postgresql:42.7.2'
-    implementation 'com.oracle.database.jdbc:ojdbc11:23.3.0.23.09'
-    implementation 'com.microsoft.sqlserver:mssql-jdbc:12.6.1.jre11'
-    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
-    implementation 'com.ibm.db2:jcc:12.1.5.0'
-    implementation 'com.h2database:h2:2.2.224'
+    requestedJdbcDrivers.each { driver ->
+        implementation jdbcDriverDependencies[driver]
+    }
+
+    // Query integration tests use H2 even when a production build selects another driver.
+    testRuntimeOnly jdbcDriverDependencies.h2
 }

@@ -74,7 +74,9 @@
 
 추가 규칙:
 
-- `png`, `jpg`, `jpeg`는 `target-ext.txt`에 있어도 실제 패킹 대상에서 제외된다.
+- `png`, `jpg`, `jpeg`, `ser`는 `target-ext.txt`에 있어도 실제 패킹 대상에서 제외된다.
+  특히 `.ser`는 Java serialization 바이너리가 `.txt`로 위장된 것처럼 보이는 보안
+  오해를 피하기 위해 원래 확장자를 유지한다.
 - 확장자가 없는 엔트리는 항상 패킹 대상이다.
 - 제외 패턴에 걸린 파일 엔트리는 출력 zip에서 아예 빠진다. 디렉터리 엔트리는
   디렉터리 지향 패턴(`X/**`, `/` 포함 전체경로 글롭)에만 걸려 빠지고, name-only
@@ -83,8 +85,11 @@
 - 중첩 `jar`/`zip`도 내부까지 재귀적으로 rewrite 한다. 단, 실제 바이트가 zip일
   때만(`PK\x03\x04` 매직) 재귀하고, 이름만 아카이브처럼 생긴 엔트리는
   `WARN ... looks like an archive but is not`을 출력하고 내용 그대로 복사한다.
-- rename 결과가 같은 레벨의 기존 엔트리 이름과 충돌하면(예: `a.cfg`와 진짜
-  `a.cfg.txt`가 공존) rename을 포기하고 원래 이름을 유지하며 WARN을 출력한다.
+- rename 결과가 같은 레벨의 기존 엔트리 이름과 충돌해도, 그 기존 엔트리도 이번
+  rewrite에서 다른 이름으로 이동할 수 있으면 단계적으로 rename한다
+  (예: `LICENSE` → `LICENSE.txt`, 기존 `LICENSE.txt` → `LICENSE.txt.txt`).
+  충돌 대상이 이동하지 않는 경우(예: `a.cfg`와 진짜 `a.cfg.txt`가 공존하지만
+  `txt`가 대상 확장자가 아님)에는 rename을 포기하고 원래 이름을 유지하며 WARN을 출력한다.
   이렇게 남은 엔트리는 `.txt`로 끝나지 않으므로 unpack이 건드리지 않는다.
 - rename 결과가 메타데이터 이름(`target.txt`, `target-ext.txt`)과 같아지면
   rename을 포기하고 WARN을 출력한다(메타데이터 슬롯 탈취 방지).
@@ -199,7 +204,9 @@
   메타데이터를 최대한 유지한다. 단 central directory에만 존재하는 엔트리 comment는
   스트림 rewrite에서 보존되지 않는다.
 - 중첩 아카이브가 아닌 엔트리는 전체 버퍼링 없이 스트리밍 복사한다.
-- rename 충돌은 seen 집합과 원본 이름 집합으로 방지하며 원래 이름을 유지하고 WARN을 출력하며, 중복 엔트리는 감지 시 즉시 IOException을 던지고 실패한다.
+- rename 충돌은 seen 집합과 원본 이름 집합으로 방지한다. 충돌 대상도 이동 가능한
+  대상이면 단계적으로 rename하고, 이동할 수 없는 대상이면 원래 이름을 유지하며
+  WARN을 출력한다. 중복 엔트리는 감지 시 즉시 IOException을 던지고 실패한다.
 - rewrite 중 실패하면 입력 옆에 만든 `airbridge-*` 임시 파일을 정리한다.
 - 순차 ZipInputStream 패스가 본 엔트리 이름 집합이 central directory 이름 집합을
   모두 포함하지 못하면(자가압축해제형 preamble, 앞에 다른 zip이 concat돼 뒤쪽 EOCD가

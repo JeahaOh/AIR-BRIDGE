@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 final class ExtensionTokens {
-    private static final Set<String> BLOCKED_PACK_EXTENSIONS = Set.of("png", "jpg", "jpeg");
+    private static final Set<String> BLOCKED_PACK_EXTENSIONS = Set.of("png", "jpg", "jpeg", "ser");
 
     private ExtensionTokens() {
     }
@@ -30,7 +30,7 @@ final class ExtensionTokens {
 
     static Set<String> loadExcludedTokens() {
         Set<String> fallback = Set.of(
-                "class", "xml", "js", "jsp", "html", "css", "exe", "zip", "jar", "properties",
+                "class", "xml", "js", "jsp", "html", "css", "exe", "zip", "jar", "properties", "ser",
                 "png", "jpg", "jpeg"
         );
         Properties props = new Properties();

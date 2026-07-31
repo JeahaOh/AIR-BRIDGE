@@ -301,7 +301,8 @@ public final class PackagerRewriter {
                         System.out.printf("WARN not renaming %s%s: %s is reserved for packager metadata%n",
                                 nestedPrefix, originalName, newName);
                         newName = originalName;
-                    } else if (originalNames.contains(newName)) {
+                    } else if (originalNames.contains(newName)
+                            && !canVacateName(newName, targetExts, originalNames, nestedPrefix, new HashSet<>())) {
                         System.out.printf("WARN not renaming %s%s: %s%s already exists in the archive%n",
                                 nestedPrefix, originalName, nestedPrefix, newName);
                         newName = originalName;
@@ -506,6 +507,23 @@ public final class PackagerRewriter {
             return originalName + ".txt";
         }
         return originalName;
+    }
+
+    private static boolean canVacateName(String originalName, Set<String> targetExts,
+                                         Set<String> originalNames, String nestedPrefix,
+                                         Set<String> visiting) {
+        if (!visiting.add(originalName)) {
+            return false;
+        }
+        String newName = renameForPack(originalName, targetExts);
+        if (newName.equals(originalName) || isMetadataEntry(newName)
+                || EntryNames.hasLineBreak(nestedPrefix + newName)) {
+            return false;
+        }
+        if (!originalNames.contains(newName)) {
+            return true;
+        }
+        return canVacateName(newName, targetExts, originalNames, nestedPrefix, visiting);
     }
 
     private static UnpackRename renameForUnpack(String originalName, Set<String> targetExts,

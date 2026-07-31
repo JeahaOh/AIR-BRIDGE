@@ -51,6 +51,10 @@ java -jar build/libs/sender-<version>.jar --help
 ## 운영 메모
 
 - `sender`는 단일 fat jar 기준으로 배포하는 편이 가장 단순합니다.
+- 기본 빌드는 query용 JDBC 드라이버를 모두 포함합니다. 특정 DB 드라이버만 포함하려면
+  `queryJdbcDrivers`를 지정합니다. 예: DB2 전용 sender는
+  `GRADLE_USER_HOME=$PWD/.gradle-home ./gradlew -PqueryJdbcDrivers=db2 :sender:jar`
+  로 빌드하며, 산출물 이름은 `sender-<version>-db2.jar`입니다.
 - 대부분의 경우 별도 JVM 옵션 없이 `java -jar ...`로 바로 실행하면 됩니다.
 - `--in`/`--out`을 생략하면 jar가 있는 폴더 기준 기본 디렉터리를 씁니다
   (encode: `source` → `encoded`, slide 입력: `encoded`). 디렉터리 이름은 jar 옆

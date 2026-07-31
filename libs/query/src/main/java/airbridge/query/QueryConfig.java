@@ -376,13 +376,14 @@ public class QueryConfig {
 
     public static void createDefaultTemplate(Path path) throws IOException {
         try (var writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+            writer.write('\uFEFF');
             writer.write("key,value\n");
-            writer.write("# ── DB 접속 정보 ───────────────────────────────────────────\n");
+            writer.write("# -- DB 접속 정보 --------------------------------------------------\n");
             writer.write("db.url,jdbc:mysql://localhost:3306/your_database?useSSL=false&serverTimezone=UTC&useCursorFetch=true\n");
             writer.write("db.username,root\n");
             writer.write("# db.password: 비워두고 DB_PASSWORD 환경변수 또는 -Ddb.password 사용을 권장\n");
             writer.write("db.password,\n");
-            writer.write("# ── 실행 옵션 ────────────────────────────────────────────\n");
+            writer.write("# -- 실행 옵션 ----------------------------------------------------\n");
             writer.write("thread.count,4\n");
             writer.write("fetch.size,1000\n");
             writer.write("# query.timeout.seconds: 쿼리 타임아웃 (초). 0=무제한\n");
@@ -395,7 +396,7 @@ public class QueryConfig {
             writer.write("query.retry.delay.seconds,5\n");
             writer.write("# progress.interval: 진행률 로그 출력 주기 (행 수). 0=없음, 기본 50000\n");
             writer.write("progress.interval,50000\n");
-            writer.write("# ── 출력 옵션 ────────────────────────────────────────────\n");
+            writer.write("# -- 출력 옵션 ----------------------------------------------------\n");
             writer.write("csv.delimiter,\",\"\n");
             writer.write("# csv.bom: Excel에서 한글 깨짐 방지를 위한 UTF-8 BOM 추가 (true/false)\n");
             writer.write("csv.bom,false\n");

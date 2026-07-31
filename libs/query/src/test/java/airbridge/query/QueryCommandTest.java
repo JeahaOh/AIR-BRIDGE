@@ -30,6 +30,21 @@ class QueryCommandTest {
     }
 
     @Test
+    void initCreatesConfigWithUtf8Bom() throws Exception {
+        Path config = tempDir.resolve("config.csv");
+        Path sql = tempDir.resolve("queries.sql");
+
+        Result result = execute("init", "--config=" + config, "--sql=" + sql);
+
+        assertEquals(0, result.exitCode());
+        byte[] bytes = Files.readAllBytes(config);
+        assertTrue(bytes.length >= 3);
+        assertEquals((byte) 0xEF, bytes[0]);
+        assertEquals((byte) 0xBB, bytes[1]);
+        assertEquals((byte) 0xBF, bytes[2]);
+    }
+
+    @Test
     void listModeParsesSqlWithoutConfig() throws Exception {
         Path sql = tempDir.resolve("queries.sql");
         Files.writeString(sql, """

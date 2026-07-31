@@ -129,6 +129,27 @@ class PackagerAppTest {
     }
 
     @Test
+    void packSkipsSerializedExtensionEvenWhenTargetExtListsIt() throws Exception {
+        byte[] serData = new byte[] {(byte) 0xAC, (byte) 0xED, 0x00, 0x05, 0x70};
+        Path input = tempDir.resolve("sample.jar");
+        createZip(input, Map.of(
+                "profile/T4XAIndbtPkg_SJProfile0.ser", serData,
+                "assets/blob.dat", text("dat")
+        ));
+        Files.writeString(tempDir.resolve("target-ext.txt"), "ser\ndat\n", StandardCharsets.UTF_8);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", input.toString()));
+
+        Path packed = tempDir.resolve("sample.zip");
+        List<String> names = listZipEntries(packed);
+        assertTrue(names.contains("profile/T4XAIndbtPkg_SJProfile0.ser"));
+        assertFalse(names.contains("profile/T4XAIndbtPkg_SJProfile0.ser.txt"));
+        assertTrue(names.contains("assets/blob.dat.txt"));
+        assertLinesMatch(List.of("assets/blob.dat.txt"), readZipTextEntry(packed, "target.txt"));
+        assertLinesMatch(List.of("dat"), readZipTextEntry(packed, "target-ext.txt"));
+    }
+
+    @Test
     void unpackUsesEmbeddedMetadataAndRemovesIt() throws Exception {
         Path input = tempDir.resolve("sample.jar");
         createZip(input, Map.of(
@@ -551,6 +572,32 @@ class PackagerAppTest {
     }
 
     @Test
+    void packCascadesRenameWhenCollisionTargetAlsoMoves() throws Exception {
+        byte[] licenseData = text("PLAIN LICENSE");
+        byte[] licenseTxtData = text("TEXT LICENSE");
+        Path input = tempDir.resolve("app.jar");
+        createZip(input, Map.of(
+                "META-INF/LICENSE", licenseData,
+                "META-INF/LICENSE.txt", licenseTxtData
+        ));
+        Files.write(tempDir.resolve("target-ext.txt"), List.of("license", "txt"), StandardCharsets.UTF_8);
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("pack", "--in", input.toString()));
+
+        Path packed = tempDir.resolve("app.zip");
+        org.junit.jupiter.api.Assertions.assertArrayEquals(licenseData, readZipEntryBytes(packed, "META-INF/LICENSE.txt"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(licenseTxtData, readZipEntryBytes(packed, "META-INF/LICENSE.txt.txt"));
+        assertLinesMatch(
+                List.of("META-INF/LICENSE.txt", "META-INF/LICENSE.txt.txt"),
+                readZipTextEntry(packed, "target.txt")
+        );
+
+        assertEquals(0, new CommandLine(new PackagerApp()).execute("unpack", "--in", packed.toString()));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(licenseData, readZipEntryBytes(packed, "META-INF/LICENSE"));
+        org.junit.jupiter.api.Assertions.assertArrayEquals(licenseTxtData, readZipEntryBytes(packed, "META-INF/LICENSE.txt"));
+    }
+
+    @Test
     void packPreservesUserFilesWhoseRenameWouldHijackMetadataNames() throws Exception {
         byte[] targetData = text("USER DATA IN plain target");
         byte[] targetExtData = text("USER DATA IN plain target-ext");
@@ -848,6 +895,22 @@ class PackagerAppTest {
 
         assertLinesMatch(List.of("dat", "run"), Files.readAllLines(targetExt, StandardCharsets.UTF_8));
         assertTrue(out.contains("Wrote 2 entries"), out);
+    }
+
+    @Test
+    void identifyExcludesSerializedExtensionByDefault() throws Exception {
+        Path input = tempDir.resolve("app.jar");
+        createZip(input, Map.of(
+                "profile/T4XAIndbtPkg_SJProfile0.ser", new byte[] {(byte) 0xAC, (byte) 0xED, 0x00, 0x05, 0x70},
+                "assets/blob.dat", text("dat")
+        ));
+        Path targetExt = tempDir.resolve("target-ext.txt");
+
+        String out = captureStdout(() ->
+                assertEquals(0, new CommandLine(new PackagerApp()).execute("identify", "--in", input.toString())));
+
+        assertLinesMatch(List.of("dat"), Files.readAllLines(targetExt, StandardCharsets.UTF_8));
+        assertTrue(out.contains("Wrote 1 entries"), out);
     }
 
     @Test

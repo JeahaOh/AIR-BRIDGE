@@ -49,6 +49,14 @@ build/libs/sender-<version>.jar
 build/libs/receiver-<version>.jar
 ```
 
+DB2 전용 sender처럼 query JDBC 드라이버를 제한하려면 아래처럼 빌드합니다.
+
+```bash
+GRADLE_USER_HOME=$PWD/.gradle-home ./gradlew -PqueryJdbcDrivers=db2 :sender:jar
+```
+
+이 경우 산출물은 `apps/sender/build/libs/sender-<version>-db2.jar` 입니다.
+
 같은 폴더에 기본 명령 실행용 스크립트도 생성됩니다.
 
 ```bash

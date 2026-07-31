@@ -27,6 +27,17 @@ ext {
     openblasVersion = '0.3.26-1.5.10'
 }
 
+def senderJdbcVariantSuffix = {
+    def queryJdbcDrivers = findProperty('queryJdbcDrivers')?.toString()?.trim()
+    if (!queryJdbcDrivers || queryJdbcDrivers.equalsIgnoreCase('all')) {
+        return ''
+    }
+    def suffix = queryJdbcDrivers.toLowerCase(Locale.ROOT)
+            .replaceAll(/[^a-z0-9]+/, '-')
+            .replaceAll(/^-|-$/, '')
+    return suffix.isEmpty() ? '' : "-${suffix}"
+}
+
 def buildVersion = "0.95.${LocalDateTime.now().format(DateTimeFormatter.ofPattern('yyMMdd.HHmm', Locale.ROOT))}"
 version = buildVersion
 
@@ -55,7 +66,7 @@ tasks.register('writeLauncherScripts') {
         ].each { name, command ->
             String app = command[0]
             String subcommand = command[1]
-            String jarName = "${app}-${projectVersion}.jar"
+            String jarName = "${app}-${projectVersion}${app == 'sender' ? senderJdbcVariantSuffix() : ''}.jar"
 
             File sh = new File(libsDir, "${name}.sh")
             sh.text = """#!/usr/bin/env sh
@@ -166,7 +177,7 @@ subprojects {
         tasks.named('jar') {
             dependsOn configurations.runtimeClasspath
             duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-            archiveFileName = "${project.name}-${project.version}.jar"
+            archiveFileName = "${project.name}-${project.version}${project.name == 'sender' ? senderJdbcVariantSuffix() : ''}.jar"
             manifest {
                 attributes(
                         'Manifest-Version': '1.0',

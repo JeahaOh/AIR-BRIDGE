@@ -26,6 +26,9 @@ java -jar sender-<version>.jar query
 java -jar sender-<version>.jar query init
 ```
 
+생성되는 `config.csv`는 내부망 Windows/Excel에서 한글 주석이 깨지지 않도록 UTF-8 BOM을
+포함합니다.
+
 기존 파일을 덮어쓰려면:
 
 ```bash

@@ -67,9 +67,17 @@ Build the full project with:
 같은 폴더에 기본 명령 실행용 `encode.sh/.bat`, `slide.sh/.bat`, `capture.sh/.bat`,
 `decode.sh/.bat`도 생성됩니다.
 
+DB2 전용 sender처럼 query JDBC 드라이버를 제한하려면
+`GRADLE_USER_HOME=$PWD/.gradle-home ./gradlew -PqueryJdbcDrivers=db2 :sender:jar`
+로 빌드합니다. 산출물은 `apps/sender/build/libs/sender-<version>-db2.jar`입니다.
+
 The primary artifacts are `build/libs/sender-<version>.jar` and `build/libs/receiver-<version>.jar`.
 The same directory also contains default-command launchers: `encode.sh/.bat`,
 `slide.sh/.bat`, `capture.sh/.bat`, and `decode.sh/.bat`.
+
+To limit bundled query JDBC drivers, for example a DB2-only sender, build with
+`GRADLE_USER_HOME=$PWD/.gradle-home ./gradlew -PqueryJdbcDrivers=db2 :sender:jar`.
+The artifact is `apps/sender/build/libs/sender-<version>-db2.jar`.
 
 실행 기준은 `sender` 와 `receiver` 모두 jar입니다.
 

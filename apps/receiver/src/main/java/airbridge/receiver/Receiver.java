@@ -290,6 +290,7 @@ public class Receiver implements Runnable {
             List<CaptureDeviceInfo> devices = CaptureSupport.listDevices();
             if (devices.isEmpty()) {
                 System.out.println("(no devices found)");
+                System.out.println("[CAPTURE][ERROR] " + CaptureSupport.deviceAccessHelp());
                 return;
             }
             for (CaptureDeviceInfo device : devices) {

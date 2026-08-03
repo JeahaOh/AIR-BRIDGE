@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CaptureDeviceInfoTest {
 
@@ -26,5 +27,14 @@ class CaptureDeviceInfoTest {
         assertEquals(left, same);
         assertEquals(left.hashCode(), same.hashCode());
         assertNotEquals(left, different);
+    }
+
+    @Test
+    void macDeviceAccessHelpExplainsPermissionAndDeviceContention() {
+        String message = CaptureSupport.deviceAccessHelp("Mac OS X");
+
+        assertTrue(message.contains("카메라"));
+        assertTrue(message.contains("권한"));
+        assertTrue(message.contains("OBS"));
     }
 }

@@ -24,6 +24,23 @@ public final class CaptureSupport {
     private CaptureSupport() {
     }
 
+    /**
+     * Returns an operator-facing next step when OpenCV cannot open a capture device.
+     * Native OpenCV diagnostics are often emitted only to stderr, which is not visible
+     * from the Swing device picker.
+     */
+    public static String deviceAccessHelp() {
+        return deviceAccessHelp(System.getProperty("os.name", ""));
+    }
+
+    static String deviceAccessHelp(String osName) {
+        if (osName.toLowerCase(Locale.ROOT).contains("mac")) {
+            return "카메라 장치에 접근할 수 없습니다. 시스템 설정 > 개인정보 보호 및 보안 > 카메라에서 "
+                    + "receiver를 실행한 Terminal/iTerm의 권한을 허용하고, OBS 등 장치를 사용하는 앱을 종료한 뒤 다시 시도하세요.";
+        }
+        return "카메라 장치에 접근할 수 없습니다. 장치 연결, 다른 앱의 장치 점유, 카메라 권한을 확인한 뒤 다시 시도하세요.";
+    }
+
     public static List<CaptureDeviceInfo> listDevices() {
         Map<Integer, String> deviceNames = listVideoDeviceNames();
         List<CaptureDeviceInfo> result = new ArrayList<>();

@@ -370,7 +370,7 @@ public final class ReceiverGui {
                         List<CaptureDeviceInfo> devices = get();
                         populateDeviceCombo(devices);
                         if (devices.isEmpty()) {
-                            appendLog("[GUI][INFO] no devices found");
+                            appendLog("[GUI][ERROR] " + CaptureSupport.deviceAccessHelp());
                             return;
                         }
                         for (CaptureDeviceInfo device : devices) {

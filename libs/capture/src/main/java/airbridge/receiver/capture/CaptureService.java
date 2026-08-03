@@ -205,6 +205,13 @@ public final class CaptureService {
                     logStatus();
                 }
             }
+        } catch (Exception e) {
+            listener.onLog("[CAPTURE][ERROR] " + CaptureSupport.deviceAccessHelp());
+            String detail = e.getMessage();
+            if (detail != null && !detail.isBlank()) {
+                listener.onLog("[CAPTURE][ERROR] OpenCV: " + detail);
+            }
+            throw e;
         } finally {
             stopRequested.set(true);
             mouseJiggleExecutor.shutdownNow();

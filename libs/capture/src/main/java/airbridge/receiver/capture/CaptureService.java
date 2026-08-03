@@ -249,7 +249,7 @@ public final class CaptureService {
                 completionTracker.observedFiles(),
                 completionTracker.decodableFiles()
         );
-        String recommendation = dwellRecommendationLog(seenPayloads.size(), elapsedMillis(), true);
+        String recommendation = dwellRecommendationLog(seenPayloads.size(), elapsedMillis());
         if (recommendation != null) {
             listener.onLog(recommendation);
         }
@@ -479,7 +479,7 @@ public final class CaptureService {
                 status.decodableFiles(),
                 status.observedFiles()));
         // 매 상태 주기(기본 10초)마다 지금까지 관측된 속도로 다시 계산한 slide 권장값을 별도 줄로 출력한다.
-        String recommendation = dwellRecommendationLog(status.uniquePayloads(), elapsedMillis(), false);
+        String recommendation = dwellRecommendationLog(status.uniquePayloads(), elapsedMillis());
         if (recommendation != null) {
             listener.onLog(recommendation);
         }
@@ -540,26 +540,16 @@ public final class CaptureService {
         return (long) Math.ceil(msPerUnique * PACING_SAFETY_FACTOR);
     }
 
-    // Pacing guidance with an explicit adjustment direction. The receiver cannot see the
-    // sender's current Page(ms), so the direction is phrased against the recommended floor and
-    // the operator compares it with their own setting. Null when too little was captured.
-    private String dwellRecommendationLog(long uniquePayloads, long elapsedMillis, boolean finalPass) {
+    // Compact pacing guidance for status and completion logs. Null when too little was captured.
+    private String dwellRecommendationLog(long uniquePayloads, long elapsedMillis) {
         long recommended = recommendedDwellMs(uniquePayloads, elapsedMillis);
         if (recommended < 0) {
             return null;
         }
         double uniquePerSec = uniquePayloads * 1000.0 / Math.max(1, elapsedMillis);
-        if (finalPass) {
-            return String.format(Locale.ROOT,
-                    "[CAPTURE][INFO] 이번 실행 고유 %.1f QR/s -> 다음 패스 slide page-display-ms >= %dms 권장 — "
-                            + "지금 slide Page(ms)가 %d보다 작았다면 올리고, 컸다면 %d까지 내려도 됩니다 "
-                            + "(fountain 복구+루프가 흡수하므로 가이드값)",
-                    uniquePerSec, recommended, recommended, recommended);
-        }
         return String.format(Locale.ROOT,
-                "[CAPTURE][INFO] 고유 %.1f QR/s -> slide page-display-ms >= %dms 권장 — "
-                        + "지금 slide Page(ms)가 %d보다 작으면 올리고, 크면 %d까지 내려도 됩니다 (가이드값)",
-                uniquePerSec, recommended, recommended, recommended);
+                "[CAPTURE][INFO] 고유 %.1f QR/s -> slide page-display-ms >= %dms 권장",
+                uniquePerSec, recommended);
     }
 
     private void requestStop(String reason) {

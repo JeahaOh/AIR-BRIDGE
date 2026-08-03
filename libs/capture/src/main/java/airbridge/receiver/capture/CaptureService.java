@@ -95,7 +95,6 @@ public final class CaptureService {
 
     private volatile String stopReason = "completed";
     private volatile long startedAtMillis;
-    private volatile ScreenFingerprint lastGrabbedFingerprint = null;
 
     public CaptureService(CaptureOptions options, CaptureListener listener) {
         this.options = options;
@@ -177,13 +176,6 @@ public final class CaptureService {
                     blackFramesSkipped.incrementAndGet();
                     continue;
                 }
-
-                if (lastGrabbedFingerprint != null
-                        && hammingDistance(lastGrabbedFingerprint.bits, fp.bits) <= CaptureDefaults.SAME_SCREEN_DISTANCE_THRESHOLD) {
-                    continue;
-                }
-
-                lastGrabbedFingerprint = fp;
 
                 BufferedImage copy = copyImage(image, imagePool);
                 emitPreviewIfDue(copy);
@@ -367,8 +359,22 @@ public final class CaptureService {
                 saveQueue.put(new SavePacket(packet.frameId, packet.capturedAtMillis, packet.image, payload));
                 updateHighWaterMark(saveQueueHighWaterMark, saveQueue.size());
                 submittedToSave = true;
-            } catch (Exception ignored) {
-                decodeFailures.incrementAndGet();
+            } catch (Exception e) {
+                long failures = decodeFailures.incrementAndGet();
+                // Decode failures used to be completely silent. Keep the regular status counter,
+                // but expose a sampled reason so live-camera failures can be distinguished from
+                // a save-path problem without flooding the console at camera frame rate.
+                if (failures == 1 || failures % 25 == 0) {
+                    String detail = e.getMessage();
+                    listener.onLog(String.format(Locale.ROOT,
+                            "[CAPTURE][WARN] QR decode failed count=%d frame=%d size=%dx%d type=%s%s",
+                            failures,
+                            packet.frameId,
+                            packet.image.getWidth(),
+                            packet.image.getHeight(),
+                            e.getClass().getSimpleName(),
+                            detail == null || detail.isBlank() ? "" : " detail=" + detail));
+                }
             } finally {
                 decodeNanos.addAndGet(System.nanoTime() - startedAt);
                 decodePermits.release();

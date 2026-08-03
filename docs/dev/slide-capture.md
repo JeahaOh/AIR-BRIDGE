@@ -263,6 +263,10 @@ decode 시작을 막습니다. 단, `Preview` 토글과 `Preview FPS`는 실행 
 - 새 화면이 한 번만 보인 경우는 pending
 - 같은 pending 화면이 두 번 연속 관찰되면 decode 대상으로 확정
 
+grab loop는 화면 지문이 같다는 이유만으로 프레임을 미리 버리지 않는다. 그 판단을
+analyze loop 한 곳에서만 수행해야, 연속 두 프레임으로 화면 안정화를 확인하는 조건과
+서로 충돌하지 않는다.
+
 의미:
 
 - 검은 프레임이나 순간적인 노이즈를 줄임
@@ -277,7 +281,7 @@ decode는 `decodeExecutor` 고정 풀에서 수행합니다.
 - worker 수는 `options.decodeWorkers()`
 - `decodePermits`로 pending decode 개수 상한 제어
 - 성공 시 `SavePacket(frameId, capturedAtMillis, image, payload)`를 `saveQueue`로 전달
-- 실패 시 `decodeFailures` 증가
+- 실패 시 `decodeFailures` 증가, 첫 번째와 매 25번째 실패에 프레임 크기·예외 종류를 경고 로그로 출력
 
 decode 구현 자체는 `CaptureQrDecodeSupport.decodeQrPayloadWithRetries(...)`에 위임됩니다.
 

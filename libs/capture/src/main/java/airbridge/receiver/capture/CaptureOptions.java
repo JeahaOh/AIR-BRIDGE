@@ -13,7 +13,8 @@ public record CaptureOptions(
         int decodeWorkers,
         long statusIntervalMs,
         long sameSignalSeconds,
-        boolean resume
+        boolean resume,
+        boolean resumeIndex
 ) {
     public CaptureOptions {
         outputDir = outputDir.toAbsolutePath().normalize();

@@ -92,6 +92,7 @@ public final class ReceiverGui {
         private final JSpinner statusIntervalSpinner = longSpinner(CaptureDefaults.DEFAULT_STATUS_INTERVAL_MS, 0L, 3_600_000L, 1_000L);
         private final JSpinner captureDecodeWorkersSpinner = intSpinner(DEFAULT_DECODE_WORKERS, 1, 256, 1);
         private final JCheckBox resumeCheck = new JCheckBox("Resume");
+        private final JCheckBox resumeIndexCheck = new JCheckBox("Fast resume index");
         private final JCheckBox previewCheck = new JCheckBox("Preview", true);
         private final JSpinner previewFpsSpinner = doubleSpinner(DEFAULT_PREVIEW_FPS, MIN_PREVIEW_FPS, MAX_PREVIEW_FPS, 0.5d);
         private final JButton startButton = new JButton("Start");
@@ -169,7 +170,7 @@ public final class ReceiverGui {
             addField(form, row++, "Height", heightSpinner, fpsSpinner, "FPS");
             addField(form, row++, "Workers", captureDecodeWorkersSpinner, statusIntervalSpinner, "Status ms");
             addField(form, row++, "Preview", previewCheck, previewFpsSpinner, "Preview FPS");
-            addField(form, row, "Resume", resumeCheck, new JLabel(), "");
+            addField(form, row++, "Resume", resumeCheck, resumeIndexCheck, "Index");
 
             JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
             startButton.addActionListener(event -> startCapture());
@@ -327,7 +328,8 @@ public final class ReceiverGui {
                     intValue(captureDecodeWorkersSpinner),
                     longValue(statusIntervalSpinner),
                     CaptureDefaults.DEFAULT_SAME_SIGNAL_SECONDS,
-                    resumeCheck.isSelected()
+                    resumeCheck.isSelected(),
+                    resumeIndexCheck.isSelected()
             );
         }
 

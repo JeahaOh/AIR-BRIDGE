@@ -21,8 +21,10 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -88,6 +90,7 @@ public final class CaptureService {
     private final Set<PayloadDigest> seenPayloads = Collections.synchronizedSet(new HashSet<>());
     private final CaptureCompletionTracker completionTracker = new CaptureCompletionTracker();
     private final BufferedImagePool imagePool;
+    private CaptureResumeIndex resumeIndex;
 
     private static final ThreadLocal<BufferedImage> FINGERPRINT_BUFFER = ThreadLocal.withInitial(() ->
         new BufferedImage(33, 32, BufferedImage.TYPE_BYTE_GRAY)
@@ -119,6 +122,9 @@ public final class CaptureService {
         Path outDir = options.outputDir();
         Path imagesDir = outDir.resolve("captured-images");
         Files.createDirectories(imagesDir);
+        if (options.resumeIndex()) {
+            resumeIndex = new CaptureResumeIndex(imagesDir.resolve(CaptureResumeIndex.FILE_NAME), options.resume());
+        }
         restoreResumeState(imagesDir);
 
         Instant startedAt = Instant.now();
@@ -218,6 +224,7 @@ public final class CaptureService {
             saveThread.join();
             saveExecutor.shutdown();
             saveExecutor.awaitTermination(5, TimeUnit.MINUTES);
+            closeResumeIndex();
 
             // Clean up any remaining images in the raw queue
             FramePacket p;
@@ -427,6 +434,9 @@ public final class CaptureService {
         long startedAt = System.nanoTime();
         try {
             writePngFast(packet.image, imagePath);
+            if (resumeIndex != null) {
+                resumeIndex.append(imagePath, packet.payload);
+            }
             listener.onSavedImage(imagePath, packet.payload, imageNumber);
         } catch (Exception e) {
             requestStop("save-error");
@@ -637,33 +647,68 @@ public final class CaptureService {
         int maxImageNumber = 0;
         int restoredPayloads = 0;
         int scannedImages = 0;
-
+        List<Path> imagePaths;
         try (Stream<Path> files = Files.list(imagesDir)) {
-            for (Path imagePath : files
-                    .filter(Files::isRegularFile)
+            imagePaths = files.filter(Files::isRegularFile)
                     .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".png"))
                     .sorted(Comparator.comparing(path -> path.getFileName().toString()))
-                    .toList()) {
-                scannedImages++;
-                maxImageNumber = Math.max(maxImageNumber, extractSavedImageNumber(imagePath, scannedImages));
-                BufferedImage image = null;
-                try {
-                    image = ImageIO.read(imagePath.toFile());
-                    if (image == null) {
-                        listener.onLog("[CAPTURE][WARN] resume skipped unreadable image: " + imagePath.getFileName());
+                    .toList();
+        }
+        Map<String, Path> imagesByName = new HashMap<>();
+        for (Path imagePath : imagePaths) {
+            scannedImages++;
+            imagesByName.put(imagePath.getFileName().toString(), imagePath);
+            maxImageNumber = Math.max(maxImageNumber, extractSavedImageNumber(imagePath, scannedImages));
+        }
+
+        Set<String> indexedImageNames = new HashSet<>();
+        Path indexPath = imagesDir.resolve(CaptureResumeIndex.FILE_NAME);
+        if (options.resumeIndex() && Files.isRegularFile(indexPath)) {
+            try {
+                for (CaptureResumeIndex.Entry entry : CaptureResumeIndex.read(indexPath)) {
+                    if (!imagesByName.containsKey(entry.imageFileName())) {
+                        listener.onLog("[CAPTURE][WARN] resume index skipped missing image: " + entry.imageFileName());
                         continue;
                     }
-                    String payload = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
-                    if (seenPayloads.add(PayloadDigest.of(payload))) {
+                    indexedImageNames.add(entry.imageFileName());
+                    if (seenPayloads.add(PayloadDigest.of(entry.payload()))) {
                         restoredPayloads++;
-                        trackCompletion(payload);
+                        trackCompletion(entry.payload());
                     }
-                } catch (Exception e) {
-                    listener.onLog("[CAPTURE][WARN] resume skipped " + imagePath.getFileName() + ": " + e.getMessage());
-                } finally {
-                    if (image != null) {
-                        image.flush();
-                    }
+                }
+                listener.onLog(String.format("[CAPTURE][INFO] resume index restored images=%d payloads=%d",
+                        indexedImageNames.size(), restoredPayloads));
+            } catch (Exception e) {
+                indexedImageNames.clear();
+                seenPayloads.clear();
+                listener.onLog("[CAPTURE][WARN] resume index unusable; falling back to PNG scan: " + e.getMessage());
+            }
+        }
+
+        for (Path imagePath : imagePaths) {
+            if (indexedImageNames.contains(imagePath.getFileName().toString())) {
+                continue;
+            }
+            BufferedImage image = null;
+            try {
+                image = ImageIO.read(imagePath.toFile());
+                if (image == null) {
+                    listener.onLog("[CAPTURE][WARN] resume skipped unreadable image: " + imagePath.getFileName());
+                    continue;
+                }
+                String payload = CaptureQrDecodeSupport.decodeQrPayloadWithRetries(image);
+                if (seenPayloads.add(PayloadDigest.of(payload))) {
+                    restoredPayloads++;
+                    trackCompletion(payload);
+                }
+                if (resumeIndex != null) {
+                    resumeIndex.append(imagePath, payload);
+                }
+            } catch (Exception e) {
+                listener.onLog("[CAPTURE][WARN] resume skipped " + imagePath.getFileName() + ": " + e.getMessage());
+            } finally {
+                if (image != null) {
+                    image.flush();
                 }
             }
         }
@@ -673,6 +718,17 @@ public final class CaptureService {
                 scannedImages,
                 restoredPayloads,
                 savedImageCounter.get() + 1));
+    }
+
+    private void closeResumeIndex() {
+        if (resumeIndex == null) {
+            return;
+        }
+        try {
+            resumeIndex.close();
+        } catch (Exception e) {
+            listener.onLog("[CAPTURE][WARN] resume index write failed: " + e.getMessage());
+        }
     }
 
     private static int extractSavedImageNumber(Path imagePath, int fallback) {

@@ -47,7 +47,7 @@ class CaptureServiceInternalTest {
 
         List<String> logs = new ArrayList<>();
         CaptureService service = new CaptureService(
-                new CaptureOptions(outDir, 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, true),
+                new CaptureOptions(outDir, 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, true, false),
                 new CaptureListener() {
                     @Override
                     public void onLog(String line) {
@@ -70,11 +70,45 @@ class CaptureServiceInternalTest {
     }
 
     @Test
+    void restoreResumeStateUsesOptionalIndexAndScansOnlyImagesMissingFromIt() throws Exception {
+        Path outDir = tempDir.resolve("indexed-out");
+        Path imagesDir = outDir.resolve("captured-images");
+        Files.createDirectories(imagesDir);
+        Path first = imagesDir.resolve("frame_000001.png");
+        Path second = imagesDir.resolve("frame_000002.png");
+        writeQrPng(first, "payload-A");
+        writeQrPng(second, "payload-B");
+
+        try (CaptureResumeIndex index = new CaptureResumeIndex(
+                imagesDir.resolve(CaptureResumeIndex.FILE_NAME), false)) {
+            index.append(first, "payload-A");
+        }
+
+        List<String> logs = new ArrayList<>();
+        CaptureService service = new CaptureService(
+                new CaptureOptions(outDir, 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, true, true),
+                new CaptureListener() {
+                    @Override
+                    public void onLog(String line) {
+                        logs.add(line);
+                    }
+                }
+        );
+
+        invoke(service, "restoreResumeState", new Class<?>[]{Path.class}, imagesDir);
+
+        Set<?> seenPayloads = getField(service, "seenPayloads", Set.class);
+        assertEquals(2, seenPayloads.size());
+        assertTrue(logs.stream().anyMatch(line -> line.contains("resume index restored images=1 payloads=1")));
+        assertTrue(logs.stream().anyMatch(line -> line.contains("resume scan finished images=2 restoredPayloads=2 nextImageIndex=3")));
+    }
+
+    @Test
     void buildManifestJsonIncludesCurrentMetricsAndEscapesStrings() throws Exception {
         Path outDir = tempDir.resolve("manifest-out");
         Path imagesDir = outDir.resolve("captured-images");
         CaptureService service = new CaptureService(
-                new CaptureOptions(outDir, 7, 1920, 1080, 15.5d, 0L, 0, 4, 1000L, 30L, false),
+                new CaptureOptions(outDir, 7, 1920, 1080, 15.5d, 0L, 0, 4, 1000L, 30L, false, false),
                 null
         );
         // One decodable single-symbol file plus one foreign payload, to pin the new fields.
@@ -129,7 +163,7 @@ class CaptureServiceInternalTest {
         List<String> logs = new ArrayList<>();
         List<CaptureStatus> statuses = new ArrayList<>();
         CaptureService service = new CaptureService(
-                new CaptureOptions(tempDir.resolve("done-out"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false),
+                new CaptureOptions(tempDir.resolve("done-out"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false, false),
                 new CaptureListener() {
                     @Override
                     public void onLog(String line) {
@@ -166,7 +200,7 @@ class CaptureServiceInternalTest {
     @Test
     void recommendedDwellMsScalesWithObservedUniqueRate() throws Exception {
         CaptureService service = new CaptureService(
-                new CaptureOptions(tempDir.resolve("o"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false),
+                new CaptureOptions(tempDir.resolve("o"), 0, 1280, 720, 15.0d, 0L, 0, 2, 0L, 10L, false, false),
                 null
         );
         Class<?>[] sig = {long.class, long.class};

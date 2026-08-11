@@ -247,6 +247,9 @@ public class Receiver implements Runnable {
         @Option(names = "--resume", descriptionKey = "option.resume")
         private boolean resume;
 
+        @Option(names = "--resume-index", descriptionKey = "option.resume-index")
+        private boolean resumeIndex;
+
         @Override
         public Integer call() throws Exception {
             if (listDevices) {
@@ -342,7 +345,8 @@ public class Receiver implements Runnable {
                     Math.max(1, decodeWorkers),
                     Math.max(0, statusIntervalMs),
                     Math.max(1, sameSignalSeconds),
-                    resume
+                    resume,
+                    resumeIndex
             );
         }
     }

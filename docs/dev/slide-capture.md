@@ -306,7 +306,13 @@ PNG 저장 시:
 
 ## capture resume 동작
 
-`--resume`이 켜져 있으면 시작 시 `captured-images`를 스캔합니다.
+`--resume`이 켜져 있으면 시작 시 `captured-images`를 스캔합니다. 기본 동작은 모든 PNG를 다시
+decode하므로, 기존 동작과 호환되는 대신 이미지 수에 비례해 준비 시간이 듭니다.
+
+`--resume-index`는 선택 기능이다. 이 옵션으로 capture를 실행하면 `captured-images/capture-resume.index`를
+비동기로 기록하고, 이후 `--resume --resume-index` 실행에서 해당 인덱스를 먼저 읽는다. 인덱스에 없는
+PNG만 다시 decode하므로 정상 종료한 대량 capture의 재개 준비가 빨라진다. 인덱스가 없거나 읽을 수 없으면
+자동으로 전체 PNG 스캔으로 fallback한다.
 
 복구 내용:
 

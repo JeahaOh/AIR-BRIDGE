@@ -163,7 +163,8 @@ java -jar build/libs/receiver-<version>.jar capture --device FaceTime
 ```bash
 java -jar build/libs/receiver-<version>.jar capture \
   --out /path/capture-out \
-  --resume
+  --resume \
+  --resume-index
 ```
 
 주요 산출물:
@@ -272,7 +273,9 @@ java -jar build/libs/receiver-<version>.jar decode \
 - `slide`는 시작 직후 전체화면과 전면 유지 성격이 강하므로 일반 데스크톱 앱처럼 쓰기 어렵습니다.
 - `slide`와 `capture`는 처음에는 같은 해상도와 안정적인 화면 비율에서 맞춘다.
 - 고속 재생은 항상 `decode` 결과까지 같이 확인한다.
-- 캡처가 중간에 끊기면 `--resume`으로 이어서 받는 편이 낫다.
+- 캡처가 중간에 끊기면 `--resume`으로 이어서 받는 편이 낫다. 대량 캡처라면 처음부터
+  `--resume-index`를 함께 사용하고, 재개할 때도 두 옵션을 함께 준다. 이 옵션이 없으면 기존과 같이
+  PNG 전체를 다시 읽어 중복 상태를 복원한다.
 - 장치 이름이 애매하면 먼저 `--list-devices`로 확인한다.
 - `slide`는 화면 점유 성격이 강하므로 다른 작업과 병행하기 불편할 수 있습니다.
 

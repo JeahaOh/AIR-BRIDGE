@@ -26,6 +26,7 @@ class CaptureOptionsTest {
                 0,
                 -100L,
                 0L,
+                true,
                 true
         );
 
@@ -40,6 +41,7 @@ class CaptureOptionsTest {
         assertEquals(0L, options.statusIntervalMs());
         assertEquals(1L, options.sameSignalSeconds());
         assertEquals(true, options.resume());
+        assertEquals(true, options.resumeIndex());
     }
 
     @Test
@@ -55,6 +57,7 @@ class CaptureOptionsTest {
                 4,
                 5000L,
                 60L,
+                false,
                 false
         );
 
@@ -68,5 +71,6 @@ class CaptureOptionsTest {
         assertEquals(5000L, options.statusIntervalMs());
         assertEquals(60L, options.sameSignalSeconds());
         assertFalse(options.resume());
+        assertFalse(options.resumeIndex());
     }
 }

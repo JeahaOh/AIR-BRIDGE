@@ -45,10 +45,15 @@ config.csv + queries.sql
 
 - SQL은 `SELECT` 또는 `WITH`로 시작하는 문장만 실행합니다.
 - 세미콜론 분할 뒤 하위 문장마다 허용 패턴을 다시 확인해 다중문 DML/DDL을 차단합니다.
-- 커넥션에 `setReadOnly(true)`를 시도합니다.
+- `db.read-only=true`(기본값)를 HikariCP 커넥션 풀과 실행 커넥션의
+  `setReadOnly(true)`에 적용합니다.
 - 대용량 결과를 메모리에 모으지 않고 `ResultSet`에서 CSV로 스트리밍합니다.
 - `--out`은 `config.csv`의 `output.dir`보다 우선합니다.
 - JDBC URL 로그에서는 `password`/`pwd` 파라미터를 마스킹합니다.
+- sender의 `logback.xml`은 `DEBUG/INFO`용 stdout과 `WARN/ERROR`용 stderr
+  ConsoleAppender를 분리하고 두 인코더를 UTF-8로 고정합니다. query 실행 상태와 오류는
+  Logback을 사용합니다. 다만 banner와 일부 CLI 결과는 `System.out`/`System.err` 직접 출력이므로 Windows 터미널 코드 페이지도
+  UTF-8(`chcp 65001`)로 맞춰야 전체 한글 출력이 일관됩니다.
 - 내장 JDBC 드라이버는 MySQL, PostgreSQL, Oracle, SQL Server, MariaDB, IBM DB2, H2입니다.
 
 이 안전장치는 보조 방어입니다. 실제 운영에서는 읽기 전용 DB 계정을 사용해야 합니다.

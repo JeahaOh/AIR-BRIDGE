@@ -62,6 +62,7 @@ public final class DatabaseConnector implements AutoCloseable {
         hikariConfig.setJdbcUrl(url);
         hikariConfig.setUsername(username);
         hikariConfig.setPassword(password);
+        hikariConfig.setReadOnly(config.isDbReadOnlyEnabled());
         hikariConfig.setMaximumPoolSize(maxPoolSize);
         hikariConfig.setMinimumIdle(Math.min(2, maxPoolSize));
         int connTimeoutMs = config.getDbConnectionTimeoutSeconds() * 1000;

@@ -237,10 +237,12 @@ public class QueryExecutor {
                 log.debug("[{}] UTF-8 BOM을 CSV 앞에 기록했습니다.", title);
             }
 
-            try {
-                conn.setReadOnly(true);
-            } catch (SQLException readOnlyError) {
-                log.warn("[{}] 읽기 전용 커넥션 설정을 적용하지 못했습니다: {}", title, readOnlyError.getMessage());
+            if (config.isDbReadOnlyEnabled()) {
+                try {
+                    conn.setReadOnly(true);
+                } catch (SQLException readOnlyError) {
+                    log.warn("[{}] 읽기 전용 커넥션 설정을 적용하지 못했습니다: {}", title, readOnlyError.getMessage());
+                }
             }
             conn.setAutoCommit(false);
 

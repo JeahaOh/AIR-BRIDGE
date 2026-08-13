@@ -334,6 +334,31 @@ class QueryConfigTest {
         assertEquals(30, config.getDbConnectionTimeoutSeconds());
     }
 
+    @Test
+    @DisplayName("db.read-only 설정이 없으면 안전한 기본값 true 반환")
+    void testDbReadOnly_default() throws Exception {
+        QueryConfig config = loadFromString("""
+                key,value
+                db.url,jdbc:h2:mem:x
+                db.username,sa
+                db.password,
+                """);
+        assertTrue(config.isDbReadOnlyEnabled());
+    }
+
+    @Test
+    @DisplayName("db.read-only=false 설정을 명시하면 false 반환")
+    void testDbReadOnly_disabled() throws Exception {
+        QueryConfig config = loadFromString("""
+                key,value
+                db.url,jdbc:h2:mem:x
+                db.username,sa
+                db.password,
+                db.read-only,false
+                """);
+        assertFalse(config.isDbReadOnlyEnabled());
+    }
+
     // ─── 헬퍼: CSV 문자열 → QueryConfig 객체 ────────────────────────────────────
 
     /**

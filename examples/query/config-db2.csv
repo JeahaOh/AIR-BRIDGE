@@ -1,0 +1,15 @@
+key,value
+db.url,jdbc:db2://db2-host.example.internal:50000/YOUR_DATABASE:currentSchema=YOUR_SCHEMA;
+db.username,readonly_user
+db.password,
+db.read-only,true
+thread.count,2
+fetch.size,1000
+query.timeout.seconds,0
+db.connection.timeout.seconds,30
+query.retry.count,0
+query.retry.delay.seconds,5
+progress.interval,50000
+csv.delimiter,","
+csv.bom,true
+output.dir,

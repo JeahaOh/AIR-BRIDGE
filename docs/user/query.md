@@ -63,6 +63,7 @@ key,value
 db.url,jdbc:mysql://localhost:3306/your_database?useSSL=false&serverTimezone=UTC&useCursorFetch=true
 db.username,readonly_user
 db.password,
+db.read-only,true
 thread.count,4
 fetch.size,1000
 query.timeout.seconds,0
@@ -77,6 +78,14 @@ output.dir,
 
 `db.password`를 비워두면 `DB_PASSWORD` 환경변수 또는 `-Ddb.password=...` JVM 옵션을
 사용합니다. 비밀번호는 `config.csv`에 평문으로 두기보다 이 방식을 권장합니다.
+`db.read-only=true`는 JDBC 커넥션을 읽기 전용으로 요청하며, 생략해도 기본값은
+`true`입니다. 이 옵션은 DB 계정 권한을 대신하지 않습니다.
+
+DB2와 PostgreSQL용 설정 예제는 다음 파일을 참고하십시오.
+
+- `examples/query/config-db2.csv`
+- `examples/query/config-postgresql.csv`
+- 실행 방법: `examples/query/README.ko.md`
 
 ## SQL 파일
 
@@ -119,6 +128,11 @@ java -jar sender-<version>.jar encode \
 ## 주의
 
 - 읽기 전용 DB 계정을 사용하십시오. `sender query`는 `SELECT/WITH` 필터와 read-only 커넥션 힌트를 적용하지만, DB 권한 설정을 대체하지 않습니다.
+- query 실행 과정은 Logback을 사용하며 `DEBUG/INFO`는 stdout, `WARN/ERROR`는 stderr에
+  각각 UTF-8로 출력됩니다. Windows CMD에서는 터미널도 UTF-8로 맞추기 위해
+  실행 전에 `chcp 65001`을 사용하십시오. banner와 일부 CLI 결과는
+  `System.out`/`System.err` 직접 출력이므로 Logback 설정만으로는 터미널 문자셋 불일치를
+  해결할 수 없습니다.
 - MySQL/MariaDB에서 대용량 결과를 스트리밍하려면 JDBC URL에 `useCursorFetch=true`를 넣는 것을 권장합니다.
 - 내장 JDBC 드라이버: MySQL, PostgreSQL, Oracle, SQL Server, MariaDB, IBM DB2, H2.
 - 이 기능은 DB에 접속하므로, air-gap 대상 환경에서 쓰려면 해당 환경 안에서 접근 가능한 DB와 JDBC 설정이 필요합니다. 원격 업데이트, telemetry, cloud sync는 수행하지 않습니다.

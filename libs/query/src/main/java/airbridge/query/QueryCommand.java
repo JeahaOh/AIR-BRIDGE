@@ -1,5 +1,7 @@
 package airbridge.query;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -17,6 +19,7 @@ import java.util.concurrent.Callable;
         subcommands = QueryCommand.InitCommand.class
 )
 public final class QueryCommand implements Callable<Integer> {
+    private static final Logger log = LoggerFactory.getLogger(QueryCommand.class);
     private static final Path DEFAULT_CONFIG = Paths.get("config.csv");
     private static final Path DEFAULT_SQL = Paths.get("queries.sql");
 
@@ -53,30 +56,30 @@ public final class QueryCommand implements Callable<Integer> {
 
             List<QueryParser.QueryInfo> queries = QueryParser.parseFromPath(sqlPath);
             if (queries.isEmpty()) {
-                System.out.println("[WARN] queries.sql에서 실행할 쿼리를 찾을 수 없습니다: " + sqlPath);
+                log.warn("queries.sql에서 실행할 쿼리를 찾을 수 없습니다: {}", sqlPath);
                 return 0;
             }
 
-            System.out.println("[QUERY] config: " + configPath);
-            System.out.println("[QUERY] sql   : " + sqlPath);
-            System.out.println("[QUERY] out   : " + config.getOutputDir());
-            System.out.println("[QUERY] count : " + queries.size());
+            log.info("[QUERY] config: {}", configPath);
+            log.info("[QUERY] sql: {}", sqlPath);
+            log.info("[QUERY] out: {}", config.getOutputDir());
+            log.info("[QUERY] count: {}", queries.size());
 
             QueryExecutor.QuerySummary summary = new QueryExecutor(config, queries).executeAll();
             if (summary.failedCount() > 0) {
-                System.err.printf("[QUERY] failed: %d/%d queries%n", summary.failedCount(), summary.totalQueries());
+                log.error("[QUERY] failed: {}/{} queries", summary.failedCount(), summary.totalQueries());
                 return 1;
             }
-            System.out.println("[QUERY] complete: " + summary.outputDir());
+            log.info("[QUERY] complete: {}", summary.outputDir());
             return 0;
         } catch (IllegalArgumentException | IllegalStateException e) {
-            System.err.println("[QUERY][ERROR] " + e.getMessage());
+            log.error("[QUERY] {}", e.getMessage());
             return 2;
         } catch (RuntimeException e) {
-            System.err.println("[QUERY][ERROR] " + messageOf(e));
+            log.error("[QUERY] {}", messageOf(e));
             return 1;
         } catch (IOException e) {
-            System.err.println("[QUERY][ERROR] " + e.getMessage());
+            log.error("[QUERY] {}", e.getMessage());
             return 1;
         }
     }

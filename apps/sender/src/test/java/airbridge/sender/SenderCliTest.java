@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SenderCliTest {
@@ -49,6 +50,18 @@ class SenderCliTest {
         assertEquals(0, result.exitCode());
         assertTrue(result.stdout().contains("air-bridge sender - "));
         assertTrue(result.stdout().contains("____"));
+    }
+
+    @Test
+    void logbackConsoleEncoderUsesUtf8() throws Exception {
+        try (var input = Sender.class.getResourceAsStream("/logback.xml")) {
+            assertNotNull(input);
+            String config = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+            assertTrue(config.contains("<charset>UTF-8</charset>"));
+            assertTrue(config.contains("<target>System.out</target>"));
+            assertTrue(config.contains("<target>System.err</target>"));
+            assertEquals(2, config.split("<charset>UTF-8</charset>", -1).length - 1);
+        }
     }
 
     @Test

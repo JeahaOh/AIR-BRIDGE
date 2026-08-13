@@ -29,6 +29,7 @@ public class QueryConfig {
     public static final String KEY_DB_URL                     = "db.url";
     public static final String KEY_DB_USERNAME                = "db.username";
     public static final String KEY_DB_PASSWORD                = "db.password";
+    public static final String KEY_DB_READ_ONLY               = "db.read-only";
     public static final String KEY_THREAD_COUNT               = "thread.count";
     public static final String KEY_FETCH_SIZE                 = "fetch.size";
     public static final String KEY_CSV_DELIMITER              = "csv.delimiter";
@@ -210,6 +211,10 @@ public class QueryConfig {
             log.warn("[설정 경고] db.connection.timeout.seconds가 0 이하입니다 ({}). 기본값 30초로 동작합니다.", connTimeout);
         }
 
+        if (!isDbReadOnlyEnabled()) {
+            log.warn("[설정 경고] db.read-only=false: JDBC 읽기 전용 연결 보호가 비활성화됩니다. 조회 전용 계정을 사용하십시오.");
+        }
+
         // query.retry.count 범위 검증
         int retryCount = getInt(KEY_QUERY_RETRY_COUNT, 0);
         if (retryCount < 0) {
@@ -269,6 +274,11 @@ public class QueryConfig {
 
     public String getDbUrl()      { return get(KEY_DB_URL); }
     public String getDbUsername() { return get(KEY_DB_USERNAME); }
+
+    /** JDBC 커넥션을 읽기 전용으로 요청할지 여부. 안전을 위해 기본값은 true입니다. */
+    public boolean isDbReadOnlyEnabled() {
+        return getBoolean(KEY_DB_READ_ONLY, true);
+    }
 
     public String getDbPassword() {
         String pw = get(KEY_DB_PASSWORD);
@@ -383,6 +393,8 @@ public class QueryConfig {
             writer.write("db.username,root\n");
             writer.write("# db.password: 비워두고 DB_PASSWORD 환경변수 또는 -Ddb.password 사용을 권장\n");
             writer.write("db.password,\n");
+            writer.write("# db.read-only: JDBC 커넥션을 읽기 전용으로 요청 (true 권장, 기본 true)\n");
+            writer.write("db.read-only,true\n");
             writer.write("# -- 실행 옵션 ----------------------------------------------------\n");
             writer.write("thread.count,4\n");
             writer.write("fetch.size,1000\n");
